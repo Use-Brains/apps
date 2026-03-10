@@ -1,0 +1,14 @@
+appId: com.tradejournal.app
+---
+- assertVisible: Trade Journal
+- tapOn:
+    id: login-email-input
+- eraseText
+- inputText: ${MAESTRO_TEST_EMAIL}
+- tapOn:
+    id: login-password-input
+- eraseText
+- inputText: ${MAESTRO_TEST_PASSWORD}
+- tapOn:
+    id: login-submit-button
+- assertVisible: Journal

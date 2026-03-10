@@ -29,6 +29,7 @@ export function FilterBar({
   return (
     <View style={styles.container}>
       <TextInput
+        testID="filter-search-input"
         style={styles.searchInput}
         value={search}
         onChangeText={handleSearch}
@@ -39,6 +40,7 @@ export function FilterBar({
       />
       <View style={styles.filters}>
         <Pressable
+          testID="filter-side-long-chip"
           style={[styles.chip, activeSide === 'long' && styles.chipActive]}
           onPress={() => onSideFilter(activeSide === 'long' ? undefined : 'long')}
         >
@@ -47,6 +49,7 @@ export function FilterBar({
           </Text>
         </Pressable>
         <Pressable
+          testID="filter-side-short-chip"
           style={[styles.chip, activeSide === 'short' && styles.chipActive]}
           onPress={() => onSideFilter(activeSide === 'short' ? undefined : 'short')}
         >
@@ -57,6 +60,7 @@ export function FilterBar({
         {availableTags.slice(0, 5).map((tag) => (
           <Pressable
             key={tag}
+            testID={`filter-tag-${tag}`}
             style={[styles.chip, activeTag === tag && styles.chipActive]}
             onPress={() => onTagFilter(activeTag === tag ? undefined : tag)}
           >

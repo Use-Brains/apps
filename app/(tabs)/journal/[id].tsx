@@ -16,6 +16,7 @@ import { TradeImages } from '@/components/TradeImages';
 import { formatDateTime, formatCurrency } from '@/utils/format';
 import { colors, fontSize, spacing, borderRadius, fontWeight } from '@/lib/theme';
 import type { TradeFormData } from '@/types/trades';
+import { mapTradeFormToUpdate } from '@/utils/trade-payloads';
 
 export default function TradeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -47,21 +48,7 @@ export default function TradeDetailScreen() {
   const handleUpdate = async (data: TradeFormData, _imagePaths: string[]) => {
     await updateTrade.mutateAsync({
       id: id!,
-      symbol: data.symbol,
-      asset_class: data.asset_class,
-      side: data.side,
-      status: data.status,
-      entry_price: data.entry_price,
-      exit_price: data.exit_price ?? null,
-      size: data.size,
-      fees: data.fees,
-      entry_date: data.entry_date,
-      exit_date: data.exit_date ?? null,
-      confidence: data.confidence ?? null,
-      thesis: data.thesis ?? null,
-      notes: data.notes ?? null,
-      setup_tags: data.setup_tags,
-      mistake_tags: data.mistake_tags,
+      ...mapTradeFormToUpdate(data),
     });
     setEditing(false);
   };
@@ -182,10 +169,14 @@ export default function TradeDetailScreen() {
 
       {/* Actions */}
       <View style={styles.actions}>
-        <Pressable style={styles.editButton} onPress={() => setEditing(true)}>
+        <Pressable
+          testID="trade-edit-button"
+          style={styles.editButton}
+          onPress={() => setEditing(true)}
+        >
           <Text style={styles.editButtonText}>Edit Trade</Text>
         </Pressable>
-        <Pressable style={styles.deleteButton} onPress={handleDelete}>
+        <Pressable testID="trade-delete-button" style={styles.deleteButton} onPress={handleDelete}>
           <Text style={styles.deleteButtonText}>Delete</Text>
         </Pressable>
       </View>

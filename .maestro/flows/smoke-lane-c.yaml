@@ -1,0 +1,13 @@
+appId: com.tradejournal.app
+---
+- launchApp
+- runFlow:
+    file: login.yaml
+- runFlow:
+    file: add-trade.yaml
+- runFlow:
+    file: edit-trade.yaml
+- runFlow:
+    file: filter-trade.yaml
+- runFlow:
+    file: delete-trade.yaml

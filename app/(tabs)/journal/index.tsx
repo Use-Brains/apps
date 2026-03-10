@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, StyleSheet, RefreshControl } from 'react-native';
+import { View, Text, Pressable, StyleSheet, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { FlashList } from '@shopify/flash-list';
 import { useTrades, useTradeStats, useDistinctTags } from '@/hooks/use-trades';
@@ -51,6 +51,13 @@ export default function JournalScreen() {
             tradeCount={stats.tradeCount}
           />
         )}
+        <Pressable
+          testID="journal-import-csv-button"
+          style={styles.importButton}
+          onPress={() => router.push('/(tabs)/journal/import')}
+        >
+          <Text style={styles.importButtonText}>Import CSV</Text>
+        </Pressable>
         <FilterBar
           onSearchChange={(search) => setFilters((f) => ({ ...f, search: search || undefined }))}
           onSideFilter={(side) => setFilters((f) => ({ ...f, side }))}
@@ -67,6 +74,7 @@ export default function JournalScreen() {
   return (
     <View style={styles.container}>
       <FlashList
+        testID="journal-trades-list"
         data={trades ?? []}
         renderItem={renderItem}
         ListHeaderComponent={ListHeader}
@@ -102,6 +110,19 @@ const styles = StyleSheet.create({
   header: {
     gap: spacing.sm,
     paddingBottom: spacing.sm,
+  },
+  importButton: {
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+    marginHorizontal: spacing.md,
+  },
+  importButtonText: {
+    color: colors.primary,
+    fontWeight: '600',
   },
   listContent: {
     paddingBottom: spacing['4xl'],

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculatePnl } from '../src/utils/pnl';
+import { calculatePnl } from '../../src/utils/pnl';
 
 describe('calculatePnl', () => {
   it('calculates profit on long trade', () => {

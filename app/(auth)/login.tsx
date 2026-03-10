@@ -61,6 +61,7 @@ export default function LoginScreen() {
               name="email"
               render={({ field: { onChange, onBlur, value } }) => (
                 <TextInput
+                  testID="login-email-input"
                   style={[styles.input, errors.email && styles.inputError]}
                   value={value}
                   onChangeText={onChange}
@@ -84,6 +85,7 @@ export default function LoginScreen() {
               name="password"
               render={({ field: { onChange, onBlur, value } }) => (
                 <TextInput
+                  testID="login-password-input"
                   style={[styles.input, errors.password && styles.inputError]}
                   value={value}
                   onChangeText={onChange}
@@ -100,6 +102,7 @@ export default function LoginScreen() {
           </View>
 
           <Pressable
+            testID="login-submit-button"
             style={[styles.button, loading && styles.buttonDisabled]}
             onPress={onSubmit}
             disabled={loading}

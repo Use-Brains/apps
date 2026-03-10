@@ -1,7 +1,10 @@
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
+import { Pressable, Text } from 'react-native';
 import { colors } from '@/lib/theme';
 
 export default function JournalLayout() {
+  const router = useRouter();
+
   return (
     <Stack
       screenOptions={{
@@ -9,7 +12,18 @@ export default function JournalLayout() {
         headerTitleStyle: { color: colors.text, fontWeight: '600' },
       }}
     >
-      <Stack.Screen name="index" options={{ title: 'Journal' }} />
+      <Stack.Screen
+        name="index"
+        options={{
+          title: 'Journal',
+          headerRight: () => (
+            <Pressable onPress={() => router.push('/(tabs)/journal/import')}>
+              <Text style={{ color: colors.primary, fontWeight: '600' }}>Import CSV</Text>
+            </Pressable>
+          ),
+        }}
+      />
+      <Stack.Screen name="import" options={{ title: 'Import CSV' }} />
       <Stack.Screen name="[id]" options={{ title: 'Trade Detail' }} />
     </Stack>
   );

@@ -1,50 +1,31 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { tradeKeys, type Trade, type TradeInsert, type TradeUpdate } from '@/types/trades';
-import { calculatePnl } from '@/utils/pnl';
-
-export interface TradeFilters {
-  search?: string;
-  side?: 'long' | 'short';
-  status?: 'open' | 'closed';
-  tag?: string;
-  dateFrom?: string;
-  dateTo?: string;
-  [key: string]: unknown;
-}
+import {
+  applyTradeFilterOperations,
+  buildTradeFilterOperations,
+  type TradeFilters,
+} from '@/utils/trade-query';
+import {
+  applyDerivedMetricsToTradeUpdate,
+  deriveTradeMetricsForCreate,
+} from '@/utils/trade-payloads';
 
 const PAGE_SIZE = 20;
+
+export type { TradeFilters };
 
 export function useTrades(filters: TradeFilters = {}) {
   return useQuery({
     queryKey: tradeKeys.list(filters),
     queryFn: async () => {
-      let query = supabase
+      const baseQuery = supabase
         .from('trades')
         .select('*')
         .order('entry_date', { ascending: false })
         .limit(PAGE_SIZE);
 
-      if (filters.search) {
-        query = query.ilike('symbol', `%${filters.search}%`);
-      }
-      if (filters.side) {
-        query = query.eq('side', filters.side);
-      }
-      if (filters.status) {
-        query = query.eq('status', filters.status);
-      }
-      if (filters.tag) {
-        query = query.or(
-          `setup_tags.cs.{${filters.tag}},mistake_tags.cs.{${filters.tag}}`
-        );
-      }
-      if (filters.dateFrom) {
-        query = query.gte('entry_date', filters.dateFrom);
-      }
-      if (filters.dateTo) {
-        query = query.lte('entry_date', filters.dateTo);
-      }
+      const query = applyTradeFilterOperations(baseQuery, buildTradeFilterOperations(filters));
 
       const { data, error } = await query;
       if (error) throw error;
@@ -79,20 +60,7 @@ export function useCreateTrade() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      let pnl: number | null = null;
-      let pnl_percent: number | null = null;
-
-      if (input.status === 'closed' && input.exit_price != null) {
-        const result = calculatePnl({
-          side: input.side,
-          entry_price: input.entry_price,
-          exit_price: input.exit_price,
-          size: input.size,
-          fees: input.fees ?? 0,
-        });
-        pnl = result.pnl;
-        pnl_percent = result.pnl_percent;
-      }
+      const { pnl, pnl_percent } = deriveTradeMetricsForCreate(input);
 
       const { data, error } = await supabase
         .from('trades')
@@ -113,20 +81,7 @@ export function useUpdateTrade() {
 
   return useMutation({
     mutationFn: async ({ id, ...input }: TradeUpdate & { id: string }) => {
-      // Recalculate PnL if relevant fields changed
-      let updates: TradeUpdate = { ...input };
-
-      if (input.status === 'closed' && input.exit_price != null && input.entry_price != null && input.size != null && input.side != null) {
-        const result = calculatePnl({
-          side: input.side,
-          entry_price: input.entry_price,
-          exit_price: input.exit_price,
-          size: input.size,
-          fees: input.fees ?? 0,
-        });
-        updates.pnl = result.pnl;
-        updates.pnl_percent = result.pnl_percent;
-      }
+      const updates = applyDerivedMetricsToTradeUpdate(input);
 
       const { data, error } = await supabase
         .from('trades')
@@ -162,28 +117,16 @@ export function useTradeStats(filters: TradeFilters = {}) {
   return useQuery({
     queryKey: tradeKeys.stats(filters),
     queryFn: async () => {
-      let query = supabase
+      const baseQuery = supabase
         .from('trades')
         .select('pnl, status')
         .eq('status', 'closed');
 
-      if (filters.search) {
-        query = query.ilike('symbol', `%${filters.search}%`);
-      }
-      if (filters.side) {
-        query = query.eq('side', filters.side);
-      }
-      if (filters.tag) {
-        query = query.or(
-          `setup_tags.cs.{${filters.tag}},mistake_tags.cs.{${filters.tag}}`
-        );
-      }
-      if (filters.dateFrom) {
-        query = query.gte('entry_date', filters.dateFrom);
-      }
-      if (filters.dateTo) {
-        query = query.lte('entry_date', filters.dateTo);
-      }
+      const operations = buildTradeFilterOperations({
+        ...filters,
+        status: undefined,
+      });
+      const query = applyTradeFilterOperations(baseQuery, operations);
 
       const { data, error } = await query;
       if (error) throw error;

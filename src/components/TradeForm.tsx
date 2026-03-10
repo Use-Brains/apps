@@ -92,6 +92,7 @@ export function TradeForm({ defaultValues, onSubmit, submitLabel = 'Save Trade' 
             name="symbol"
             render={({ field: { onChange, onBlur, value } }) => (
               <TextInput
+                testID="trade-symbol-input"
                 style={[styles.input, errors.symbol && styles.inputError]}
                 value={value}
                 onChangeText={onChange}
@@ -114,6 +115,7 @@ export function TradeForm({ defaultValues, onSubmit, submitLabel = 'Save Trade' 
             render={({ field: { onChange, value } }) => (
               <View style={styles.toggleRow}>
                 <Pressable
+                  testID="trade-side-long-button"
                   style={[styles.toggle, value === 'long' && styles.toggleActive]}
                   onPress={() => onChange('long')}
                 >
@@ -122,6 +124,7 @@ export function TradeForm({ defaultValues, onSubmit, submitLabel = 'Save Trade' 
                   </Text>
                 </Pressable>
                 <Pressable
+                  testID="trade-side-short-button"
                   style={[styles.toggle, value === 'short' && styles.toggleActive]}
                   onPress={() => onChange('short')}
                 >
@@ -145,6 +148,7 @@ export function TradeForm({ defaultValues, onSubmit, submitLabel = 'Save Trade' 
                 {ASSET_CLASSES.map((ac) => (
                   <Pressable
                     key={ac}
+                    testID={`trade-asset-${ac}-chip`}
                     style={[styles.chip, value === ac && styles.chipActive]}
                     onPress={() => onChange(ac)}
                   >
@@ -167,6 +171,7 @@ export function TradeForm({ defaultValues, onSubmit, submitLabel = 'Save Trade' 
             render={({ field: { onChange, value } }) => (
               <View style={styles.toggleRow}>
                 <Pressable
+                  testID="trade-status-closed-button"
                   style={[styles.toggle, value === 'closed' && styles.toggleActive]}
                   onPress={() => onChange('closed')}
                 >
@@ -175,6 +180,7 @@ export function TradeForm({ defaultValues, onSubmit, submitLabel = 'Save Trade' 
                   </Text>
                 </Pressable>
                 <Pressable
+                  testID="trade-status-open-button"
                   style={[styles.toggle, value === 'open' && styles.toggleActive]}
                   onPress={() => onChange('open')}
                 >
@@ -196,6 +202,7 @@ export function TradeForm({ defaultValues, onSubmit, submitLabel = 'Save Trade' 
               name="entry_price"
               render={({ field: { onChange, onBlur, value } }) => (
                 <TextInput
+                  testID="trade-entry-price-input"
                   style={[styles.input, errors.entry_price && styles.inputError]}
                   value={value?.toString() ?? ''}
                   onChangeText={onChange}
@@ -217,6 +224,7 @@ export function TradeForm({ defaultValues, onSubmit, submitLabel = 'Save Trade' 
                 name="exit_price"
                 render={({ field: { onChange, onBlur, value } }) => (
                   <TextInput
+                    testID="trade-exit-price-input"
                     style={[styles.input, errors.exit_price && styles.inputError]}
                     value={value?.toString() ?? ''}
                     onChangeText={onChange}
@@ -241,6 +249,7 @@ export function TradeForm({ defaultValues, onSubmit, submitLabel = 'Save Trade' 
               name="size"
               render={({ field: { onChange, onBlur, value } }) => (
                 <TextInput
+                  testID="trade-size-input"
                   style={[styles.input, errors.size && styles.inputError]}
                   value={value?.toString() ?? ''}
                   onChangeText={onChange}
@@ -261,6 +270,7 @@ export function TradeForm({ defaultValues, onSubmit, submitLabel = 'Save Trade' 
               name="fees"
               render={({ field: { onChange, onBlur, value } }) => (
                 <TextInput
+                  testID="trade-fees-input"
                   style={styles.input}
                   value={value?.toString() ?? '0'}
                   onChangeText={onChange}
@@ -285,6 +295,7 @@ export function TradeForm({ defaultValues, onSubmit, submitLabel = 'Save Trade' 
                 {[1, 2, 3, 4, 5].map((n) => (
                   <Pressable
                     key={n}
+                    testID={`trade-confidence-${n}-button`}
                     style={[styles.confidenceButton, value === n && styles.confidenceActive]}
                     onPress={() => onChange(value === n ? null : n)}
                   >
@@ -391,6 +402,7 @@ export function TradeForm({ defaultValues, onSubmit, submitLabel = 'Save Trade' 
 
         {/* Submit */}
         <Pressable
+          testID="trade-submit-button"
           style={[styles.submitButton, submitting && styles.submitDisabled]}
           onPress={handleFormSubmit}
           disabled={submitting}

@@ -1,0 +1,7 @@
+appId: com.tradejournal.app
+---
+- tapOn: QA-LANE-C
+- tapOn:
+    id: trade-delete-button
+- tapOn: Delete
+- assertNotVisible: QA-LANE-C

@@ -11,7 +11,7 @@ interface TradeCardProps {
 
 export function TradeCard({ trade, onPress }: TradeCardProps) {
   return (
-    <Pressable style={styles.card} onPress={onPress}>
+    <Pressable testID={`trade-card-${trade.id}`} style={styles.card} onPress={onPress}>
       <View style={styles.header}>
         <View style={styles.symbolRow}>
           <Text style={styles.symbol}>{trade.symbol}</Text>

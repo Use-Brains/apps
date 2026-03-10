@@ -18,6 +18,7 @@ export default function TabsLayout() {
           title: 'Journal',
           headerShown: false,
           tabBarLabel: 'Journal',
+          tabBarButtonTestID: 'tab-journal-button',
         }}
       />
       <Tabs.Screen
@@ -25,6 +26,7 @@ export default function TabsLayout() {
         options={{
           title: 'New Trade',
           tabBarLabel: 'Add',
+          tabBarButtonTestID: 'tab-add-button',
         }}
       />
       <Tabs.Screen
@@ -32,6 +34,7 @@ export default function TabsLayout() {
         options={{
           title: 'Settings',
           tabBarLabel: 'Settings',
+          tabBarButtonTestID: 'tab-settings-button',
         }}
       />
     </Tabs>

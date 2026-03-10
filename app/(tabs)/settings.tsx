@@ -1,8 +1,10 @@
 import { View, Text, Pressable, StyleSheet, Alert } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useAuth } from '@/hooks/use-auth';
 import { colors, fontSize, spacing, borderRadius, fontWeight } from '@/lib/theme';
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const { user, logout } = useAuth();
 
   const displayName = user?.user_metadata?.display_name ?? user?.email ?? 'User';
@@ -39,6 +41,15 @@ export default function SettingsScreen() {
             <Text style={styles.value}>{user?.email ?? ''}</Text>
           </View>
         </View>
+      </View>
+
+      <View style={styles.section}>
+        <Pressable
+          style={styles.actionButton}
+          onPress={() => router.push('/(tabs)/journal/import')}
+        >
+          <Text style={styles.actionText}>Import Trades CSV</Text>
+        </Pressable>
       </View>
 
       <View style={styles.section}>
@@ -99,6 +110,17 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.lg,
     borderRadius: borderRadius.lg,
     alignItems: 'center',
+  },
+  actionButton: {
+    backgroundColor: colors.background,
+    paddingVertical: spacing.lg,
+    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+  },
+  actionText: {
+    color: colors.primary,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.semibold,
   },
   logoutText: {
     color: colors.danger,
