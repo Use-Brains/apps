@@ -1,6 +1,6 @@
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
-import { colors, fontSize, spacing, borderRadius } from '@/lib/theme';
+import { fontSize, spacing, borderRadius, useTheme, useThemedStyles, type AppTheme } from '@/lib/theme';
 import type { PickedImage } from '@/hooks/use-images';
 
 interface ImagePickerButtonProps {
@@ -16,6 +16,9 @@ export function ImagePickerButton({
   onRemove,
   maxImages = 5,
 }: ImagePickerButtonProps) {
+  const { theme } = useTheme();
+  const { colors } = theme;
+  const styles = useThemedStyles(createStyles);
   return (
     <View>
       <View style={styles.grid}>
@@ -50,7 +53,8 @@ export function ImagePickerButton({
 
 const THUMB_SIZE = 80;
 
-const styles = StyleSheet.create({
+const createStyles = ({ colors }: AppTheme) =>
+  StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

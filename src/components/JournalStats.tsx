@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet } from 'react-native';
-import { colors, fontSize, spacing, borderRadius, fontWeight } from '@/lib/theme';
+import { fontSize, spacing, borderRadius, fontWeight, useThemedStyles, type AppTheme } from '@/lib/theme';
 import { formatCurrency, formatPercent } from '@/utils/format';
 
 interface JournalStatsProps {
@@ -9,6 +9,8 @@ interface JournalStatsProps {
 }
 
 export function JournalStats({ totalPnl, winRate, tradeCount }: JournalStatsProps) {
+  const styles = useThemedStyles(createStyles);
+
   return (
     <View style={styles.container}>
       <View style={styles.stat}>
@@ -36,7 +38,8 @@ export function JournalStats({ totalPnl, winRate, tradeCount }: JournalStatsProp
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = ({ colors }: AppTheme) =>
+  StyleSheet.create({
   container: {
     flexDirection: 'row',
     backgroundColor: colors.background,

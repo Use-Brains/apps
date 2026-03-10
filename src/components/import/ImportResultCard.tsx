@@ -1,12 +1,14 @@
 import { View, Text, StyleSheet } from 'react-native';
 import type { ImportExecutionReport } from '@/features/import/types';
-import { colors, fontSize, spacing, borderRadius, fontWeight } from '@/lib/theme';
+import { fontSize, spacing, borderRadius, fontWeight, useThemedStyles, type AppTheme } from '@/lib/theme';
 
 interface ImportResultCardProps {
   report: ImportExecutionReport;
 }
 
 export function ImportResultCard({ report }: ImportResultCardProps) {
+  const styles = useThemedStyles(createStyles);
+
   return (
     <View style={styles.card}>
       <Text style={styles.title}>Import Results</Text>
@@ -24,7 +26,8 @@ export function ImportResultCard({ report }: ImportResultCardProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = ({ colors }: AppTheme) =>
+  StyleSheet.create({
   card: {
     backgroundColor: colors.background,
     borderRadius: borderRadius.lg,

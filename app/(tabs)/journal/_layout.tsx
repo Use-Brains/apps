@@ -1,9 +1,12 @@
 import { Stack, useRouter } from 'expo-router';
 import { Pressable, Text } from 'react-native';
-import { colors } from '@/lib/theme';
+import { useTheme } from '@/lib/theme';
 
 export default function JournalLayout() {
   const router = useRouter();
+  const {
+    theme: { colors },
+  } = useTheme();
 
   return (
     <Stack

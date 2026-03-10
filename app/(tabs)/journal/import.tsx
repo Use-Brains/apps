@@ -17,11 +17,14 @@ import { ConflictReviewTable } from '@/components/import/ConflictReviewTable';
 import { ImportResultCard } from '@/components/import/ImportResultCard';
 import { useTradeImport, type ParsedImportSession, type PreviewImportSession } from '@/hooks/use-trade-import';
 import type { ImportResolution } from '@/features/import/types';
-import { colors, fontSize, spacing, borderRadius, fontWeight } from '@/lib/theme';
+import { fontSize, spacing, borderRadius, fontWeight, useTheme, useThemedStyles, type AppTheme } from '@/lib/theme';
 
 const DEFAULT_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
 export default function ImportCsvScreen() {
+  const { theme } = useTheme();
+  const { colors } = theme;
+  const styles = useThemedStyles(createStyles);
   const router = useRouter();
   const { parseFile, buildPreview, execute, executing } = useTradeImport();
 
@@ -227,7 +230,8 @@ export default function ImportCsvScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = ({ colors }: AppTheme) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface,

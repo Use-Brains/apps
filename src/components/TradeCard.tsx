@@ -1,5 +1,5 @@
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { colors, fontSize, spacing, borderRadius, fontWeight } from '@/lib/theme';
+import { fontSize, spacing, borderRadius, fontWeight, useTheme, useThemedStyles, type AppTheme } from '@/lib/theme';
 import { formatDate } from '@/utils/format';
 import { PnlBadge } from './PnlBadge';
 import type { Trade } from '@/types/trades';
@@ -10,6 +10,10 @@ interface TradeCardProps {
 }
 
 export function TradeCard({ trade, onPress }: TradeCardProps) {
+  const { theme } = useTheme();
+  const { colors } = theme;
+  const styles = useThemedStyles(createStyles);
+
   return (
     <Pressable testID={`trade-card-${trade.id}`} style={styles.card} onPress={onPress}>
       <View style={styles.header}>
@@ -45,7 +49,8 @@ export function TradeCard({ trade, onPress }: TradeCardProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = ({ colors }: AppTheme) =>
+  StyleSheet.create({
   card: {
     backgroundColor: colors.background,
     borderRadius: borderRadius.lg,

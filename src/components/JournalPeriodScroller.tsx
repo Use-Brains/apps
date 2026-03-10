@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, View, Text, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
-import { colors, spacing, borderRadius, fontSize, fontWeight } from '@/lib/theme';
+import { spacing, borderRadius, fontSize, fontWeight, useTheme, useThemedStyles, type AppTheme } from '@/lib/theme';
 import type { JournalPeriodOption } from '@/utils/journal-periods';
 
 interface JournalPeriodScrollerProps {
@@ -21,6 +21,9 @@ export function JournalPeriodScroller({
   onSelect,
   onTodayPress,
 }: JournalPeriodScrollerProps) {
+  const { theme } = useTheme();
+  const { colors } = theme;
+  const styles = useThemedStyles(createStyles);
   const listRef = useRef<FlatList<JournalPeriodOption>>(null);
   const [frameWidth, setFrameWidth] = useState(0);
   const { width } = useWindowDimensions();
@@ -119,7 +122,8 @@ export function JournalPeriodScroller({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = ({ colors }: AppTheme) =>
+  StyleSheet.create({
   container: {
     gap: spacing.sm,
     marginHorizontal: spacing.lg,

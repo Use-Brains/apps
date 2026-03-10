@@ -1,6 +1,6 @@
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import type { ImportConflict, ImportResolution } from '@/features/import/types';
-import { colors, fontSize, spacing, borderRadius, fontWeight } from '@/lib/theme';
+import { fontSize, spacing, borderRadius, fontWeight, useTheme, useThemedStyles, type AppTheme } from '@/lib/theme';
 
 interface ConflictReviewTableProps {
   conflicts: ImportConflict[];
@@ -13,6 +13,9 @@ export function ConflictReviewTable({
   resolutions,
   onChangeResolution,
 }: ConflictReviewTableProps) {
+  const { theme } = useTheme();
+  const { colors } = theme;
+  const styles = useThemedStyles(createStyles);
   if (conflicts.length === 0) {
     return null;
   }
@@ -60,7 +63,8 @@ export function ConflictReviewTable({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = ({ colors }: AppTheme) =>
+  StyleSheet.create({
   container: {
     gap: spacing.sm,
   },

@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet } from 'react-native';
-import { colors, fontSize, spacing, borderRadius } from '@/lib/theme';
+import { fontSize, spacing, borderRadius, useThemedStyles, type AppTheme } from '@/lib/theme';
 import { formatCurrency, formatPercent } from '@/utils/format';
 
 interface PnlBadgeProps {
@@ -9,6 +9,8 @@ interface PnlBadgeProps {
 }
 
 export function PnlBadge({ pnl, pnlPercent, size = 'md' }: PnlBadgeProps) {
+  const styles = useThemedStyles(createStyles);
+
   if (pnl == null) {
     return (
       <View style={[styles.badge, styles.neutral, sizeStyles[size]]}>
@@ -54,7 +56,8 @@ const textSizeStyles = StyleSheet.create({
   lg: { fontSize: fontSize.md },
 });
 
-const styles = StyleSheet.create({
+const createStyles = ({ colors }: AppTheme) =>
+  StyleSheet.create({
   badge: {
     borderRadius: borderRadius.sm,
     alignSelf: 'flex-start',

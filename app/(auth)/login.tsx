@@ -15,10 +15,13 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuth } from '@/hooks/use-auth';
 import { authSchema, type AuthFormData } from '@/types/trades';
-import { colors, fontSize, spacing, borderRadius, fontWeight } from '@/lib/theme';
+import { fontSize, spacing, borderRadius, fontWeight, useTheme, useThemedStyles, type AppTheme } from '@/lib/theme';
 
 export default function LoginScreen() {
   const { login } = useAuth();
+  const { theme } = useTheme();
+  const { colors } = theme;
+  const styles = useThemedStyles(createStyles);
   const [loading, setLoading] = useState(false);
 
   const {
@@ -128,7 +131,8 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = ({ colors }: AppTheme) =>
+  StyleSheet.create({
   flex: { flex: 1 },
   container: {
     flex: 1,
@@ -200,4 +204,4 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     fontWeight: fontWeight.medium,
   },
-});
+  });

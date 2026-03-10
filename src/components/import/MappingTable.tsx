@@ -1,7 +1,7 @@
 import { View, Text, TextInput, StyleSheet } from 'react-native';
 import { CANONICAL_FIELDS } from '@/features/import/constants';
 import type { CanonicalTradeField, ImportColumnBinding } from '@/features/import/types';
-import { colors, fontSize, spacing, borderRadius, fontWeight } from '@/lib/theme';
+import { fontSize, spacing, borderRadius, fontWeight, useTheme, useThemedStyles, type AppTheme } from '@/lib/theme';
 
 interface MappingTableProps {
   bindings: ImportColumnBinding[];
@@ -16,6 +16,10 @@ function asField(value: string): CanonicalTradeField | null {
 }
 
 export function MappingTable({ bindings, onChange }: MappingTableProps) {
+  const { theme } = useTheme();
+  const { colors } = theme;
+  const styles = useThemedStyles(createStyles);
+
   const updateBinding = (index: number, value: string) => {
     const nextField = asField(value);
     const next = bindings.map((binding, idx) => {
@@ -65,7 +69,8 @@ export function MappingTable({ bindings, onChange }: MappingTableProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = ({ colors }: AppTheme) =>
+  StyleSheet.create({
   container: {
     gap: spacing.sm,
     backgroundColor: colors.background,

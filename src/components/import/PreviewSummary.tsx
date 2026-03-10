@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet } from 'react-native';
-import { colors, fontSize, spacing, borderRadius, fontWeight } from '@/lib/theme';
+import { fontSize, spacing, borderRadius, fontWeight, useTheme, useThemedStyles, type AppTheme } from '@/lib/theme';
 
 interface PreviewSummaryProps {
   totalRows: number;
@@ -16,6 +16,9 @@ export function PreviewSummary({
   conflicts,
   timeZone,
 }: PreviewSummaryProps) {
+  const { theme } = useTheme();
+  const { colors } = theme;
+  const styles = useThemedStyles(createStyles);
   return (
     <View style={styles.card}>
       <Text style={styles.title}>Preview</Text>
@@ -28,7 +31,8 @@ export function PreviewSummary({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = ({ colors }: AppTheme) =>
+  StyleSheet.create({
   card: {
     backgroundColor: colors.background,
     borderRadius: borderRadius.lg,

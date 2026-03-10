@@ -12,10 +12,13 @@ import {
 } from 'react-native';
 import { Link } from 'expo-router';
 import { useAuth } from '@/hooks/use-auth';
-import { colors, fontSize, spacing, borderRadius, fontWeight } from '@/lib/theme';
+import { fontSize, spacing, borderRadius, fontWeight, useTheme, useThemedStyles, type AppTheme } from '@/lib/theme';
 
 export default function ForgotPasswordScreen() {
   const { forgotPassword } = useAuth();
+  const { theme } = useTheme();
+  const { colors } = theme;
+  const styles = useThemedStyles(createStyles);
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
@@ -98,7 +101,8 @@ export default function ForgotPasswordScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = ({ colors }: AppTheme) =>
+  StyleSheet.create({
   flex: { flex: 1 },
   container: {
     flex: 1,
@@ -154,4 +158,4 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     fontWeight: fontWeight.medium,
   },
-});
+  });

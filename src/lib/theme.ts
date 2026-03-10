@@ -1,26 +1,35 @@
-export const colors = {
-  primary: '#2563EB',
-  primaryLight: '#DBEAFE',
-  success: '#16A34A',
-  successLight: '#DCFCE7',
-  danger: '#DC2626',
-  dangerLight: '#FEE2E2',
-  warning: '#F59E0B',
-  warningLight: '#FEF3C7',
+import { storage } from './mmkv';
+import { composeTheme, parseThemeSelection, THEME_STORAGE_KEY } from './theme-system';
+import type { ThemeMode, ThemePalette, ThemeStyle } from './theme-system';
 
-  background: '#FFFFFF',
-  surface: '#F8FAFC',
-  border: '#E2E8F0',
-  borderLight: '#F1F5F9',
+export {
+  ThemeProvider,
+  useTheme,
+  useThemedStyles,
+  composeTheme,
+  getContrastRatio,
+  defaultThemeSelection,
+  normalizeThemeSelection,
+  parseThemeSelection,
+  serializeThemeSelection,
+  THEME_STORAGE_KEY,
+  THEME_MODES,
+  THEME_STYLES,
+  THEME_PALETTES,
+} from './theme-system';
 
-  text: '#0F172A',
-  textSecondary: '#64748B',
-  textTertiary: '#94A3B8',
-  textInverse: '#FFFFFF',
+export type {
+  AppTheme,
+  ThemeColors,
+  ThemeMode,
+  ThemePalette,
+  ThemeSelection,
+  ThemeStyle,
+} from './theme-system';
 
-  profit: '#16A34A',
-  loss: '#DC2626',
-} as const;
+// Compatibility export for static style consumers.
+const staticSelection = parseThemeSelection(storage.getString(THEME_STORAGE_KEY));
+export const colors = composeTheme(staticSelection).colors;
 
 export const spacing = {
   xs: 4,
@@ -57,3 +66,24 @@ export const borderRadius = {
   xl: 16,
   full: 9999,
 } as const;
+
+export const themeModeLabels: Record<ThemeMode, string> = {
+  light: 'Light',
+  dark: 'Dark',
+};
+
+export const themeStyleLabels: Record<ThemeStyle, string> = {
+  classic: 'Classic',
+  modern: 'Modern',
+  ios_glass: 'iOS Liquid Glass',
+  android_material: 'Android Material',
+  high_contrast: 'High Contrast',
+};
+
+export const themePaletteLabels: Record<ThemePalette, string> = {
+  ocean: 'Ocean',
+  emerald: 'Emerald',
+  amber: 'Amber',
+  ruby: 'Ruby',
+  slate: 'Slate',
+};

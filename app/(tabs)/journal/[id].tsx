@@ -14,11 +14,14 @@ import { TradeForm } from '@/components/TradeForm';
 import { PnlBadge } from '@/components/PnlBadge';
 import { TradeImages } from '@/components/TradeImages';
 import { formatDateTime, formatCurrency } from '@/utils/format';
-import { colors, fontSize, spacing, borderRadius, fontWeight } from '@/lib/theme';
+import { fontSize, spacing, borderRadius, fontWeight, useTheme, useThemedStyles, type AppTheme } from '@/lib/theme';
 import type { TradeFormData } from '@/types/trades';
 import { mapTradeFormToUpdate } from '@/utils/trade-payloads';
 
 export default function TradeDetailScreen() {
+  const { theme } = useTheme();
+  const { colors } = theme;
+  const styles = useThemedStyles(createStyles);
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -111,19 +114,19 @@ export default function TradeDetailScreen() {
 
       {/* Details */}
       <View style={styles.detailsCard}>
-        <DetailRow label="Entry Price" value={formatCurrency(trade.entry_price, 8)} />
+        <DetailRow label="Entry Price" value={formatCurrency(trade.entry_price, 8)} styles={styles} />
         {trade.exit_price != null && (
-          <DetailRow label="Exit Price" value={formatCurrency(trade.exit_price, 8)} />
+          <DetailRow label="Exit Price" value={formatCurrency(trade.exit_price, 8)} styles={styles} />
         )}
-        <DetailRow label="Size" value={trade.size.toString()} />
-        <DetailRow label="Fees" value={formatCurrency(trade.fees)} />
-        <DetailRow label="Entry Date" value={formatDateTime(trade.entry_date)} />
+        <DetailRow label="Size" value={trade.size.toString()} styles={styles} />
+        <DetailRow label="Fees" value={formatCurrency(trade.fees)} styles={styles} />
+        <DetailRow label="Entry Date" value={formatDateTime(trade.entry_date)} styles={styles} />
         {trade.exit_date && (
-          <DetailRow label="Exit Date" value={formatDateTime(trade.exit_date)} />
+          <DetailRow label="Exit Date" value={formatDateTime(trade.exit_date)} styles={styles} />
         )}
-        <DetailRow label="Status" value={trade.status} />
+        <DetailRow label="Status" value={trade.status} styles={styles} />
         {trade.confidence != null && (
-          <DetailRow label="Confidence" value={`${trade.confidence}/5`} />
+          <DetailRow label="Confidence" value={`${trade.confidence}/5`} styles={styles} />
         )}
       </View>
 
@@ -185,7 +188,15 @@ export default function TradeDetailScreen() {
   );
 }
 
-function DetailRow({ label, value }: { label: string; value: string }) {
+function DetailRow({
+  label,
+  value,
+  styles,
+}: {
+  label: string;
+  value: string;
+  styles: ReturnType<typeof createStyles>;
+}) {
   return (
     <View style={styles.detailRow}>
       <Text style={styles.detailLabel}>{label}</Text>
@@ -194,7 +205,8 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = ({ colors }: AppTheme) =>
+  StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   loading: {
     flex: 1,

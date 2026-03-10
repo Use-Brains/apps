@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet } from 'react-native';
-import { colors, fontSize, spacing } from '@/lib/theme';
+import { fontSize, spacing, useTheme, useThemedStyles, type AppTheme } from '@/lib/theme';
 
 interface EmptyStateProps {
   title: string;
@@ -7,6 +7,10 @@ interface EmptyStateProps {
 }
 
 export function EmptyState({ title, message }: EmptyStateProps) {
+  const { theme } = useTheme();
+  const { colors } = theme;
+  const styles = useThemedStyles(createStyles);
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{title}</Text>
@@ -15,7 +19,8 @@ export function EmptyState({ title, message }: EmptyStateProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = ({ colors }: AppTheme) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',

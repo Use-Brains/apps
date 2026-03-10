@@ -7,7 +7,7 @@ import {
   StyleSheet,
   FlatList,
 } from 'react-native';
-import { colors, fontSize, spacing, borderRadius } from '@/lib/theme';
+import { fontSize, spacing, borderRadius, useTheme, useThemedStyles, type AppTheme } from '@/lib/theme';
 
 interface TagInputProps {
   tags: string[];
@@ -17,6 +17,9 @@ interface TagInputProps {
 }
 
 export function TagInput({ tags, onChange, suggestions = [], placeholder = 'Add tag...' }: TagInputProps) {
+  const { theme } = useTheme();
+  const { colors } = theme;
+  const styles = useThemedStyles(createStyles);
   const [input, setInput] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
 
@@ -87,7 +90,8 @@ export function TagInput({ tags, onChange, suggestions = [], placeholder = 'Add 
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = ({ colors }: AppTheme) =>
+  StyleSheet.create({
   tagsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',

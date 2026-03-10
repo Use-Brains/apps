@@ -1,6 +1,6 @@
 import { View, Pressable, StyleSheet, Linking } from 'react-native';
 import { Image } from 'expo-image';
-import { colors, spacing, borderRadius } from '@/lib/theme';
+import { spacing, borderRadius, useThemedStyles, type AppTheme } from '@/lib/theme';
 import { getSignedImageUrl } from '@/hooks/use-images';
 import type { TradeImage } from '@/types/trades';
 
@@ -9,6 +9,8 @@ interface TradeImagesProps {
 }
 
 export function TradeImages({ images }: TradeImagesProps) {
+  const styles = useThemedStyles(createStyles);
+
   if (images.length === 0) return null;
 
   const sorted = [...images].sort((a, b) => a.sort_order - b.sort_order);
@@ -30,14 +32,20 @@ export function TradeImages({ images }: TradeImagesProps) {
           style={styles.imageContainer}
           onPress={() => handlePress(image.storage_path)}
         >
-          <SignedImage storagePath={image.storage_path} />
+          <SignedImage storagePath={image.storage_path} styles={styles} />
         </Pressable>
       ))}
     </View>
   );
 }
 
-function SignedImage({ storagePath }: { storagePath: string }) {
+function SignedImage({
+  storagePath,
+  styles,
+}: {
+  storagePath: string;
+  styles: ReturnType<typeof createStyles>;
+}) {
   // Use signed URL for private bucket images
   return (
     <Image
@@ -51,7 +59,8 @@ function SignedImage({ storagePath }: { storagePath: string }) {
 
 const THUMB_SIZE = 100;
 
-const styles = StyleSheet.create({
+const createStyles = ({ colors }: AppTheme) =>
+  StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

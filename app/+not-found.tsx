@@ -1,9 +1,12 @@
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { colors, fontSize, spacing, borderRadius } from '@/lib/theme';
+import { fontSize, spacing, borderRadius, useTheme, useThemedStyles, type AppTheme } from '@/lib/theme';
 
 export default function NotFoundScreen() {
   const router = useRouter();
+  const { theme } = useTheme();
+  const { colors } = theme;
+  const styles = useThemedStyles(createStyles);
 
   return (
     <View style={styles.container}>
@@ -16,7 +19,8 @@ export default function NotFoundScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = ({ colors }: AppTheme) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',
@@ -46,4 +50,4 @@ const styles = StyleSheet.create({
     fontSize: fontSize.md,
     fontWeight: '600',
   },
-});
+  });

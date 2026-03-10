@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View, TextInput, Pressable, Text, StyleSheet } from 'react-native';
-import { colors, fontSize, spacing, borderRadius, fontWeight } from '@/lib/theme';
+import { fontSize, spacing, borderRadius, fontWeight, useTheme, useThemedStyles, type AppTheme } from '@/lib/theme';
 
 interface FilterBarProps {
   onSearchChange: (text: string) => void;
@@ -19,6 +19,9 @@ export function FilterBar({
   activeTag,
   availableTags = [],
 }: FilterBarProps) {
+  const { theme } = useTheme();
+  const { colors } = theme;
+  const styles = useThemedStyles(createStyles);
   const [search, setSearch] = useState('');
 
   const handleSearch = (text: string) => {
@@ -74,7 +77,8 @@ export function FilterBar({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = ({ colors }: AppTheme) =>
+  StyleSheet.create({
   container: {
     paddingHorizontal: spacing.lg,
     gap: spacing.sm,

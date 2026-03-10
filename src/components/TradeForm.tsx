@@ -29,7 +29,7 @@ import {
 } from '@/features/assets/quotes';
 import { TagInput } from './TagInput';
 import { ImagePickerButton } from './ImagePickerButton';
-import { colors, fontSize, spacing, borderRadius, fontWeight } from '@/lib/theme';
+import { fontSize, spacing, borderRadius, fontWeight, useTheme, useThemedStyles, type AppTheme } from '@/lib/theme';
 
 const ASSET_CLASSES = ['crypto', 'stocks', 'options', 'futures', 'forex'] as const;
 const SYMBOL_PLACEHOLDERS: Record<(typeof ASSET_CLASSES)[number], string> = {
@@ -55,6 +55,9 @@ export function TradeForm({
   resetOnSuccess = false,
   mode = 'create',
 }: TradeFormProps) {
+  const { theme } = useTheme();
+  const { colors } = theme;
+  const styles = useThemedStyles(createStyles);
   const isEditMode = mode === 'edit';
   const enablePriceAutomation = mode === 'create';
   const [submitting, setSubmitting] = useState(false);
@@ -647,7 +650,8 @@ export function TradeForm({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = ({ colors }: AppTheme) =>
+  StyleSheet.create({
   flex: { flex: 1 },
   content: {
     padding: spacing.lg,

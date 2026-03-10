@@ -5,11 +5,14 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 import { queryClient, queryPersister } from '@/lib/query-client';
 import { useAuth } from '@/hooks/use-auth';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { colors } from '@/lib/theme';
+import { ThemeProvider, useTheme, useThemedStyles } from '@/lib/theme';
+import type { AppTheme } from '@/lib/theme';
 import { initRevenueCat, syncRevenueCatIdentity } from '@/lib/revenuecat';
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading, user } = useAuth();
+  const { theme } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const segments = useSegments();
   const router = useRouter();
 
@@ -44,7 +47,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   if (loading) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
@@ -54,21 +57,24 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
 export default function RootLayout() {
   return (
-    <ErrorBoundary>
-      <PersistQueryClientProvider client={queryClient} persistOptions={{ persister: queryPersister }}>
-        <AuthGate>
-          <Slot />
-        </AuthGate>
-      </PersistQueryClientProvider>
-    </ErrorBoundary>
+    <ThemeProvider>
+      <ErrorBoundary>
+        <PersistQueryClientProvider client={queryClient} persistOptions={{ persister: queryPersister }}>
+          <AuthGate>
+            <Slot />
+          </AuthGate>
+        </PersistQueryClientProvider>
+      </ErrorBoundary>
+    </ThemeProvider>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = ({ colors }: AppTheme) =>
+  StyleSheet.create({
   loading: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: colors.background,
   },
-});
+  });

@@ -1,5 +1,5 @@
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { colors, spacing, borderRadius, fontSize, fontWeight } from '@/lib/theme';
+import { spacing, borderRadius, fontSize, fontWeight, useThemedStyles, type AppTheme } from '@/lib/theme';
 import type { JournalViewMode } from '@/utils/journal-periods';
 
 const VIEW_OPTIONS: Array<{ label: string; value: JournalViewMode }> = [
@@ -15,6 +15,8 @@ interface JournalViewTabsProps {
 }
 
 export function JournalViewTabs({ value, onChange }: JournalViewTabsProps) {
+  const styles = useThemedStyles(createStyles);
+
   return (
     <View style={styles.container} testID="journal-view-tabs">
       {VIEW_OPTIONS.map((option) => {
@@ -34,7 +36,8 @@ export function JournalViewTabs({ value, onChange }: JournalViewTabsProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = ({ colors }: AppTheme) =>
+  StyleSheet.create({
   container: {
     marginHorizontal: spacing.lg,
     marginTop: spacing.md,

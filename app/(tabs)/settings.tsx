@@ -3,7 +3,24 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/hooks/use-auth';
 import { useSubscription } from '@/hooks/use-subscription';
 import { ENTITLEMENT_ID, PAYWALL_RESULT } from '@/lib/revenuecat';
-import { colors, fontSize, spacing, borderRadius, fontWeight } from '@/lib/theme';
+import {
+  fontSize,
+  spacing,
+  borderRadius,
+  fontWeight,
+  THEME_MODES,
+  THEME_STYLES,
+  THEME_PALETTES,
+  themeModeLabels,
+  themeStyleLabels,
+  themePaletteLabels,
+  useTheme,
+  useThemedStyles,
+  type AppTheme,
+  type ThemeMode,
+  type ThemePalette,
+  type ThemeStyle,
+} from '@/lib/theme';
 
 function formatDate(dateValue?: string | null) {
   if (!dateValue) {
@@ -15,6 +32,9 @@ function formatDate(dateValue?: string | null) {
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const { selection, setMode, setStyle, setPalette, theme } = useTheme();
+  const styles = useThemedStyles(createStyles);
+  const { colors } = theme;
   const { user, logout } = useAuth();
   const {
     loading: subscriptionLoading,
@@ -30,6 +50,25 @@ export default function SettingsScreen() {
   } = useSubscription();
 
   const displayName = user?.user_metadata?.display_name ?? user?.email ?? 'User';
+
+  const applyThemeChange = (kind: 'mode' | 'style' | 'palette', value: string) => {
+    const isSameSelection =
+      (kind === 'mode' && selection.mode === value) ||
+      (kind === 'style' && selection.style === value) ||
+      (kind === 'palette' && selection.palette === value);
+
+    if (isSameSelection) {
+      return;
+    }
+
+    if (kind === 'mode') {
+      setMode(value as ThemeMode);
+    } else if (kind === 'style') {
+      setStyle(value as ThemeStyle);
+    } else {
+      setPalette(value as ThemePalette);
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -93,6 +132,78 @@ export default function SettingsScreen() {
           <View style={styles.row}>
             <Text style={styles.label}>Email</Text>
             <Text style={styles.value}>{user?.email ?? ''}</Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Appearance</Text>
+        <View style={styles.card}>
+          <View style={styles.appearanceGroup}>
+            <Text style={styles.appearanceLabel}>Mode</Text>
+            <View style={styles.optionRow}>
+              {THEME_MODES.map((mode) => {
+                const active = selection.mode === mode;
+
+                return (
+                  <Pressable
+                    key={mode}
+                    style={[styles.optionChip, active && styles.optionChipActive]}
+                    onPress={() => applyThemeChange('mode', mode)}
+                  >
+                    <Text style={[styles.optionChipText, active && styles.optionChipTextActive]}>
+                      {themeModeLabels[mode]}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          <View style={styles.appearanceDivider} />
+
+          <View style={styles.appearanceGroup}>
+            <Text style={styles.appearanceLabel}>Look</Text>
+            <View style={styles.optionRow}>
+              {THEME_STYLES.map((style) => {
+                const active = selection.style === style;
+
+                return (
+                  <Pressable
+                    key={style}
+                    style={[styles.optionChip, active && styles.optionChipActive]}
+                    onPress={() => applyThemeChange('style', style)}
+                  >
+                    <Text style={[styles.optionChipText, active && styles.optionChipTextActive]}>
+                      {themeStyleLabels[style]}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          <View style={styles.appearanceDivider} />
+
+          <View style={styles.appearanceGroup}>
+            <Text style={styles.appearanceLabel}>Palette</Text>
+            <View style={styles.optionRow}>
+              {THEME_PALETTES.map((palette) => {
+                const active = selection.palette === palette;
+
+                return (
+                  <Pressable
+                    key={palette}
+                    style={[styles.optionChip, active && styles.optionChipActive]}
+                    onPress={() => applyThemeChange('palette', palette)}
+                  >
+                    <Text style={[styles.optionChipText, active && styles.optionChipTextActive]}>
+                      {themePaletteLabels[palette]}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
         </View>
       </View>
@@ -201,7 +312,8 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = ({ colors }: AppTheme) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface,
@@ -223,6 +335,46 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
+  },
+  appearanceGroup: {
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
+  appearanceLabel: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    fontWeight: fontWeight.medium,
+  },
+  appearanceDivider: {
+    height: 1,
+    backgroundColor: colors.borderLight,
+    marginHorizontal: spacing.lg,
+  },
+  optionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  optionChip: {
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  optionChipActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
+  },
+  optionChipText: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    fontWeight: fontWeight.medium,
+  },
+  optionChipTextActive: {
+    color: colors.primary,
+    fontWeight: fontWeight.semibold,
   },
   row: {
     flexDirection: 'row',
@@ -292,4 +444,4 @@ const styles = StyleSheet.create({
     color: colors.textTertiary,
     marginTop: 'auto',
   },
-});
+  });

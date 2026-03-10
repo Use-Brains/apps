@@ -8,7 +8,7 @@ import { JournalStats } from '@/components/JournalStats';
 import { JournalViewTabs } from '@/components/JournalViewTabs';
 import { JournalPeriodScroller } from '@/components/JournalPeriodScroller';
 import { EmptyState } from '@/components/EmptyState';
-import { colors, spacing } from '@/lib/theme';
+import { spacing, useTheme, useThemedStyles, type AppTheme } from '@/lib/theme';
 import type { Trade } from '@/types/trades';
 import {
   buildJournalPeriodOptions,
@@ -18,6 +18,9 @@ import {
 } from '@/utils/journal-periods';
 
 export default function JournalScreen() {
+  const { theme } = useTheme();
+  const { colors } = theme;
+  const styles = useThemedStyles(createStyles);
   const router = useRouter();
   const [viewMode, setViewMode] = useState<JournalViewMode>('daily');
   const [anchors, setAnchors] = useState<Record<JournalViewMode, Date>>(() => {
@@ -143,7 +146,8 @@ export default function JournalScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = ({ colors }: AppTheme) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface,

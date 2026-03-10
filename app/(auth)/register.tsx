@@ -15,10 +15,13 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuth } from '@/hooks/use-auth';
 import { registerSchema, type RegisterFormData } from '@/types/trades';
-import { colors, fontSize, spacing, borderRadius, fontWeight } from '@/lib/theme';
+import { fontSize, spacing, borderRadius, fontWeight, useTheme, useThemedStyles, type AppTheme } from '@/lib/theme';
 
 export default function RegisterScreen() {
   const { register } = useAuth();
+  const { theme } = useTheme();
+  const { colors } = theme;
+  const styles = useThemedStyles(createStyles);
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
@@ -150,7 +153,8 @@ export default function RegisterScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = ({ colors }: AppTheme) =>
+  StyleSheet.create({
   flex: { flex: 1 },
   container: {
     flex: 1,
@@ -220,4 +224,4 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     fontWeight: fontWeight.medium,
   },
-});
+  });
