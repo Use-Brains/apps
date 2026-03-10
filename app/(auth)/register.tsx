@@ -10,7 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuth } from '@/hooks/use-auth';
@@ -19,6 +19,7 @@ import { colors, fontSize, spacing, borderRadius, fontWeight } from '@/lib/theme
 
 export default function RegisterScreen() {
   const { register } = useAuth();
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
 
   const {
@@ -34,7 +35,12 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       await register(data.email, data.password, data.displayName);
-      Alert.alert('Success', 'Account created! You can now log in.');
+      Alert.alert(
+        'Success',
+        'Account created. Check your email and verify your account before logging in. If you do not see it, check spam.',
+        [{ text: 'OK', onPress: () => router.replace('/(auth)/login') }],
+        { cancelable: false }
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Registration failed';
       Alert.alert('Error', message);

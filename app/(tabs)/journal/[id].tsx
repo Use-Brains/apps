@@ -65,6 +65,7 @@ export default function TradeDetailScreen() {
     return (
       <View style={styles.flex}>
         <TradeForm
+          mode="edit"
           defaultValues={{
             symbol: trade.symbol,
             asset_class: trade.asset_class,

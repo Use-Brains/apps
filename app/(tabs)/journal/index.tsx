@@ -1,35 +1,89 @@
-import { useState, useCallback } from 'react';
-import { View, Text, Pressable, StyleSheet, RefreshControl } from 'react-native';
+import { useState, useMemo, useCallback } from 'react';
+import { View, Text, StyleSheet, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { FlashList } from '@shopify/flash-list';
-import { useTrades, useTradeStats, useDistinctTags } from '@/hooks/use-trades';
+import { useTrades, useTradeStats } from '@/hooks/use-trades';
 import { TradeCard } from '@/components/TradeCard';
 import { JournalStats } from '@/components/JournalStats';
-import { FilterBar } from '@/components/FilterBar';
+import { JournalViewTabs } from '@/components/JournalViewTabs';
+import { JournalPeriodScroller } from '@/components/JournalPeriodScroller';
 import { EmptyState } from '@/components/EmptyState';
 import { colors, spacing } from '@/lib/theme';
 import type { Trade } from '@/types/trades';
+import {
+  buildJournalPeriodOptions,
+  getJournalPeriodRange,
+  type JournalPeriodOption,
+  type JournalViewMode,
+} from '@/utils/journal-periods';
 
 export default function JournalScreen() {
   const router = useRouter();
-  const [filters, setFilters] = useState<{
-    search?: string;
-    side?: 'long' | 'short';
-    tag?: string;
-  }>({});
+  const [viewMode, setViewMode] = useState<JournalViewMode>('daily');
+  const [anchors, setAnchors] = useState<Record<JournalViewMode, Date>>(() => {
+    const now = new Date();
+    return {
+      daily: now,
+      weekly: now,
+      monthly: now,
+      yearly: now,
+    };
+  });
 
-  const { data: trades, isLoading, refetch } = useTrades(filters);
-  const { data: stats } = useTradeStats(filters);
-  const { data: tagData } = useDistinctTags();
+  const selectedAnchor = anchors[viewMode];
+  const selectedPeriod = useMemo(
+    () => getJournalPeriodRange(viewMode, selectedAnchor),
+    [viewMode, selectedAnchor]
+  );
+  const periodOptions = useMemo(
+    () => buildJournalPeriodOptions(viewMode, selectedAnchor),
+    [viewMode, selectedAnchor]
+  );
 
-  const allTags = [
-    ...(tagData?.setupTags ?? []),
-    ...(tagData?.mistakeTags ?? []),
-  ].filter((v, i, a) => a.indexOf(v) === i);
+  const periodFilters = useMemo(
+    () => ({
+      dateFrom: selectedPeriod.dateFrom,
+      dateTo: selectedPeriod.dateTo,
+    }),
+    [selectedPeriod.dateFrom, selectedPeriod.dateTo]
+  );
+
+  const { data: trades, isLoading, refetch } = useTrades(periodFilters);
+  const { data: stats } = useTradeStats(periodFilters);
+
+  const tradesForList = useMemo<Trade[]>(
+    () => (Array.isArray(trades) ? trades : []),
+    [trades]
+  );
+
+  const sortedTrades = useMemo(
+    () =>
+      [...tradesForList].sort(
+        (a, b) => new Date(a.entry_date).getTime() - new Date(b.entry_date).getTime()
+      ),
+    [tradesForList]
+  );
 
   const handleRefresh = useCallback(() => {
     refetch();
   }, [refetch]);
+
+  const handlePeriodSelect = useCallback(
+    (option: JournalPeriodOption) => {
+      setAnchors((previous) => ({
+        ...previous,
+        [viewMode]: new Date(option.anchorDate),
+      }));
+    },
+    [viewMode]
+  );
+
+  const handleTodayPress = useCallback(() => {
+    setAnchors((previous) => ({
+      ...previous,
+      [viewMode]: new Date(),
+    }));
+  }, [viewMode]);
 
   const renderItem = useCallback(
     ({ item }: { item: Trade }) => (
@@ -44,6 +98,14 @@ export default function JournalScreen() {
   const ListHeader = useCallback(
     () => (
       <View style={styles.header}>
+        <JournalViewTabs value={viewMode} onChange={setViewMode} />
+        <JournalPeriodScroller
+          title={selectedPeriod.rangeLabel}
+          options={periodOptions}
+          selectedKey={selectedPeriod.key}
+          onSelect={handlePeriodSelect}
+          onTodayPress={handleTodayPress}
+        />
         {stats && (
           <JournalStats
             totalPnl={stats.totalPnl}
@@ -51,46 +113,25 @@ export default function JournalScreen() {
             tradeCount={stats.tradeCount}
           />
         )}
-        <Pressable
-          testID="journal-import-csv-button"
-          style={styles.importButton}
-          onPress={() => router.push('/(tabs)/journal/import')}
-        >
-          <Text style={styles.importButtonText}>Import CSV</Text>
-        </Pressable>
-        <FilterBar
-          onSearchChange={(search) => setFilters((f) => ({ ...f, search: search || undefined }))}
-          onSideFilter={(side) => setFilters((f) => ({ ...f, side }))}
-          onTagFilter={(tag) => setFilters((f) => ({ ...f, tag }))}
-          activeSide={filters.side}
-          activeTag={filters.tag}
-          availableTags={allTags}
-        />
+        <Text style={styles.sectionTitle}>Trades</Text>
       </View>
     ),
-    [stats, filters.side, filters.tag, allTags]
+    [viewMode, selectedPeriod, periodOptions, handlePeriodSelect, handleTodayPress, stats]
   );
 
   return (
     <View style={styles.container}>
       <FlashList
         testID="journal-trades-list"
-        data={trades ?? []}
+        data={sortedTrades}
         renderItem={renderItem}
         ListHeaderComponent={ListHeader}
         ListEmptyComponent={
           !isLoading ? (
-            trades && filters.search ? (
-              <EmptyState
-                title="No trades found"
-                message="Try adjusting your search or filters."
-              />
-            ) : (
-              <EmptyState
-                title="No trades yet"
-                message="Tap the Add tab to log your first trade."
-              />
-            )
+            <EmptyState
+              title="No trades in this period"
+              message="Try another day, week, month, or year."
+            />
           ) : null
         }
         refreshControl={
@@ -111,17 +152,10 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingBottom: spacing.sm,
   },
-  importButton: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingVertical: spacing.sm,
-    alignItems: 'center',
-    marginHorizontal: spacing.md,
-  },
-  importButtonText: {
-    color: colors.primary,
+  sectionTitle: {
+    marginTop: spacing.sm,
+    marginHorizontal: spacing.lg,
+    color: colors.textSecondary,
     fontWeight: '600',
   },
   listContent: {

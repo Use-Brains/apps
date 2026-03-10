@@ -29,5 +29,5 @@ export default function AddTradeScreen() {
     router.push('/(tabs)/journal');
   };
 
-  return <TradeForm onSubmit={handleSubmit} submitLabel="Save Trade" />;
+  return <TradeForm onSubmit={handleSubmit} submitLabel="Save Trade" resetOnSuccess />;
 }

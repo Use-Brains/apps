@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -16,26 +16,65 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { tradeFormSchema, type TradeFormData } from '@/types/trades';
 import { useDistinctTags } from '@/hooks/use-trades';
 import { useImages } from '@/hooks/use-images';
+import {
+  getAssetSuggestions,
+  resolveAssetSelection,
+  type AssetOption,
+} from '@/features/assets/catalog';
+import {
+  fetchCurrentPrices,
+  fetchCurrentPriceForAsset,
+  formatDisplayPrice,
+  roundPrefillPrice,
+} from '@/features/assets/quotes';
 import { TagInput } from './TagInput';
 import { ImagePickerButton } from './ImagePickerButton';
 import { colors, fontSize, spacing, borderRadius, fontWeight } from '@/lib/theme';
 
 const ASSET_CLASSES = ['crypto', 'stocks', 'options', 'futures', 'forex'] as const;
+const SYMBOL_PLACEHOLDERS: Record<(typeof ASSET_CLASSES)[number], string> = {
+  crypto: 'BTC/USD, ETH/USD, etc.',
+  stocks: 'AAPL, NVDA, etc.',
+  options: 'SPY, QQQ, etc.',
+  futures: 'ES, NQ, etc.',
+  forex: 'EUR/USD, GBP/USD, etc.',
+};
 
 interface TradeFormProps {
   defaultValues?: Partial<TradeFormData>;
   onSubmit: (data: TradeFormData, imagePaths: string[]) => Promise<void>;
   submitLabel?: string;
+  resetOnSuccess?: boolean;
+  mode?: 'create' | 'edit';
 }
 
-export function TradeForm({ defaultValues, onSubmit, submitLabel = 'Save Trade' }: TradeFormProps) {
+export function TradeForm({
+  defaultValues,
+  onSubmit,
+  submitLabel = 'Save Trade',
+  resetOnSuccess = false,
+  mode = 'create',
+}: TradeFormProps) {
+  const isEditMode = mode === 'edit';
+  const enablePriceAutomation = mode === 'create';
   const [submitting, setSubmitting] = useState(false);
+  const [isSymbolFocused, setIsSymbolFocused] = useState(false);
+  const [prefillLoading, setPrefillLoading] = useState(false);
+  const [prefillMessage, setPrefillMessage] = useState<string | null>(null);
+  const [autoPriceSyncEnabled, setAutoPriceSyncEnabled] = useState(enablePriceAutomation);
+  const [latestAssetPrice, setLatestAssetPrice] = useState<number | null>(null);
+  const [suggestionPrices, setSuggestionPrices] = useState<Record<string, number | null>>({});
+  const suppressNextSymbolBlurRef = useRef(false);
+  const suggestionPriceRequestRef = useRef(0);
   const { data: tagData } = useDistinctTags();
   const { images, pickImages, removeImage, uploadImages, reset: resetImages } = useImages();
 
   const {
     control,
     handleSubmit,
+    getValues,
+    reset,
+    setValue,
     watch,
     formState: { errors },
   } = useForm<TradeFormData>({
@@ -62,6 +101,135 @@ export function TradeForm({ defaultValues, onSubmit, submitLabel = 'Save Trade' 
   });
 
   const status = watch('status');
+  const symbol = watch('symbol');
+  const assetClass = watch('asset_class');
+
+  const symbolSuggestions = useMemo(() => {
+    if (!enablePriceAutomation) {
+      return [];
+    }
+
+    return (
+      getAssetSuggestions(symbol ?? '', {
+        preferredAssetClass: assetClass,
+        limit: 8,
+      })
+    );
+  }, [assetClass, enablePriceAutomation, symbol]);
+
+  const shouldShowSymbolSuggestions =
+    enablePriceAutomation && isSymbolFocused && (symbol ?? '').trim().length > 0;
+  const symbolPlaceholder =
+    SYMBOL_PLACEHOLDERS[assetClass] ?? 'BTC/USD, ETH/USD, etc.';
+  const isAutoPricePreview = autoPriceSyncEnabled && latestAssetPrice != null;
+
+  const syncLivePriceToStatus = (price: number, tradeStatus: 'open' | 'closed') => {
+    if (tradeStatus === 'closed') {
+      // Auto-mode should map price to only the active status field.
+      setValue('entry_price', undefined, { shouldDirty: true, shouldValidate: true });
+      setValue('exit_price', price, { shouldDirty: true, shouldValidate: true });
+      setPrefillMessage(`Live price prefilled in Exit Price: ${price}`);
+      return;
+    }
+
+    // Auto-mode should map price to only the active status field.
+    setValue('exit_price', undefined, { shouldDirty: true, shouldValidate: true });
+    setValue('entry_price', price, { shouldDirty: true, shouldValidate: true });
+    setPrefillMessage(`Live price prefilled in Entry Price: ${price}`);
+  };
+
+  const disableAutoPriceSync = () => {
+    if (!enablePriceAutomation) return;
+    if (!autoPriceSyncEnabled) return;
+    setAutoPriceSyncEnabled(false);
+    setPrefillLoading(false);
+    setPrefillMessage(
+      'Auto price sync disabled. Manual price mode is now active for this trade.'
+    );
+  };
+
+  useEffect(() => {
+    if (!enablePriceAutomation || !autoPriceSyncEnabled || latestAssetPrice == null) {
+      return;
+    }
+
+    syncLivePriceToStatus(latestAssetPrice, status);
+  }, [autoPriceSyncEnabled, enablePriceAutomation, latestAssetPrice, setValue, status]);
+
+  useEffect(() => {
+    if (!enablePriceAutomation || !shouldShowSymbolSuggestions || symbolSuggestions.length === 0) {
+      setSuggestionPrices({});
+      return;
+    }
+
+    const quoteSymbols = symbolSuggestions.map((asset) => asset.quoteSymbol);
+
+    const requestId = suggestionPriceRequestRef.current + 1;
+    suggestionPriceRequestRef.current = requestId;
+
+    void (async () => {
+      const fetchedPrices = await fetchCurrentPrices(quoteSymbols);
+      if (suggestionPriceRequestRef.current !== requestId) {
+        return;
+      }
+
+      setSuggestionPrices(fetchedPrices);
+    })();
+  }, [enablePriceAutomation, shouldShowSymbolSuggestions, symbolSuggestions]);
+
+  const prefillPriceForSelectedAsset = async (asset: AssetOption) => {
+    if (!enablePriceAutomation) {
+      return;
+    }
+
+    if (!autoPriceSyncEnabled) {
+      setPrefillMessage(
+        'Auto price sync is disabled. Edit Entry/Exit Price manually.'
+      );
+      return;
+    }
+
+    setPrefillLoading(true);
+    setPrefillMessage(null);
+
+    try {
+      const livePrice = await fetchCurrentPriceForAsset(asset);
+      if (livePrice == null) {
+        setPrefillMessage('Live price unavailable. Enter price manually.');
+        return;
+      }
+
+      const roundedPrice = roundPrefillPrice(livePrice);
+      setLatestAssetPrice(roundedPrice);
+    } finally {
+      setPrefillLoading(false);
+    }
+  };
+
+  const handleAssetSelection = async (asset: AssetOption) => {
+    setIsSymbolFocused(false);
+    setValue('symbol', asset.symbol, { shouldDirty: true, shouldValidate: true });
+    setValue('asset_class', asset.assetClass, { shouldDirty: true, shouldValidate: true });
+    await prefillPriceForSelectedAsset(asset);
+  };
+
+  const handleSymbolBlur = (onBlur: () => void, value: string) => {
+    onBlur();
+    setIsSymbolFocused(false);
+
+    if (suppressNextSymbolBlurRef.current) {
+      suppressNextSymbolBlurRef.current = false;
+      return;
+    }
+
+    const resolvedAsset = resolveAssetSelection(value, {
+      preferredAssetClass: getValues('asset_class'),
+    });
+
+    if (resolvedAsset) {
+      void handleAssetSelection(resolvedAsset);
+    }
+  };
 
   const handleFormSubmit = handleSubmit(async (data) => {
     setSubmitting(true);
@@ -69,6 +237,19 @@ export function TradeForm({ defaultValues, onSubmit, submitLabel = 'Save Trade' 
       // Upload images first (will be linked to trade after creation)
       const imagePaths = images.length > 0 ? await uploadImages('pending') : [];
       await onSubmit(data, imagePaths);
+
+      if (resetOnSuccess) {
+        reset();
+        setIsSymbolFocused(false);
+        setPrefillLoading(false);
+        setPrefillMessage(null);
+        setAutoPriceSyncEnabled(enablePriceAutomation);
+        setLatestAssetPrice(null);
+        setSuggestionPrices({});
+        suppressNextSymbolBlurRef.current = false;
+        suggestionPriceRequestRef.current += 1;
+      }
+
       resetImages();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to save trade';
@@ -84,26 +265,89 @@ export function TradeForm({ defaultValues, onSubmit, submitLabel = 'Save Trade' 
       style={styles.flex}
     >
       <ScrollView style={styles.flex} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        {!isEditMode && (
+          <View style={styles.field}>
+            <Text style={styles.label}>Asset Class</Text>
+            <Controller
+              control={control}
+              name="asset_class"
+              render={({ field: { onChange, value } }) => (
+                <View style={styles.toggleRow}>
+                  {ASSET_CLASSES.map((ac) => (
+                    <Pressable
+                      key={ac}
+                      testID={`trade-asset-${ac}-chip`}
+                      style={[styles.chip, value === ac && styles.chipActive]}
+                      onPress={() => onChange(ac)}
+                    >
+                      <Text style={[styles.chipText, value === ac && styles.chipActiveText]}>
+                        {ac}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+            />
+          </View>
+        )}
+
         {/* Symbol */}
         <View style={styles.field}>
           <Text style={styles.label}>Symbol *</Text>
-          <Controller
-            control={control}
-            name="symbol"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <TextInput
-                testID="trade-symbol-input"
-                style={[styles.input, errors.symbol && styles.inputError]}
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                placeholder="BTC/USD, AAPL, etc."
-                placeholderTextColor={colors.textTertiary}
-                autoCapitalize="characters"
+          {isEditMode ? (
+            <View style={[styles.input, styles.inputReadOnly]} testID="trade-symbol-readonly">
+              <Text style={styles.inputReadOnlyText}>{symbol ?? ''}</Text>
+            </View>
+          ) : (
+            <>
+              <Controller
+                control={control}
+                name="symbol"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <TextInput
+                    testID="trade-symbol-input"
+                    style={[styles.input, errors.symbol && styles.inputError]}
+                    value={value}
+                    onChangeText={(text) => {
+                      setIsSymbolFocused(true);
+                      setPrefillMessage(null);
+                      onChange(text);
+                    }}
+                    onFocus={() => setIsSymbolFocused(true)}
+                    onBlur={() => handleSymbolBlur(onBlur, value ?? '')}
+                    placeholder={symbolPlaceholder}
+                    placeholderTextColor={colors.textTertiary}
+                    autoCapitalize="characters"
+                  />
+                )}
               />
-            )}
-          />
-          {errors.symbol && <Text style={styles.error}>{errors.symbol.message}</Text>}
+              {errors.symbol && <Text style={styles.error}>{errors.symbol.message}</Text>}
+              {shouldShowSymbolSuggestions && symbolSuggestions.length > 0 && (
+                <View style={styles.suggestionList}>
+                  {symbolSuggestions.map((asset) => (
+                    <Pressable
+                      key={`${asset.assetClass}:${asset.symbol}`}
+                      style={styles.suggestionItem}
+                      onPress={() => {
+                        suppressNextSymbolBlurRef.current = true;
+                        void handleAssetSelection(asset);
+                      }}
+                    >
+                      <Text style={styles.suggestionSymbol}>{asset.symbol}</Text>
+                      <Text style={styles.suggestionMeta}>
+                        {asset.displayName} ({asset.assetClass}) -{' '}
+                        {formatDisplayPrice(suggestionPrices[asset.quoteSymbol])}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+            </>
+          )}
+          {!isEditMode && prefillLoading && (
+            <Text style={styles.helperText}>Fetching live price...</Text>
+          )}
+          {!isEditMode && prefillMessage && <Text style={styles.helperText}>{prefillMessage}</Text>}
         </View>
 
         {/* Side Toggle */}
@@ -132,31 +376,6 @@ export function TradeForm({ defaultValues, onSubmit, submitLabel = 'Save Trade' 
                     Short
                   </Text>
                 </Pressable>
-              </View>
-            )}
-          />
-        </View>
-
-        {/* Asset Class */}
-        <View style={styles.field}>
-          <Text style={styles.label}>Asset Class</Text>
-          <Controller
-            control={control}
-            name="asset_class"
-            render={({ field: { onChange, value } }) => (
-              <View style={styles.toggleRow}>
-                {ASSET_CLASSES.map((ac) => (
-                  <Pressable
-                    key={ac}
-                    testID={`trade-asset-${ac}-chip`}
-                    style={[styles.chip, value === ac && styles.chipActive]}
-                    onPress={() => onChange(ac)}
-                  >
-                    <Text style={[styles.chipText, value === ac && styles.chipActiveText]}>
-                      {ac}
-                    </Text>
-                  </Pressable>
-                ))}
               </View>
             )}
           />
@@ -203,9 +422,14 @@ export function TradeForm({ defaultValues, onSubmit, submitLabel = 'Save Trade' 
               render={({ field: { onChange, onBlur, value } }) => (
                 <TextInput
                   testID="trade-entry-price-input"
-                  style={[styles.input, errors.entry_price && styles.inputError]}
+                  style={[
+                    styles.input,
+                    isAutoPricePreview && styles.inputTemporary,
+                    errors.entry_price && styles.inputError,
+                  ]}
                   value={value?.toString() ?? ''}
                   onChangeText={onChange}
+                  onFocus={disableAutoPriceSync}
                   onBlur={onBlur}
                   placeholder="0.00"
                   placeholderTextColor={colors.textTertiary}
@@ -225,9 +449,14 @@ export function TradeForm({ defaultValues, onSubmit, submitLabel = 'Save Trade' 
                 render={({ field: { onChange, onBlur, value } }) => (
                   <TextInput
                     testID="trade-exit-price-input"
-                    style={[styles.input, errors.exit_price && styles.inputError]}
+                    style={[
+                      styles.input,
+                      isAutoPricePreview && styles.inputTemporary,
+                      errors.exit_price && styles.inputError,
+                    ]}
                     value={value?.toString() ?? ''}
                     onChangeText={onChange}
+                    onFocus={disableAutoPriceSync}
                     onBlur={onBlur}
                     placeholder="0.00"
                     placeholderTextColor={colors.textTertiary}
@@ -446,6 +675,19 @@ const styles = StyleSheet.create({
     color: colors.text,
     backgroundColor: colors.background,
   },
+  inputTemporary: {
+    color: colors.textSecondary,
+    borderColor: colors.borderLight,
+  },
+  inputReadOnly: {
+    backgroundColor: colors.surface,
+    borderColor: colors.borderLight,
+  },
+  inputReadOnlyText: {
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.semibold,
+    color: colors.text,
+  },
   inputError: {
     borderColor: colors.danger,
   },
@@ -456,6 +698,34 @@ const styles = StyleSheet.create({
   error: {
     fontSize: fontSize.xs,
     color: colors.danger,
+  },
+  helperText: {
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+  },
+  suggestionList: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.background,
+    overflow: 'hidden',
+  },
+  suggestionItem: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  suggestionSymbol: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
+    color: colors.text,
+  },
+  suggestionMeta: {
+    marginTop: spacing.xs,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    textTransform: 'capitalize',
   },
   toggleRow: {
     flexDirection: 'row',
