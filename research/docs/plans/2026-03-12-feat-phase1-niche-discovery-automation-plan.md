@@ -1,7 +1,7 @@
 ---
 title: "Phase 1: Niche Discovery Automation Pipeline"
 type: feat
-status: active
+status: completed
 date: 2026-03-12
 deepened: 2026-03-12
 origin: apps/research/brainstorms/2026-03-12-phase1-niche-discovery-automation-brainstorm.md
@@ -358,12 +358,12 @@ def create_http_client(*, timeout: float = 30.0, retries: int = 2) -> httpx.Clie
 This ensures consistent timeout/retry behavior across all tools and avoids repeating configuration.
 
 **Tasks:**
-- [ ] Create `apps/research/tools/pyproject.toml` with dependencies and ruff config
-- [ ] Create `apps/research/tools/shared.py` with `slugify()`, `setup_logging()`, `write_json()`, `NicheDir`, `create_http_client()`
-- [ ] Create venv: `cd apps/research/tools && python3 -m venv .venv`
-- [ ] Install deps: `source .venv/bin/activate && pip install -e .`
-- [ ] Add `.venv/` to `.gitignore`
-- [ ] Verify ruff runs clean: `ruff check .`
+- [x] Create `apps/research/tools/pyproject.toml` with dependencies and ruff config
+- [x] Create `apps/research/tools/shared.py` with `slugify()`, `setup_logging()`, `write_json()`, `NicheDir`, `create_http_client()`
+- [x] Create venv: `cd apps/research/tools && python3 -m venv .venv`
+- [x] Install deps: `source .venv/bin/activate && pip install -e .`
+- [x] Add `.venv/` to `.gitignore`
+- [x] Verify ruff runs clean: `ruff check .`
 
 #### Phase 2: Primary Tools (app_discovery + review_miner + reddit_miner)
 
@@ -399,13 +399,13 @@ Output: `competitors.json`
 ```
 
 **Tasks:**
-- [ ] Create `apps/research/tools/app_discovery.py`
-- [ ] Implement iTunes Search API client with httpx
-- [ ] Implement iTunes Lookup API for `last_updated` enrichment
-- [ ] Multi-keyword search with deduplication by `app_id`
-- [ ] Sort results by `review_count` descending (most-reviewed = most relevant competitors)
-- [ ] **3-second delay between API calls** (iTunes rate limit is ~20 req/min)
-- [ ] Test with a known niche keyword (e.g., "habit tracker")
+- [x] Create `apps/research/tools/app_discovery.py`
+- [x] Implement iTunes Search API client with httpx
+- [x] Implement iTunes Lookup API for `last_updated` enrichment
+- [x] Multi-keyword search with deduplication by `app_id`
+- [x] Sort results by `review_count` descending (most-reviewed = most relevant competitors)
+- [x] **3-second delay between API calls** (iTunes rate limit is ~20 req/min)
+- [x] Test with a known niche keyword (e.g., "habit tracker")
 
 ### Research Insights — iTunes Search API
 
@@ -466,13 +466,13 @@ Output: `reviews.json`
 ```
 
 **Tasks:**
-- [ ] Create `apps/research/tools/review_miner.py`
-- [ ] Read `competitors.json` from niche-dir, take top N apps by review_count (default 10)
-- [ ] Implement iTunes RSS/JSON pagination (10 pages × 50 reviews per app)
-- [ ] 1.5-second delay between page fetches to avoid 403
-- [ ] Retry logic: on 403, back off 5s and retry once
-- [ ] Log progress: `"Mining reviews for App Name (1/10)... 350 reviews fetched"`
-- [ ] Test with a real app ID
+- [x] Create `apps/research/tools/review_miner.py`
+- [x] Read `competitors.json` from niche-dir, take top N apps by review_count (default 10)
+- [x] Implement iTunes RSS/JSON pagination (10 pages × 50 reviews per app)
+- [x] 1.5-second delay between page fetches to avoid 403
+- [x] Retry logic: on 403, back off 5s and retry once
+- [x] Log progress: `"Mining reviews for App Name (1/10)... 350 reviews fetched"`
+- [x] Test with a real app ID
 
 ### Research Insights — iTunes RSS Reviews
 
@@ -531,16 +531,16 @@ Output: `reddit_threads.json`
 ```
 
 **Tasks:**
-- [ ] Create `apps/research/tools/reddit_miner.py`
-- [ ] Implement Arctic Shift API client (`arctic-shift.photon-reddit.com`) for historical search
-- [ ] Implement PRAW client for recent threads (last 30 days)
-- [ ] Subreddit auto-discovery via `reddit.subreddits.search(query)` (NOT `search_by_topic` — returns 404 since 2020)
-- [ ] Query pattern expansion (5 patterns × N keywords)
-- [ ] Deduplicate threads by URL across sources and queries
-- [ ] Fetch top 5 comments per thread (sorted by score)
-- [ ] Log progress: `"Searching r/ADHD... 12 threads found"`
-- [ ] Handle PRAW auth: read credentials from `~/.config/niche-research/reddit.env` or env vars
-- [ ] Test with a known niche (e.g., "ADHD planner")
+- [x] Create `apps/research/tools/reddit_miner.py`
+- [x] Implement Arctic Shift API client (`arctic-shift.photon-reddit.com`) for historical search
+- [x] Implement PRAW client for recent threads (last 30 days)
+- [x] Subreddit auto-discovery via `reddit.subreddits.search(query)` (NOT `search_by_topic` — returns 404 since 2020)
+- [x] Query pattern expansion (5 patterns × N keywords)
+- [x] Deduplicate threads by URL across sources and queries
+- [x] Fetch top 5 comments per thread (sorted by score)
+- [x] Log progress: `"Searching r/ADHD... 12 threads found"`
+- [x] Handle PRAW auth: read credentials from `~/.config/niche-research/reddit.env` or env vars
+- [x] Test with a known niche (e.g., "ADHD planner")
 
 ### Research Insights — Reddit Mining
 
@@ -607,13 +607,13 @@ Output: `trends.json`
 Note: Google Trends is rate-limited. If it fails, the tool writes a minimal JSON with `"status": "rate_limited"` and the pipeline continues.
 
 **Tasks:**
-- [ ] Create `apps/research/tools/trends_checker.py`
-- [ ] Implement pytrends-modern `interest_over_time` query with retries
-- [ ] Compute direction: compare last 3 months average vs prior 3 months (growing/stable/declining)
-- [ ] Extract related queries for additional keyword ideas
-- [ ] Add seasonality detection (identify months with >1.5x average interest)
-- [ ] Graceful failure on rate limit: write partial result with status field
-- [ ] Test with trending and stable keywords
+- [x] Create `apps/research/tools/trends_checker.py`
+- [x] Implement pytrends-modern `interest_over_time` query with retries
+- [x] Compute direction: compare last 3 months average vs prior 3 months (growing/stable/declining)
+- [x] Extract related queries for additional keyword ideas
+- [x] Add seasonality detection (identify months with >1.5x average interest)
+- [x] Graceful failure on rate limit: write partial result with status field
+- [x] Test with trending and stable keywords
 
 ### Research Insights — Google Trends
 
@@ -681,11 +681,11 @@ Saturation scoring: for each suggestion, run a quick iTunes Search API query and
 - **Low**: avg rating <3.5 OR avg reviews <1000 (opportunity signal)
 
 **Tasks:**
-- [ ] Create `apps/research/tools/appstore_autocomplete.py`
-- [ ] Implement search suggestions endpoint
-- [ ] For each suggestion, run a lightweight iTunes Search query (limit=3) for saturation scoring
-- [ ] **3-second delay between requests** (shares iTunes rate limit budget)
-- [ ] Test with various keyword stems
+- [x] Create `apps/research/tools/appstore_autocomplete.py`
+- [x] Implement search suggestions endpoint
+- [x] For each suggestion, run a lightweight iTunes Search query (limit=3) for saturation scoring
+- [x] **3-second delay between requests** (shares iTunes rate limit budget)
+- [x] Test with various keyword stems
 
 ### Research Insights — App Store Autocomplete
 
@@ -744,9 +744,9 @@ topic: domain-expertise-interview
 ```
 
 **Tasks:**
-- [ ] Create `apps/research/skills/niche-brainstorm/SKILL.md` following OpenClaw SKILL.md format
-- [ ] Define question sequence with branching logic
-- [ ] Define output format (profile markdown)
+- [x] Create `apps/research/skills/niche-brainstorm/SKILL.md` following OpenClaw SKILL.md format
+- [x] Define question sequence with branching logic
+- [x] Define output format (profile markdown)
 - [ ] Test the skill interactively
 
 ### Research Insights — Skill Design
@@ -769,8 +769,8 @@ Location: `apps/research/templates/niche-brainstorm-template.md`
 Same questions as the skill but as a fillable markdown document. User fills it out manually, saves to `profiles/`.
 
 **Tasks:**
-- [ ] Create `apps/research/templates/niche-brainstorm-template.md`
-- [ ] Mirror the skill's question structure and output format
+- [x] Create `apps/research/templates/niche-brainstorm-template.md`
+- [x] Mirror the skill's question structure and output format
 
 **4c: `/niche-report` skill**
 
@@ -791,11 +791,11 @@ Key analysis steps:
 5. Flag any data gaps from pipeline metadata
 
 **Tasks:**
-- [ ] Create `apps/research/skills/niche-report/SKILL.md`
-- [ ] Define the full report template with all 9 sections
-- [ ] Specify how each JSON file maps to report sections
-- [ ] Include the Go/No-Go scoring rubric inline
-- [ ] Include the $500K formula with category benchmarks inline
+- [x] Create `apps/research/skills/niche-report/SKILL.md`
+- [x] Define the full report template with all 9 sections
+- [x] Specify how each JSON file maps to report sections
+- [x] Include the Go/No-Go scoring rubric inline
+- [x] Include the $500K formula with category benchmarks inline
 - [ ] Test with sample JSON data
 
 ### Research Insights — Report Generation
@@ -843,11 +843,11 @@ Progress output:
 ```
 
 **Tasks:**
-- [ ] Create `apps/research/skills/niche-research/SKILL.md`
-- [ ] Define keyword expansion prompt (Claude generates variations)
-- [ ] Define execution order with dependency handling
-- [ ] Define error handling: per-tool catch, continue, log to _pipeline_meta.json
-- [ ] Define progress output format
+- [x] Create `apps/research/skills/niche-research/SKILL.md`
+- [x] Define keyword expansion prompt (Claude generates variations)
+- [x] Define execution order with dependency handling
+- [x] Define error handling: per-tool catch, continue, log to _pipeline_meta.json
+- [x] Define progress output format
 - [ ] Test end-to-end with a real niche
 
 ### Research Insights — Orchestrator
@@ -865,7 +865,7 @@ Progress output:
 
 #### Phase 5: Testing & Validation
 
-- [ ] Test each Python tool standalone with a known niche (e.g., "habit tracker for ADHD")
+- [x] Test each Python tool standalone with a known niche (e.g., "habit tracker for ADHD")
 - [ ] Test the full pipeline via `/niche-research "habit tracker for ADHD"`
 - [ ] Verify report completeness: all 9 sections present, scoring rubric applied
 - [ ] Test error scenarios: invalid keyword (zero app results), Reddit rate limit, Google Trends rate limit
@@ -914,29 +914,29 @@ The three Claude Code skills (`/niche-brainstorm`, `/niche-report`, `/niche-rese
 
 ### Functional Requirements
 
-- [ ] `app_discovery.py` returns competitor apps with app_id, rating, review_count, last_updated, and genre
-- [ ] `review_miner.py` fetches up to 500 reviews per app (US) for the top 10 competitors
-- [ ] `reddit_miner.py` finds relevant threads via Arctic Shift (historical) and PRAW (recent), with auto subreddit discovery
-- [ ] `trends_checker.py` returns interest direction and seasonality via pytrends-modern
-- [ ] `appstore_autocomplete.py` returns suggestions with saturation scoring
-- [ ] `/niche-brainstorm` produces a structured profile in `profiles/`
-- [ ] `/niche-report` produces a 9-section report with Go/No-Go score
-- [ ] `/niche-research` orchestrates all tools and produces a complete report
+- [x] `app_discovery.py` returns competitor apps with app_id, rating, review_count, last_updated, and genre
+- [x] `review_miner.py` fetches up to 500 reviews per app (US) for the top 10 competitors
+- [x] `reddit_miner.py` finds relevant threads via Arctic Shift (historical) and PRAW (recent), with auto subreddit discovery
+- [x] `trends_checker.py` returns interest direction and seasonality via pytrends-modern
+- [x] `appstore_autocomplete.py` returns suggestions with saturation scoring
+- [x] `/niche-brainstorm` produces a structured profile in `profiles/`
+- [x] `/niche-report` produces a 9-section report with Go/No-Go score
+- [x] `/niche-research` orchestrates all tools and produces a complete report
 - [ ] Pipeline continues when individual tools fail, with failures flagged in the report
-- [ ] All tools accept `--niche-dir` and write structured JSON
+- [x] All tools accept `--niche-dir` and write structured JSON
 
 ### Non-Functional Requirements
 
 - [ ] Full pipeline completes in under 15 minutes per niche
 - [ ] No unhandled exceptions — all API errors caught and logged
-- [ ] ruff passes on all Python files
-- [ ] Each tool has a module docstring and `--help` output (argparse)
+- [x] ruff passes on all Python files
+- [x] Each tool has a module docstring and `--help` output (argparse)
 
 ## Dependencies & Prerequisites
 
-- [ ] Python 3.10+ with venv
+- [x] Python 3.10+ with venv
 - [ ] Reddit API credentials (register at reddit.com/prefs/apps, script type)
-- [ ] `httpx`, `praw`, `pytrends-modern` pip packages
+- [x] `httpx`, `praw`, `pytrends-modern` pip packages
 - [ ] No paid APIs or keys required (all endpoints are free/unauthenticated except Reddit OAuth)
 
 ## Risk Analysis & Mitigation

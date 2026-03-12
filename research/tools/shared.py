@@ -26,11 +26,15 @@ def slugify(text: str) -> str:
 
 def setup_logging(tool_name: str, *, verbose: bool = False) -> logging.Logger:
     """Configure logging for a tool."""
+    level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(
         format=f"[{tool_name}] %(message)s",
-        level=logging.DEBUG if verbose else logging.INFO,
+        level=level,
         stream=sys.stdout,
     )
+    # Suppress noisy httpx/httpcore debug logs unless truly verbose
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
     return logging.getLogger(tool_name)
 
 
