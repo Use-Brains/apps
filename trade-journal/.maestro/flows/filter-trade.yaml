@@ -1,0 +1,12 @@
+appId: com.tradejournal.app
+---
+- tapOn:
+    id: tab-journal-button
+- tapOn:
+    id: filter-search-input
+- eraseText
+- inputText: QA-LANE-C
+- assertVisible: QA-LANE-C
+- tapOn:
+    id: filter-side-long-chip
+- assertVisible: QA-LANE-C

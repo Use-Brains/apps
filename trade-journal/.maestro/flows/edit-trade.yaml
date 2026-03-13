@@ -1,0 +1,12 @@
+appId: com.tradejournal.app
+---
+- tapOn: QA-LANE-C
+- tapOn:
+    id: trade-edit-button
+- tapOn:
+    id: trade-exit-price-input
+- eraseText
+- inputText: "120"
+- tapOn:
+    id: trade-submit-button
+- assertVisible: QA-LANE-C

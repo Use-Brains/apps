@@ -1,0 +1,27 @@
+appId: com.tradejournal.app
+---
+- tapOn:
+    id: tab-add-button
+- tapOn:
+    id: trade-symbol-input
+- eraseText
+- inputText: QA-LANE-C
+- tapOn:
+    id: trade-entry-price-input
+- eraseText
+- inputText: "100"
+- tapOn:
+    id: trade-exit-price-input
+- eraseText
+- inputText: "110"
+- tapOn:
+    id: trade-size-input
+- eraseText
+- inputText: "10"
+- tapOn:
+    id: trade-fees-input
+- eraseText
+- inputText: "5"
+- tapOn:
+    id: trade-submit-button
+- assertVisible: QA-LANE-C

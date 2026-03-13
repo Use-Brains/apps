@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Trade Journal",
+    "slug": "trade-journal",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "trade-journal",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tradejournal.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "allowBackup": false,
+      "package": "com.tradejournal.app",
+      "permissions": ["android.permission.RECORD_AUDIO", "com.android.vending.BILLING"]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": ["expo-router", "expo-secure-store", "expo-image-picker"],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "0824391e-8780-4f80-a419-7f5147b22fa1"
+      }
+    },
+    "owner": "blue-expos-organization"
+  }
+}
