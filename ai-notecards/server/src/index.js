@@ -21,6 +21,8 @@ import marketplaceRoutes from './routes/marketplace.js';
 import sellerRoutes from './routes/seller.js';
 import ratingsRoutes from './routes/ratings.js';
 import adminRoutes from './routes/admin.js';
+import iapRoutes from './routes/iap.js';
+import appleWebhookRoutes from './routes/apple-webhook.js';
 import pool from './db/pool.js';
 
 const app = express();
@@ -57,6 +59,7 @@ app.use('/api/marketplace', marketplaceRoutes);
 app.use('/api/seller', sellerRoutes);
 app.use('/api/ratings', ratingsRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/iap', iapRoutes);
 
 // Stripe Connect webhook (separate endpoint, separate signing secret)
 import Stripe from 'stripe';
@@ -121,13 +124,8 @@ app.post('/webhooks/stripe-connect', async (req, res) => {
   res.json({ received: true });
 });
 
-// Apple webhook placeholder (full implementation in routes/iap.js)
-// Uses express.json() (not raw) — Apple sends JWS-signed JSON
-app.post('/webhooks/apple', express.json(), async (req, res) => {
-  // Placeholder — will be implemented in Phase 4 via iap.js route
-  console.log('Apple webhook received (placeholder)');
-  res.json({ received: true });
-});
+// Apple webhook — JWS-signed JSON notifications from App Store Server
+app.use('/webhooks/apple', appleWebhookRoutes);
 
 // Health check with DB connection test + API version for iOS force-update
 app.get('/api/health', async (req, res) => {
