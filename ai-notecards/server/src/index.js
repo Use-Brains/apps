@@ -26,6 +26,11 @@ import pool from './db/pool.js';
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Trust proxy when behind Railway/Vercel (needed for rate limiting + correct IP)
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 // Stripe webhooks need raw body — must be before express.json()
 app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
 app.use('/webhooks', express.raw({ type: 'application/json' }));
