@@ -1,50 +1,20 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth.js';
+import { checkTrialExpiry, checkGenerationLimits } from '../middleware/plan.js';
 import { generateCards } from '../services/ai.js';
 import pool from '../db/pool.js';
 
 const router = Router();
 
-router.post('/', authenticate, async (req, res) => {
+router.post('/', authenticate, checkTrialExpiry, checkGenerationLimits, async (req, res) => {
   const { input, title } = req.body;
   if (!input || input.trim().length === 0) {
     return res.status(400).json({ error: 'Input text is required' });
   }
 
   try {
-    // Check generation limits
-    const userResult = await pool.query(
-      'SELECT plan, daily_generation_count, last_generation_date FROM users WHERE id = $1',
-      [req.userId]
-    );
-    const user = userResult.rows[0];
-
-    const today = new Date().toISOString().split('T')[0];
-    const isNewDay = !user.last_generation_date || user.last_generation_date.toISOString().split('T')[0] !== today;
-    const currentCount = isNewDay ? 0 : user.daily_generation_count;
-
-    if (user.plan === 'free' && currentCount >= 3) {
-      return res.status(429).json({
-        error: 'Daily generation limit reached. Upgrade to Pro for unlimited generations.',
-        limit: true,
-      });
-    }
-
-    // Check deck limit for free users
-    if (user.plan === 'free') {
-      const deckCount = await pool.query('SELECT COUNT(*) FROM decks WHERE user_id = $1', [req.userId]);
-      if (parseInt(deckCount.rows[0].count) >= 10) {
-        return res.status(429).json({
-          error: 'Maximum deck limit reached. Upgrade to Pro for unlimited decks.',
-          limit: true,
-        });
-      }
-    }
-
-    // Generate cards
     const cards = await generateCards(input);
 
-    // Save deck and cards in a transaction
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -63,10 +33,10 @@ router.post('/', authenticate, async (req, res) => {
         );
       }
 
-      // Update generation count
+      const today = new Date().toISOString().split('T')[0];
       await client.query(
-        `UPDATE users SET daily_generation_count = $1, last_generation_date = $2 WHERE id = $3`,
-        [currentCount + 1, today, req.userId]
+        'UPDATE users SET daily_generation_count = $1, last_generation_date = $2 WHERE id = $3',
+        [req.generationCount + 1, today, req.userId]
       );
 
       await client.query('COMMIT');
@@ -78,7 +48,7 @@ router.post('/', authenticate, async (req, res) => {
 
       res.status(201).json({
         deck: { ...deck, cards: savedCards.rows },
-        generationsRemaining: user.plan === 'free' ? 2 - currentCount : null,
+        generationsRemaining: req.generationLimit - (req.generationCount + 1),
       });
     } catch (err) {
       await client.query('ROLLBACK');
