@@ -6,7 +6,8 @@ const SYSTEM_PROMPT = `You are a flashcard generation expert. Given text or a to
 RULES:
 - Return ONLY valid JSON. No markdown, no preamble, no explanation.
 - Format: { "cards": [{ "front": "...", "back": "..." }] }
-- Generate 8-15 cards depending on input length/complexity.
+- Generate a maximum of 25 cards. For shorter inputs, 8-15 cards is ideal.
+- If the content warrants more than 25 cards, split into multiple focused decks of ~15 cards each, naming them as Part 1, Part 2, etc. Return only the first part.
 - For pasted notes: extract key concepts, definitions, relationships, and important details.
 - For a topic name: generate foundational knowledge cards covering the most important concepts.
 - Card fronts should be concise questions or terms (under 30 words).
@@ -27,6 +28,10 @@ function parseCards(text) {
     if (typeof card.front !== 'string' || typeof card.back !== 'string') {
       throw new Error('Invalid card format');
     }
+  }
+  // Hard cap: truncate to 30 cards if AI returns more
+  if (parsed.cards.length > 30) {
+    parsed.cards = parsed.cards.slice(0, 30);
   }
   return parsed.cards;
 }
