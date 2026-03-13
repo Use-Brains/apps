@@ -8,16 +8,17 @@ Mobile-first trade journaling app for active crypto/stock/options traders.
 - Supabase (Postgres + Auth + Storage)
 - TanStack Query v5 (server state + cache persistence)
 - React Hook Form + Zod (forms + validation)
-- StyleSheet + theme.ts (styling)
+- Theme system with 5 styles (classic, modern, ios_glass, android_material, high_contrast) and 6 palettes
 - Vitest (unit tests for business logic)
+- RevenueCat (subscriptions)
 
 ## Project Structure
 - `app/` — Expo Router screens (file-based routing)
 - `src/components/` — Reusable UI components (flat, no subdirs)
-- `src/hooks/` — Custom hooks (auth, trades, images)
-- `src/lib/` — Infrastructure (supabase, query-client, mmkv, theme)
-- `src/types/` — Zod schemas, DB types, query keys
-- `src/utils/` — Pure utility functions (pnl calc, formatting)
+- `src/hooks/` — Custom hooks (auth, trades, images, strategies)
+- `src/lib/` — Infrastructure (supabase, query-client, mmkv, theme-system)
+- `src/types/` — Zod schemas, DB types, query keys (trades, strategies, common)
+- `src/utils/` — Pure utility functions (pnl calc, formatting, strategy payloads/queries)
 - `supabase/` — Migrations, config, seed data
 - `__tests__/unit/` — Unit tests
 - `__tests__/integration/` — Integration tests
@@ -28,7 +29,8 @@ Mobile-first trade journaling app for active crypto/stock/options traders.
 ## Conventions
 - Zod schemas are source of truth for types (use z.infer)
 - PnL is computed in app code, stored in DB for fast aggregation
-- Tags stored as text[] arrays on trades (no join table)
+- Strategies link to trades via `trade_strategies` join table
+- Tags (setup_tags, mistake_tags) stored as text[] arrays on trades
 - Images: compress before upload (1200px, quality 0.8)
 - Auth tokens: MMKV + SecureStore hybrid (SecureStore has 2048-byte limit)
 - Path alias: `@/*` maps to `src/*`
