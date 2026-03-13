@@ -1,0 +1,573 @@
+{
+  "product": {
+    "name": "AI Notecards",
+    "tagline": "AI-powered flashcard generation with a creator marketplace",
+    "description": "Paste notes or type a topic, AI generates study flashcards. Buy and sell decks on the marketplace. Bring your own AI model with BYOK.",
+    "platforms": ["web", "ios"],
+    "monetization": "freemium subscriptions + marketplace transaction fees",
+    "target_audience": "Students, self-learners, educators, content creators"
+  },
+
+  "tiers": {
+    "free": {
+      "price": "$0/mo",
+      "generations_per_day": 1,
+      "max_decks": 10,
+      "max_input_chars": 30000,
+      "marketplace": "buy",
+      "byok": false
+    },
+    "trial": {
+      "price": "$0 (7 days)",
+      "generations_per_day": 10,
+      "max_decks": "unlimited",
+      "max_input_chars": 30000,
+      "marketplace": "buy",
+      "byok": false
+    },
+    "pro": {
+      "price": "$9/mo",
+      "generations_per_day": 10,
+      "max_decks": "unlimited",
+      "max_input_chars": 30000,
+      "marketplace": "buy + sell",
+      "byok": false
+    },
+    "byok_pro": {
+      "price": "$5/mo",
+      "generations_per_day": "unlimited (60/hr rate limit)",
+      "max_decks": "unlimited",
+      "max_input_chars": 200000,
+      "marketplace": "buy + sell",
+      "byok": true
+    }
+  },
+
+  "features": {
+    "authentication": {
+      "version": "v1",
+      "features": [
+        {
+          "name": "Email/password auth",
+          "version": "v1",
+          "description": "Signup starts 7-day trial. bcrypt hashing, JWT in httpOnly cookies (web) or Bearer token (iOS).",
+          "platforms": ["web", "ios"],
+          "endpoints": ["POST /api/auth/signup", "POST /api/auth/login", "POST /api/auth/logout", "GET /api/auth/me"]
+        },
+        {
+          "name": "Sign in with Apple",
+          "version": "v1",
+          "description": "Create-only flow (no account linking). HMAC-based nonce (no server storage). Apple provides name/email only on first auth — persisted to UserDefaults as backup.",
+          "platforms": ["ios"],
+          "endpoints": ["GET /api/auth/apple/nonce", "POST /api/auth/apple"]
+        },
+        {
+          "name": "24h JWT with kill switch",
+          "version": "v1",
+          "description": "Unified 24h JWT for web and iOS. token_revoked_at column invalidates all tokens on logout/deletion/compromise. No refresh tokens.",
+          "platforms": ["web", "ios"]
+        },
+        {
+          "name": "Soft-delete account",
+          "version": "v1",
+          "description": "PII scrub (email, display_name, apple_user_id, source_text). Delist marketplace listings. Cancel pending payouts. Does NOT auto-cancel Apple subscription.",
+          "platforms": ["web", "ios"],
+          "endpoints": ["DELETE /api/auth/account"]
+        },
+        {
+          "name": "SIWA account linking",
+          "version": "v2",
+          "description": "If SIWA email matches existing email+password account, require password confirmation to merge. Prevents hostile takeover.",
+          "platforms": ["ios"]
+        },
+        {
+          "name": "Forgot-password flow",
+          "version": "v2",
+          "description": "Transactional email with reset token. Deferred because SIWA is primary iOS auth and adds email service dependency.",
+          "platforms": ["web", "ios"]
+        },
+        {
+          "name": "Refresh tokens",
+          "version": "v2",
+          "description": "15-min access + 30-day refresh with family tracking. Eliminated in v1 — 24h JWT over HTTPS is sufficient for flashcard app risk profile.",
+          "platforms": ["ios"]
+        },
+        {
+          "name": "Apple credential revocation handler",
+          "version": "v2",
+          "description": "Handle Apple's revocation notification to force server-side logout. 24h JWT naturally expires in v1.",
+          "platforms": ["ios"]
+        }
+      ]
+    },
+
+    "generation": {
+      "version": "v1",
+      "features": [
+        {
+          "name": "AI flashcard generation",
+          "version": "v1",
+          "description": "Paste notes or type a topic. AI generates 8-25 cards (hard cap 30). System prompt optimized for study-quality Q&A pairs.",
+          "platforms": ["web", "ios"],
+          "endpoints": ["POST /api/generate"],
+          "ai_providers": {
+            "platform": ["groq/llama-3.3-70b-versatile", "google/gemini-2.5-flash-lite"],
+            "byok": "openrouter (100+ models)"
+          }
+        },
+        {
+          "name": "Auto-fallback between providers",
+          "version": "v1",
+          "description": "If primary provider (Groq) fails, auto-fallback to secondary (Gemini). For BYOK, no fallback — user's key, user's problem.",
+          "platforms": ["web", "ios"]
+        },
+        {
+          "name": "Per-provider timeouts",
+          "version": "v1",
+          "description": "Groq 30s, Gemini 45s, OpenRouter 80s. Server route timeout 90s. iOS client timeout 120s. Layered correctly.",
+          "platforms": ["web", "ios"]
+        },
+        {
+          "name": "Input length validation",
+          "version": "v1",
+          "description": "Server-side: 30K chars for Free/Pro/Trial, 200K for BYOK Pro. Client-side character counter with limit display.",
+          "platforms": ["web", "ios"]
+        },
+        {
+          "name": "Source text truncation",
+          "version": "v1",
+          "description": "Store only first 5000 chars of input in decks.source_text. Full 200K BYOK input not persisted.",
+          "platforms": ["web", "ios"]
+        },
+        {
+          "name": "Batch card inserts",
+          "version": "v1",
+          "description": "Multi-row INSERT for generated cards instead of 30 sequential queries. ~400ms savings.",
+          "platforms": ["web", "ios"]
+        }
+      ]
+    },
+
+    "deck_management": {
+      "version": "v1",
+      "features": [
+        {
+          "name": "Deck CRUD",
+          "version": "v1",
+          "description": "View deck list, deck detail with cards. Edit card front/back, add card, delete card, delete deck.",
+          "platforms": ["web", "ios"],
+          "endpoints": ["GET /api/decks", "GET /api/decks/:id", "PATCH /api/decks/:id", "DELETE /api/decks/:id", "POST /api/decks/:id/cards", "PATCH /api/decks/:deckId/cards/:cardId", "DELETE /api/decks/:deckId/cards/:cardId"]
+        },
+        {
+          "name": "Deck origin tracking",
+          "version": "v1",
+          "description": "Decks marked as 'generated' or 'purchased'. Purchased decks don't count toward deck limits.",
+          "platforms": ["web", "ios"]
+        },
+        {
+          "name": "Offline deck caching",
+          "version": "v2",
+          "description": "SwiftData local DB for offline study mode. All v1 features require network.",
+          "platforms": ["ios"]
+        }
+      ]
+    },
+
+    "study_mode": {
+      "version": "v1",
+      "features": [
+        {
+          "name": "Card flip study sessions",
+          "version": "v1",
+          "description": "3D card flip animation. Mark known/unknown. Progress indicator. Session summary with score and percentage.",
+          "platforms": ["web", "ios"],
+          "endpoints": ["POST /api/study/start", "PATCH /api/study/:id"]
+        },
+        {
+          "name": "Study score",
+          "version": "v1",
+          "description": "Increments on session completion. Displayed on user profile and seller dashboard as reputation signal.",
+          "platforms": ["web", "ios"]
+        },
+        {
+          "name": "Haptic feedback",
+          "version": "v1",
+          "description": "Light impact on card flip, success notification on session completion.",
+          "platforms": ["ios"]
+        },
+        {
+          "name": "Spaced repetition",
+          "version": "v2",
+          "description": "SM-2 algorithm for optimized review scheduling. Cards marked 'unknown' appear more frequently.",
+          "platforms": ["ios"]
+        }
+      ]
+    },
+
+    "byok": {
+      "version": "v1",
+      "features": [
+        {
+          "name": "API key encryption and storage",
+          "version": "v1",
+          "description": "AES-256-GCM with AAD bound to userId. Format: iv:authTag:ciphertext (no version prefix in v1). Stored in users.openrouter_api_key_encrypted.",
+          "platforms": ["web", "ios"],
+          "endpoints": ["PUT /api/settings/api-key"]
+        },
+        {
+          "name": "Model selection",
+          "version": "v1",
+          "description": "Hardcoded curated list of ~10 popular models (Claude, GPT-4o, Gemini, Llama, etc.). User picks preferred_model stored in DB.",
+          "platforms": ["ios"],
+          "endpoints": ["PATCH /api/settings"]
+        },
+        {
+          "name": "Lazy key validation",
+          "version": "v1",
+          "description": "Key validated on first generation attempt, not upfront. Invalid key returns byok_key_invalid error directing to settings.",
+          "platforms": ["web", "ios"]
+        },
+        {
+          "name": "BYOK error mapping",
+          "version": "v1",
+          "description": "OpenRouter errors mapped to user-facing messages: 401→invalid key, 402→no credits, 429→rate limited, 502→provider down.",
+          "platforms": ["web", "ios"]
+        },
+        {
+          "name": "Dynamic model list from OpenRouter",
+          "version": "v2",
+          "description": "Fetch available models from OpenRouter API instead of hardcoded list. Enables new model discovery without app update.",
+          "platforms": ["ios"]
+        },
+        {
+          "name": "Key versioning",
+          "version": "v2",
+          "description": "Add v2: prefix to encryption format when ENCRYPTION_KEY is rotated. Values without prefix are v1.",
+          "platforms": ["web", "ios"]
+        }
+      ]
+    },
+
+    "subscriptions": {
+      "version": "v1",
+      "features": [
+        {
+          "name": "Stripe subscriptions (web)",
+          "version": "v1",
+          "description": "Pro $9/mo via Stripe Checkout. Cancellation at period end. Webhook-driven lifecycle management.",
+          "platforms": ["web"],
+          "endpoints": ["POST /api/stripe/checkout", "POST /api/stripe/cancel", "POST /api/stripe/webhook"]
+        },
+        {
+          "name": "Apple IAP subscriptions (iOS)",
+          "version": "v1",
+          "description": "Pro $9/mo and BYOK Pro $5/mo as auto-renewable subscriptions in same subscription group. StoreKit 2 with dual verifier (production + sandbox).",
+          "platforms": ["ios"],
+          "endpoints": ["POST /api/iap/verify"]
+        },
+        {
+          "name": "App Store Server Notifications V2",
+          "version": "v1",
+          "description": "Handles SUBSCRIBED, DID_RENEW, EXPIRED, REFUND, REVOKE. Idempotency via processed_apple_notifications table. Cancels Stripe subscription when Apple subscription activates.",
+          "platforms": ["ios"],
+          "endpoints": ["POST /webhooks/apple"]
+        },
+        {
+          "name": "Subscription restore",
+          "version": "v1",
+          "description": "AppStore.sync() for restoring purchases on new device. Transaction.currentEntitlements checked at launch.",
+          "platforms": ["ios"]
+        },
+        {
+          "name": "Paywall triggers",
+          "version": "v1",
+          "description": "Shown on: generation limit reached, marketplace listing attempt (Pro required), BYOK settings (BYOK Pro required), trial expiry.",
+          "platforms": ["ios"]
+        },
+        {
+          "name": "Stripe Direct payments (discount)",
+          "version": "v2",
+          "description": "Offer discounted subscriptions ($7.99 Pro, $3.99 BYOK) via Stripe Payment Links to bypass Apple's 30% cut. External payment link in iOS.",
+          "platforms": ["web", "ios"]
+        },
+        {
+          "name": "Grace period handling",
+          "version": "v2",
+          "description": "Track DID_FAIL_TO_RENEW with grace period. Show banner. Keep access during billing retry window.",
+          "platforms": ["ios"]
+        }
+      ]
+    },
+
+    "marketplace": {
+      "version": "v1",
+      "features": [
+        {
+          "name": "Browse and search listings",
+          "version": "v1",
+          "description": "Cursor-based pagination. Full-text search via PostgreSQL tsvector. Filter by category (13 seeded). Sort by popular/newest/rating/price.",
+          "platforms": ["web", "ios"],
+          "endpoints": ["GET /api/marketplace", "GET /api/marketplace/categories", "GET /api/marketplace/:id"]
+        },
+        {
+          "name": "Purchase via Stripe (web)",
+          "version": "v1",
+          "description": "Stripe Checkout with destination charges. 70/30 split (seller/platform). Idempotent fulfillment via ON CONFLICT.",
+          "platforms": ["web"],
+          "endpoints": ["POST /api/marketplace/:id/purchase"]
+        },
+        {
+          "name": "Purchase via Apple IAP (iOS)",
+          "version": "v1",
+          "description": "Consumable IAP (tier1-5, $1-$5). Price validation against listing. Self-purchase prevention. 14-day payout hold. UserDefaults crash recovery.",
+          "platforms": ["ios"],
+          "endpoints": ["POST /api/iap/verify-purchase"]
+        },
+        {
+          "name": "Create and manage listings",
+          "version": "v1",
+          "description": "Pro/BYOK Pro can list generated decks. Min 10 cards, max 50 active listings, $1-$5 price, 13 categories, up to 5 tags.",
+          "platforms": ["web", "ios"],
+          "endpoints": ["POST /api/seller/listings", "PATCH /api/seller/listings/:id", "DELETE /api/seller/listings/:id", "POST /api/seller/listings/:id/relist"]
+        },
+        {
+          "name": "Ratings",
+          "version": "v1",
+          "description": "1-5 stars, one per user per listing. Requires purchase + completed study session. Atomic SQL average calculation.",
+          "platforms": ["web", "ios"],
+          "endpoints": ["POST /api/ratings", "GET /api/ratings/listing/:id"]
+        },
+        {
+          "name": "Content moderation",
+          "version": "v1",
+          "description": "Flag listings (5 reasons). Admin queue with dismiss/uphold/suspend actions. Removed listings hidden from marketplace.",
+          "platforms": ["web"],
+          "endpoints": ["POST /api/marketplace/:id/flag", "GET /api/admin/flags", "PATCH /api/admin/flags/:id"]
+        },
+        {
+          "name": "Seller dashboard",
+          "version": "v1",
+          "description": "Earnings overview, listing stats, Stripe Connect onboarding via ASWebAuthenticationSession (iOS) or redirect (web).",
+          "platforms": ["web", "ios"],
+          "endpoints": ["GET /api/seller/dashboard", "GET /api/seller/listings", "POST /api/seller/onboard"]
+        },
+        {
+          "name": "14-day seller payout hold",
+          "version": "v1",
+          "description": "Payouts held for 14 days after purchase. Prevents refund fraud. Status tracked: pending→eligible→paid or refunded.",
+          "platforms": ["web", "ios"]
+        },
+        {
+          "name": "Automated payout cron",
+          "version": "v2",
+          "description": "Daily cron to process eligible payouts via Stripe Connect transfers. v1 uses manual SQL trigger.",
+          "platforms": ["web", "ios"]
+        },
+        {
+          "name": "Automated content moderation",
+          "version": "v2",
+          "description": "3-layer pipeline: obscenity filter → decancer → OpenAI Moderation API. Auto-flag for review.",
+          "platforms": ["web", "ios"]
+        },
+        {
+          "name": "Rating revision",
+          "version": "v2",
+          "description": "Allow users to update their rating after subsequent study sessions.",
+          "platforms": ["web", "ios"]
+        },
+        {
+          "name": "Cohort drops",
+          "version": "v2",
+          "description": "Weekly/biweekly featured deck release events. Limited-time drops for scarcity-driven engagement.",
+          "platforms": ["web", "ios"]
+        },
+        {
+          "name": "Seller badges",
+          "version": "v2",
+          "description": "New → Verified → Elite tiers based on sales volume, ratings, and account age.",
+          "platforms": ["web", "ios"]
+        },
+        {
+          "name": "Share decks via link",
+          "version": "v2",
+          "description": "Free deck sharing outside marketplace as viral loop for user growth.",
+          "platforms": ["web", "ios"]
+        }
+      ]
+    },
+
+    "settings": {
+      "version": "v1",
+      "features": [
+        {
+          "name": "Profile editing",
+          "version": "v1",
+          "description": "Display name, email (read-only). Preferred model for BYOK.",
+          "platforms": ["web", "ios"],
+          "endpoints": ["GET /api/settings", "PATCH /api/settings"]
+        },
+        {
+          "name": "Subscription management",
+          "version": "v1",
+          "description": "View current plan. Link to Apple subscription management or Stripe portal.",
+          "platforms": ["web", "ios"]
+        },
+        {
+          "name": "BYOK settings",
+          "version": "v1",
+          "description": "API key entry/removal, masked key display, model picker with hardcoded list.",
+          "platforms": ["ios"],
+          "endpoints": ["PUT /api/settings/api-key"]
+        },
+        {
+          "name": "Password change",
+          "version": "v2",
+          "description": "Allow email+password users to change their password.",
+          "platforms": ["web", "ios"]
+        }
+      ]
+    },
+
+    "admin": {
+      "version": "v1",
+      "features": [
+        {
+          "name": "Content flag queue",
+          "version": "v1",
+          "description": "View all flags, resolve (dismiss/uphold/suspend). Web-only admin at /admin/flags.",
+          "platforms": ["web"],
+          "endpoints": ["GET /api/admin/flags", "PATCH /api/admin/flags/:id", "PATCH /api/admin/users/:id/suspend"]
+        },
+        {
+          "name": "iOS admin view",
+          "version": "v2",
+          "description": "Native AdminFlagsView.swift. v1 uses web admin via Safari.",
+          "platforms": ["ios"]
+        },
+        {
+          "name": "Multi-admin roles",
+          "version": "v2",
+          "description": "Role-based access for multiple moderators.",
+          "platforms": ["web", "ios"]
+        }
+      ]
+    },
+
+    "infrastructure": {
+      "version": "v1",
+      "features": [
+        {
+          "name": "Health check with version",
+          "version": "v1",
+          "description": "GET /api/health returns DB status and minClientVersion for iOS force-update checks.",
+          "platforms": ["web", "ios"],
+          "endpoints": ["GET /api/health"]
+        },
+        {
+          "name": "Structured error codes",
+          "version": "v1",
+          "description": "Shared error code constants (server/src/constants/errors.js mirrored by iOS APIError enum). Prevents string-matching drift.",
+          "platforms": ["web", "ios"]
+        },
+        {
+          "name": "Per-route body parser limits",
+          "version": "v1",
+          "description": "500KB on /api/generate (BYOK), 100KB everywhere else. No global express.json().",
+          "platforms": ["web", "ios"]
+        },
+        {
+          "name": "Push notifications",
+          "version": "v2",
+          "description": "Sale notifications for sellers, study reminders for buyers. APNs integration.",
+          "platforms": ["ios"]
+        },
+        {
+          "name": "iOS widgets",
+          "version": "v2",
+          "description": "Home screen widgets: study streak, due decks, marketplace alerts.",
+          "platforms": ["ios"]
+        },
+        {
+          "name": "Email service",
+          "version": "v2",
+          "description": "Transactional emails: trial reminders, payment failure dunning, email verification, password reset.",
+          "platforms": ["web", "ios"]
+        },
+        {
+          "name": "Android app",
+          "version": "v2",
+          "description": "Kotlin/Jetpack Compose native app targeting same Express API.",
+          "platforms": ["android"]
+        }
+      ]
+    },
+
+    "design": {
+      "version": "v1",
+      "features": [
+        {
+          "name": "Warm parchment palette",
+          "version": "v1",
+          "description": "Background #FAF7F2, text #1A1614, accent green #1B6B5A, gold #C8A84E. System light/dark mode adaptation.",
+          "platforms": ["web", "ios"]
+        },
+        {
+          "name": "SF Symbols",
+          "version": "v1",
+          "description": "Native iOS icons throughout. No web icon ports.",
+          "platforms": ["ios"]
+        },
+        {
+          "name": "Liquid glass effects",
+          "version": "v2",
+          "description": "iOS 26 design language. Deferred — not publicly available. Progressive enhancement when iOS 26 ships.",
+          "platforms": ["ios"]
+        }
+      ]
+    }
+  },
+
+  "tech_stack": {
+    "backend": {
+      "runtime": "Node.js (ES modules)",
+      "framework": "Express 4",
+      "database": "PostgreSQL (Supabase in production)",
+      "auth": "bcrypt + 24h JWT",
+      "encryption": "AES-256-GCM (BYOK keys)",
+      "ai_providers": ["Groq (llama-3.3-70b)", "Gemini (gemini-2.5-flash-lite)", "OpenRouter (BYOK)"],
+      "payments_web": "Stripe Checkout + Stripe Connect Express",
+      "payments_ios": "Apple IAP (StoreKit 2) + App Store Server Notifications V2"
+    },
+    "web_client": {
+      "framework": "React 19 (Vite)",
+      "styling": "Tailwind CSS 3",
+      "routing": "react-router-dom v7",
+      "state": "React Context (AuthContext)"
+    },
+    "ios_client": {
+      "language": "Swift",
+      "framework": "SwiftUI (iOS 17+)",
+      "iap": "StoreKit 2",
+      "auth_storage": "Keychain (kSecAttrAccessibleWhenUnlockedThisDeviceOnly)",
+      "networking": "URLSession with async/await",
+      "architecture": "@Observable classes, plain APIClient (not actor)"
+    }
+  },
+
+  "database": {
+    "tables": [
+      "users", "decks", "cards", "study_sessions",
+      "marketplace_categories", "marketplace_listings", "listing_tags",
+      "purchases", "ratings", "content_flags",
+      "processed_apple_notifications", "schema_migrations"
+    ],
+    "migrations": [
+      "001_initial.sql",
+      "002_tiers_and_marketplace_prep.sql",
+      "003_marketplace.sql",
+      "004_ratings_and_flags.sql",
+      "005_byok_and_iap.sql",
+      "005b_validate_plan_check.sql"
+    ]
+  }
+}
