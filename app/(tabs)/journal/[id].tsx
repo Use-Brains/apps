@@ -10,17 +10,20 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTrade, useUpdateTrade, useDeleteTrade } from '@/hooks/use-trades';
+import { useStrategiesForTrade, useSetStrategyOnTrade } from '@/hooks/use-strategies';
 import { TradeForm } from '@/components/TradeForm';
 import { PnlBadge } from '@/components/PnlBadge';
 import { TradeImages } from '@/components/TradeImages';
 import { formatDateTime, formatCurrency } from '@/utils/format';
 import { fontSize, spacing, borderRadius, fontWeight, useTheme, useThemedStyles, type AppTheme } from '@/lib/theme';
+import { ThemedBackground } from '@/components/ThemedBackground';
 import type { TradeFormData } from '@/types/trades';
 import { mapTradeFormToUpdate } from '@/utils/trade-payloads';
 
 export default function TradeDetailScreen() {
-  const { theme } = useTheme();
+  const { theme, selection } = useTheme();
   const { colors } = theme;
+  const isGlass = selection.style === 'ios_glass';
   const styles = useThemedStyles(createStyles);
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -29,6 +32,13 @@ export default function TradeDetailScreen() {
   const { data: trade, isLoading } = useTrade(id!);
   const updateTrade = useUpdateTrade();
   const deleteTrade = useDeleteTrade();
+  const {
+    data: tradeStrategies,
+    isPending: strategiesLoading,
+    isError: strategiesError,
+    refetch: refetchStrategies,
+  } = useStrategiesForTrade(id!);
+  const setStrategyOnTrade = useSetStrategyOnTrade();
 
   const handleDelete = () => {
     Alert.alert('Delete Trade', 'Delete this trade? This cannot be undone.', [
@@ -48,58 +58,82 @@ export default function TradeDetailScreen() {
     ]);
   };
 
-  const handleUpdate = async (data: TradeFormData, _imagePaths: string[]) => {
+  const handleUpdate = async (data: TradeFormData, _imagePaths: string[], strategyIds: string[]) => {
     await updateTrade.mutateAsync({
       id: id!,
       ...mapTradeFormToUpdate(data),
     });
+
+    // Update strategy associations
+    try {
+      await setStrategyOnTrade.mutateAsync({ tradeId: id!, strategyIds });
+    } catch {
+      Alert.alert(
+        'Strategy Link Failed',
+        'Trade saved, but strategy tags failed to update.',
+        [{ text: 'OK' }]
+      );
+    }
+
     setEditing(false);
   };
 
   if (isLoading || !trade) {
     return (
-      <View style={styles.loading}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+      <ThemedBackground>
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </ThemedBackground>
     );
   }
 
   if (editing) {
     return (
-      <View style={styles.flex}>
-        <TradeForm
-          mode="edit"
-          defaultValues={{
-            symbol: trade.symbol,
-            asset_class: trade.asset_class,
-            side: trade.side,
-            status: trade.status,
-            entry_price: trade.entry_price,
-            exit_price: trade.exit_price,
-            size: trade.size,
-            fees: trade.fees,
-            entry_date: trade.entry_date,
-            exit_date: trade.exit_date,
-            confidence: trade.confidence,
-            thesis: trade.thesis,
-            notes: trade.notes,
-            setup_tags: trade.setup_tags,
-            mistake_tags: trade.mistake_tags,
-          }}
-          onSubmit={handleUpdate}
-          submitLabel="Update Trade"
-        />
-        <Pressable style={styles.cancelButton} onPress={() => setEditing(false)}>
-          <Text style={styles.cancelText}>Cancel</Text>
-        </Pressable>
-      </View>
+      <ThemedBackground>
+        <View style={styles.flex}>
+          <TradeForm
+            mode="edit"
+            defaultValues={{
+              symbol: trade.symbol,
+              asset_class: trade.asset_class,
+              side: trade.side,
+              status: trade.status,
+              entry_price: trade.entry_price,
+              exit_price: trade.exit_price,
+              size: trade.size,
+              fees: trade.fees,
+              entry_date: trade.entry_date,
+              exit_date: trade.exit_date,
+              confidence: trade.confidence,
+              thesis: trade.thesis,
+              notes: trade.notes,
+              setup_tags: trade.setup_tags,
+              mistake_tags: trade.mistake_tags,
+            }}
+            onSubmit={handleUpdate}
+            submitLabel="Update Trade"
+            initialStrategies={tradeStrategies}
+            strategiesLoading={strategiesLoading}
+            strategiesError={strategiesError}
+            onStrategiesRetry={() => refetchStrategies()}
+          />
+          <Pressable style={styles.cancelButton} onPress={() => setEditing(false)}>
+            <Text style={styles.cancelText}>Cancel</Text>
+          </Pressable>
+        </View>
+      </ThemedBackground>
     );
   }
 
   const images = trade.trade_images ?? [];
 
   return (
-    <ScrollView style={styles.flex} contentContainerStyle={styles.content}>
+    <ThemedBackground>
+    <ScrollView
+      style={[styles.flex, isGlass && { backgroundColor: 'transparent' }]}
+      contentContainerStyle={styles.content}
+    >
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.symbolRow}>
@@ -185,6 +219,7 @@ export default function TradeDetailScreen() {
         </Pressable>
       </View>
     </ScrollView>
+    </ThemedBackground>
   );
 }
 

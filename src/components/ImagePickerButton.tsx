@@ -1,6 +1,6 @@
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
-import { fontSize, spacing, borderRadius, useTheme, useThemedStyles, type AppTheme } from '@/lib/theme';
+import { fontSize, spacing, borderRadius, withAlpha, useTheme, useThemedStyles, type AppTheme } from '@/lib/theme';
 import type { PickedImage } from '@/hooks/use-images';
 
 interface ImagePickerButtonProps {
@@ -72,22 +72,22 @@ const createStyles = ({ colors }: AppTheme) =>
   },
   uploadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
   },
   uploadingText: {
-    color: '#fff',
+    color: colors.textInverse,
     fontWeight: '600',
   },
   errorOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(220,38,38,0.4)',
+    backgroundColor: withAlpha(colors.danger, 0.4),
     justifyContent: 'center',
     alignItems: 'center',
   },
   errorText: {
-    color: '#fff',
+    color: colors.textInverse,
     fontWeight: '700',
     fontSize: fontSize.lg,
   },
@@ -98,12 +98,12 @@ const createStyles = ({ colors }: AppTheme) =>
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: colors.overlayHeavy,
     justifyContent: 'center',
     alignItems: 'center',
   },
   removeText: {
-    color: '#fff',
+    color: colors.textInverse,
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 16,

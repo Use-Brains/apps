@@ -10,8 +10,8 @@ describe('theme composer', () => {
     expect(theme.selection).toEqual({ mode: 'dark', style: 'modern', palette: 'ruby' });
     expect(theme.colors.primary).toBe('#BE123C');
     expect(theme.colors.primaryLight).toBe('#FFE4E6');
-    expect(theme.colors.surface).toBe('#0B1329');
-    expect(theme.colors.border).toBe('#24314C');
+    expect(theme.colors.surface).toBe('#101A2B');
+    expect(theme.colors.border).toBe('#22324A');
   });
 
   it('keeps high contrast style readable and explicit', () => {

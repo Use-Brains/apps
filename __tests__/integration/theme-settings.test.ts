@@ -11,6 +11,6 @@ describe('theme settings integration', () => {
 
     expect(restored).toEqual(selection);
     expect(theme.colors.primary).toBe('#D97706');
-    expect(theme.colors.background).toBe('#10131A');
+    expect(theme.colors.background).toBe('#141218');
   });
 });

@@ -1,3 +1,4 @@
+export { withAlpha } from './color-utils';
 export { composeTheme, defaultTheme } from './compose';
 export { getContrastRatio } from './contrast';
 export {

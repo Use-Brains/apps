@@ -8,7 +8,8 @@ import { JournalStats } from '@/components/JournalStats';
 import { JournalViewTabs } from '@/components/JournalViewTabs';
 import { JournalPeriodScroller } from '@/components/JournalPeriodScroller';
 import { EmptyState } from '@/components/EmptyState';
-import { spacing, useTheme, useThemedStyles, type AppTheme } from '@/lib/theme';
+import { spacing, useThemedStyles, type AppTheme } from '@/lib/theme';
+import { ThemedBackground } from '@/components/ThemedBackground';
 import type { Trade } from '@/types/trades';
 import {
   buildJournalPeriodOptions,
@@ -18,8 +19,6 @@ import {
 } from '@/utils/journal-periods';
 
 export default function JournalScreen() {
-  const { theme } = useTheme();
-  const { colors } = theme;
   const styles = useThemedStyles(createStyles);
   const router = useRouter();
   const [viewMode, setViewMode] = useState<JournalViewMode>('daily');
@@ -123,7 +122,7 @@ export default function JournalScreen() {
   );
 
   return (
-    <View style={styles.container}>
+    <ThemedBackground>
       <FlashList
         testID="journal-trades-list"
         data={sortedTrades}
@@ -142,16 +141,12 @@ export default function JournalScreen() {
         }
         contentContainerStyle={styles.listContent}
       />
-    </View>
+    </ThemedBackground>
   );
 }
 
 const createStyles = ({ colors }: AppTheme) =>
   StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.surface,
-  },
   header: {
     gap: spacing.sm,
     paddingBottom: spacing.sm,

@@ -3,6 +3,7 @@ import { composeTheme, parseThemeSelection, THEME_STORAGE_KEY } from './theme-sy
 import type { ThemeMode, ThemePalette, ThemeStyle } from './theme-system';
 
 export {
+  withAlpha,
   ThemeProvider,
   useTheme,
   useThemedStyles,
@@ -75,8 +76,8 @@ export const themeModeLabels: Record<ThemeMode, string> = {
 export const themeStyleLabels: Record<ThemeStyle, string> = {
   classic: 'Classic',
   modern: 'Modern',
-  ios_glass: 'iOS Liquid Glass',
-  android_material: 'Android Material',
+  ios_glass: 'iOS Theme',
+  android_material: 'Android Theme',
   high_contrast: 'High Contrast',
 };
 

@@ -1,18 +1,27 @@
+import { modeColors } from './tokens';
 import type { ThemeColors, ThemeMode } from './types';
 
 function hexToRgb(hex: string): [number, number, number] | null {
   const normalized = hex.trim().replace('#', '');
   const isShort = normalized.length === 3;
   const isLong = normalized.length === 6;
+  const isShortWithAlpha = normalized.length === 4;
+  const isLongWithAlpha = normalized.length === 8;
 
-  if (!isShort && !isLong) return null;
+  if (!isShort && !isLong && !isShortWithAlpha && !isLongWithAlpha) return null;
 
-  const chars = isShort
-    ? normalized
+  const withoutAlpha = isShortWithAlpha
+    ? normalized.slice(0, 3)
+    : isLongWithAlpha
+      ? normalized.slice(0, 6)
+      : normalized;
+
+  const chars = (isShort || isShortWithAlpha)
+    ? withoutAlpha
         .split('')
         .map((char) => `${char}${char}`)
         .join('')
-    : normalized;
+    : withoutAlpha;
 
   const int = Number.parseInt(chars, 16);
   if (Number.isNaN(int)) return null;
@@ -52,11 +61,12 @@ export function ensureAccessibleText(colors: ThemeColors, mode: ThemeMode): Them
     return colors;
   }
 
+  const fallback = modeColors[mode];
   return {
     ...colors,
-    text: mode === 'dark' ? '#F8FAFC' : '#0F172A',
-    textSecondary: mode === 'dark' ? '#CBD5E1' : '#475569',
-    textTertiary: mode === 'dark' ? '#94A3B8' : '#64748B',
+    text: fallback.text,
+    textSecondary: fallback.textSecondary,
+    textTertiary: fallback.textTertiary,
   };
 }
 
