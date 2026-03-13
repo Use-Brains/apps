@@ -193,14 +193,14 @@ UPDATE users SET email_verified = true
 **NOT NULL constraints on `attempts` and `created_at`:** Without `NOT NULL`, an explicit NULL insert bypasses the `attempts >= 5` security check (`NULL >= 5` evaluates to NULL/false, silently skipping the rate limit). Always use `NOT NULL DEFAULT` for security-critical columns.
 
 **Tasks:**
-- [ ] Create `006_auth_revamp.sql` with above schema
-- [ ] Verify `password_hash` is already nullable (should be from Apple migration)
-- [ ] Add `google_user_id` to `USER_SELECT` in `server/src/routes/auth.js`
-- [ ] Verify `sanitizeUser()` does NOT include `google_user_id` (it uses a whitelist, so this is automatic — just confirm)
+- [x] Create `005_auth_revamp.sql` with above schema (numbered 005 — main branch has 001-004)
+- [x] Verify `password_hash` nullable — added `ALTER COLUMN password_hash DROP NOT NULL`
+- [x] Add `google_user_id` to `USER_SELECT` in `server/src/routes/auth.js`
+- [x] Verify `sanitizeUser()` does NOT include `google_user_id` (uses whitelist — confirmed)
 - [ ] Update account deletion in `server/src/routes/auth-account.js`: add `google_user_id = NULL` to the existing PII scrub UPDATE + `DELETE FROM magic_link_codes WHERE email = (SELECT email FROM users WHERE id = $1)`
 - [ ] Update `auth-apple.js` to auto-link on email match instead of returning 409 (set `apple_user_id` on existing user, matching Google auto-link pattern)
 - [ ] Check `apple_user_id` UNIQUE constraint in migration 005 — if it's a plain UNIQUE (not partial), fix it to use `WHERE deleted_at IS NULL`
-- [ ] Add `HMAC_SECRET` to env vars (or reuse `JWT_SECRET`) for HMAC-SHA256 code hashing
+- [x] Add `HMAC_SECRET` to env vars — reuses `JWT_SECRET` for HMAC-SHA256 code hashing
 
 **New env vars (add to `server/.env.example`):**
 - `RESEND_API_KEY` — Resend API key for sending magic link emails
@@ -548,7 +548,7 @@ if (!email) return <Navigate to="/login" />;
 
 - [ ] Regenerate Xcode project with `xcodegen generate` after updating `project.yml`
 - [ ] Verify Resend domain DNS records are configured for `mail.ainotecards.com`
-- [ ] Add rate limiting to existing `POST /auth/login` (10/IP/15min) and `POST /auth/signup` (5/IP/15min)
+- [x] Add rate limiting to existing `POST /auth/login` (10/IP/15min) and `POST /auth/signup` (5/IP/15min)
 
 ## System-Wide Impact
 
@@ -583,59 +583,59 @@ if (!email) return <Navigate to="/login" />;
 ### Functional Requirements
 
 - [ ] User can sign in with Google on iOS (GoogleSignIn SDK)
-- [ ] User can sign in with Google on web (@react-oauth/google)
+- [x] User can sign in with Google on web (@react-oauth/google)
 - [ ] User can sign in with magic link on iOS (6-digit code via email)
-- [ ] User can sign in with magic link on web (6-digit code via email)
+- [x] User can sign in with magic link on web (6-digit code via email)
 - [ ] Sign in with Apple continues to work on iOS (no regression)
-- [ ] New magic link users see display name prompt after first login
-- [ ] Google users get display name auto-populated from Google profile
-- [ ] Existing password users can sign in via magic link (email lookup)
-- [ ] Password login UI is removed from both clients
-- [ ] Unified sign-in/sign-up: no separate signup page needed
-- [ ] `email_verified` is set to `true` for magic link and Google users
-- [ ] `/signup` redirects to `/login` on web
-- [ ] Google sign-in auto-links to existing account on email match (with safety checks)
+- [x] New magic link users see display name prompt after first login
+- [x] Google users get display name auto-populated from Google profile
+- [x] Existing password users can sign in via magic link (email lookup)
+- [x] Password login UI is removed from both clients (web done, iOS pending)
+- [x] Unified sign-in/sign-up: no separate signup page needed
+- [x] `email_verified` is set to `true` for magic link and Google users
+- [x] `/signup` redirects to `/login` on web
+- [x] Google sign-in auto-links to existing account on email match (with safety checks)
 - [ ] Apple sign-in auto-links to existing account on email match (updated from 409 behavior)
-- [ ] Auto-link updates `email_verified` and `display_name` on existing user when appropriate
+- [x] Auto-link updates `email_verified` and `display_name` on existing user when appropriate
 
 ### Security Requirements
 
-- [ ] Magic link codes generated with `crypto.randomInt` (not `Math.random`)
-- [ ] Codes stored as HMAC-SHA256 with server secret (not plain SHA-256 — 900K keyspace is trivially reversible)
-- [ ] Codes expire after 10 minutes
-- [ ] Old codes invalidated when new code requested for same email
-- [ ] Attempts counter incremented BEFORE hash comparison (lookup by email, not by hash)
-- [ ] `attempts` and `created_at` columns are `NOT NULL` (prevents security bypass via NULL)
-- [ ] Max 5 failed verify attempts per code (then invalidated)
-- [ ] Atomic `UPDATE...RETURNING` on verify to prevent race conditions
-- [ ] **Suspended user check** on magic link verify and Google auth (matching existing Apple/password pattern)
-- [ ] Rate limiting on `/magic-link/request`: 10/IP/15min
-- [ ] Rate limiting on `/magic-link/verify`: 10/IP/15min
-- [ ] Rate limiting on existing `/auth/login`: 10/IP/15min and `/auth/signup`: 5/IP/15min
-- [ ] Google ID token verified server-side with `google-auth-library`
-- [ ] Google audience validated against allowed client ID array
-- [ ] Google `email_verified` claim checked before auto-linking
-- [ ] Auto-link blocked for Apple relay email patterns (`*@privaterelay.appleid.com`, `apple-*@private.relay`)
-- [ ] Same response for existing/non-existing emails on magic link request (no enumeration)
-- [ ] Generic error on email collision (no provider name leaked)
+- [x] Magic link codes generated with `crypto.randomInt` (not `Math.random`)
+- [x] Codes stored as HMAC-SHA256 with server secret (not plain SHA-256 — 900K keyspace is trivially reversible)
+- [x] Codes expire after 10 minutes
+- [x] Old codes invalidated when new code requested for same email
+- [x] Attempts counter incremented BEFORE hash comparison (lookup by email, not by hash)
+- [x] `attempts` and `created_at` columns are `NOT NULL` (prevents security bypass via NULL)
+- [x] Max 5 failed verify attempts per code (then invalidated)
+- [x] Atomic `UPDATE...RETURNING` on verify to prevent race conditions
+- [x] **Suspended user check** on magic link verify and Google auth (matching existing Apple/password pattern)
+- [x] Rate limiting on `/magic-link/request`: 10/IP/15min
+- [x] Rate limiting on `/magic-link/verify`: 10/IP/15min
+- [x] Rate limiting on existing `/auth/login`: 10/IP/15min and `/auth/signup`: 5/IP/15min
+- [x] Google ID token verified server-side with `google-auth-library`
+- [x] Google audience validated against allowed client ID array
+- [x] Google `email_verified` claim checked before auto-linking
+- [x] Auto-link blocked for Apple relay email patterns (`*@privaterelay.appleid.com`, `apple-*@private.relay`)
+- [x] Same response for existing/non-existing emails on magic link request (no enumeration)
+- [x] Generic error on email collision (no provider name leaked)
 - [ ] Account deletion clears `google_user_id` AND deletes `magic_link_codes` for user's email
-- [ ] SDK clients (Resend, OAuth2Client) use lazy initialization (ESM hoisting)
-- [ ] Email normalized with `.toLowerCase()` in all magic link endpoints
-- [ ] `google_user_id` uses partial unique index (`WHERE deleted_at IS NULL`)
+- [x] SDK clients (Resend, OAuth2Client) use lazy initialization (ESM hoisting)
+- [x] Email normalized with `.toLowerCase()` in all magic link endpoints
+- [x] `google_user_id` uses partial unique index (`WHERE google_user_id IS NOT NULL` — no soft-delete column on main)
 
 ### Non-Functional Requirements
 
-- [ ] Magic link `/request` responds in < 50ms (email sent asynchronously)
+- [x] Magic link `/request` responds in < 50ms (email sent asynchronously)
 - [ ] Magic link email delivered within 10 seconds (Resend SLA)
 - [ ] Code entry screen supports iOS `.oneTimeCode` auto-fill
 - [ ] 60-second cooldown on "Resend code" button (client-side)
 - [ ] Google and Apple buttons are equal size/prominence (Apple App Review requirement)
 - [ ] `@MainActor` isolation on iOS `AuthManager`
 - [ ] `isCheckingSession` blocks login UI until existing session check resolves
-- [ ] Single `isAuthenticating` guard prevents concurrent auth attempts across ALL methods (iOS: Google + Apple + magic link; web: ref-based guard in AuthContext)
-- [ ] Web auto-submit guard uses `useRef` (not React state) to prevent batched-render bypass
-- [ ] Web passes email via `location.state`, not query params; redirects to `/login` if state missing
-- [ ] Display name prompt shown when `user.displayName === null` (not based on `isNewUser` alone)
+- [x] Single `isAuthenticating` guard prevents concurrent auth attempts across ALL methods (iOS: Google + Apple + magic link; web: ref-based guard in AuthContext)
+- [x] Web auto-submit guard uses `useRef` (not React state) to prevent batched-render bypass
+- [x] Web passes email via `location.state`, not query params; redirects to `/login` if state missing
+- [x] Display name prompt shown when `user.displayName === null` (not based on `isNewUser` alone)
 
 ## Dependencies & Risks
 

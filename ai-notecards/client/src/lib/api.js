@@ -25,6 +25,13 @@ export const api = {
   logout: () => request('/auth/logout', { method: 'POST' }),
   me: () => request('/auth/me'),
 
+  // Auth — Google
+  authGoogle: (idToken) => request('/auth/google', { method: 'POST', body: JSON.stringify({ idToken }) }),
+
+  // Auth — Magic Link
+  magicLinkRequest: (email) => request('/auth/magic-link/request', { method: 'POST', body: JSON.stringify({ email }) }),
+  magicLinkVerify: (email, code) => request('/auth/magic-link/verify', { method: 'POST', body: JSON.stringify({ email, code }) }),
+
   // Generate
   generate: (input, title) => request('/generate', { method: 'POST', body: JSON.stringify({ input, title }) }),
 

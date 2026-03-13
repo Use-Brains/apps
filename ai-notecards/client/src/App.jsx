@@ -1,9 +1,11 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './lib/AuthContext.jsx';
 import Landing from './pages/Landing.jsx';
 import Login from './pages/Login.jsx';
-import Signup from './pages/Signup.jsx';
+import VerifyCode from './pages/VerifyCode.jsx';
+import Welcome from './pages/Welcome.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import DeckView from './pages/DeckView.jsx';
 import Generate from './pages/Generate.jsx';
@@ -36,32 +38,38 @@ function PublicRoute({ children }) {
   return children;
 }
 
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+
 export default function App() {
   return (
-    <AuthProvider>
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          duration: 3000,
-          style: { background: '#1A1614', color: '#fff', borderRadius: '12px' },
-        }}
-      />
-      <Routes>
-        <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
-        <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-        <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
-        <Route path="/pricing" element={<Pricing />} />
-        <Route path="/marketplace" element={<Marketplace />} />
-        <Route path="/marketplace/:id" element={<MarketplaceDeck />} />
-        <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-        <Route path="/decks/:id" element={<ProtectedRoute><DeckView /></ProtectedRoute>} />
-        <Route path="/generate" element={<ProtectedRoute><Generate /></ProtectedRoute>} />
-        <Route path="/study/:deckId" element={<ProtectedRoute><Study /></ProtectedRoute>} />
-        <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-        <Route path="/sell/:deckId" element={<ProtectedRoute><ListDeck /></ProtectedRoute>} />
-        <Route path="/seller" element={<ProtectedRoute><SellerDashboard /></ProtectedRoute>} />
-        <Route path="/admin/flags" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
-      </Routes>
-    </AuthProvider>
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <AuthProvider>
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            duration: 3000,
+            style: { background: '#1A1614', color: '#fff', borderRadius: '12px' },
+          }}
+        />
+        <Routes>
+          <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
+          <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+          <Route path="/signup" element={<Navigate to="/login" replace />} />
+          <Route path="/verify-code" element={<PublicRoute><VerifyCode /></PublicRoute>} />
+          <Route path="/welcome" element={<ProtectedRoute><Welcome /></ProtectedRoute>} />
+          <Route path="/pricing" element={<Pricing />} />
+          <Route path="/marketplace" element={<Marketplace />} />
+          <Route path="/marketplace/:id" element={<MarketplaceDeck />} />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/decks/:id" element={<ProtectedRoute><DeckView /></ProtectedRoute>} />
+          <Route path="/generate" element={<ProtectedRoute><Generate /></ProtectedRoute>} />
+          <Route path="/study/:deckId" element={<ProtectedRoute><Study /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+          <Route path="/sell/:deckId" element={<ProtectedRoute><ListDeck /></ProtectedRoute>} />
+          <Route path="/seller" element={<ProtectedRoute><SellerDashboard /></ProtectedRoute>} />
+          <Route path="/admin/flags" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+        </Routes>
+      </AuthProvider>
+    </GoogleOAuthProvider>
   );
 }

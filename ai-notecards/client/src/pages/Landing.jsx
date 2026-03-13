@@ -24,7 +24,7 @@ export default function Landing() {
         </p>
         <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
           <Link
-            to="/signup"
+            to="/login"
             className="px-8 py-3.5 bg-[#1B6B5A] text-white rounded-xl text-lg font-semibold hover:bg-[#155a4a] transition-all hover:shadow-lg hover:shadow-[#1B6B5A]/25 active:scale-[0.98]"
           >
             Start studying for free
@@ -126,7 +126,7 @@ export default function Landing() {
               ))}
             </ul>
             <Link
-              to="/signup"
+              to="/login"
               className="mt-8 block text-center px-6 py-3 bg-gray-100 text-[#1A1614] rounded-xl font-medium hover:bg-gray-200 transition-colors"
             >
               Get started
@@ -154,7 +154,7 @@ export default function Landing() {
               ))}
             </ul>
             <Link
-              to="/signup"
+              to="/login"
               className="mt-8 block text-center px-6 py-3 bg-white text-[#1B6B5A] rounded-xl font-semibold hover:bg-[#E8F5F0] transition-colors"
             >
               Start free trial
