@@ -83,6 +83,7 @@ router.get('/', async (req, res) => {
       else nextCursor = `${last.purchase_count}_${last.id}`;
     }
 
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
     res.json({ listings, nextCursor, hasMore });
   } catch (err) {
     console.error('Marketplace browse error:', err);
@@ -156,9 +157,26 @@ router.get('/:id', async (req, res) => {
 });
 
 // Flag a listing
-router.post('/:id/flag', async (req, res) => {
-  // Will be fully implemented in Phase 4
-  res.status(501).json({ error: 'Not yet implemented' });
+router.post('/:id/flag', authenticate, async (req, res) => {
+  const { reason } = req.body;
+  const VALID_REASONS = ['Inappropriate', 'Misleading', 'Spam', 'Low Quality', 'Other'];
+
+  if (!reason || !VALID_REASONS.includes(reason)) {
+    return res.status(400).json({ error: `Reason must be one of: ${VALID_REASONS.join(', ')}` });
+  }
+
+  try {
+    await pool.query(
+      `INSERT INTO content_flags (listing_id, reporter_id, reason)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (listing_id, reporter_id) DO NOTHING`,
+      [req.params.id, req.userId, reason]
+    );
+    res.status(201).json({ ok: true });
+  } catch (err) {
+    console.error('Flag listing error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // Purchase — create Stripe Checkout session
