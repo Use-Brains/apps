@@ -15,6 +15,8 @@ import deckRoutes from './routes/decks.js';
 import studyRoutes from './routes/study.js';
 import stripeRoutes from './routes/stripe.js';
 import settingsRoutes from './routes/settings.js';
+import marketplaceRoutes from './routes/marketplace.js';
+import sellerRoutes from './routes/seller.js';
 import pool from './db/pool.js';
 
 const app = express();
@@ -40,6 +42,8 @@ app.use('/api/decks', deckRoutes);
 app.use('/api/study', studyRoutes);
 app.use('/api/stripe', stripeRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/marketplace', marketplaceRoutes);
+app.use('/api/seller', sellerRoutes);
 
 // Health check with DB connection test
 app.get('/api/health', async (req, res) => {
