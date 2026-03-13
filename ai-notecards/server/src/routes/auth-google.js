@@ -1,0 +1,122 @@
+import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
+import pool from '../db/pool.js';
+import { USER_SELECT, setTokenCookie, sanitizeUser } from './auth.js';
+
+const router = Router();
+
+const googleLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
+
+// Lazy-initialized OAuth2Client (ESM hoisting)
+let oauthClient;
+async function getOAuthClient() {
+  if (!oauthClient) {
+    const { OAuth2Client } = await import('google-auth-library');
+    oauthClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+  }
+  return oauthClient;
+}
+
+// Apple relay email patterns — never auto-link to these
+function isAppleRelayEmail(email) {
+  return email.endsWith('@privaterelay.appleid.com') || /^apple-[a-z0-9]+@private\.relay$/i.test(email);
+}
+
+// POST / — verify Google ID token, login/create user
+router.post('/', googleLimiter, async (req, res) => {
+  const { idToken } = req.body;
+  if (!idToken) {
+    return res.status(400).json({ error: 'ID token is required' });
+  }
+
+  try {
+    const client = await getOAuthClient();
+    const audience = [process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_IOS_CLIENT_ID].filter(Boolean);
+
+    const ticket = await client.verifyIdToken({ idToken, audience });
+    const payload = ticket.getPayload();
+
+    const { sub, email, name, email_verified } = payload;
+    if (!email) {
+      return res.status(400).json({ error: 'Google account has no email' });
+    }
+
+    const normalizedEmail = email.toLowerCase();
+
+    // 1. Lookup by google_user_id
+    const googleResult = await pool.query(
+      `SELECT ${USER_SELECT} FROM users WHERE google_user_id = $1`,
+      [sub]
+    );
+
+    if (googleResult.rows.length > 0) {
+      const user = googleResult.rows[0];
+      if (user.suspended) {
+        return res.status(403).json({ error: 'Account suspended. Contact support.', code: 'AUTH_ACCOUNT_SUSPENDED' });
+      }
+      setTokenCookie(res, user.id);
+      return res.json({ user: sanitizeUser(user), isNewUser: false });
+    }
+
+    // 2. Check email match for auto-link
+    const emailResult = await pool.query(
+      `SELECT ${USER_SELECT} FROM users WHERE email = $1`,
+      [normalizedEmail]
+    );
+
+    if (emailResult.rows.length > 0) {
+      const user = emailResult.rows[0];
+      if (user.suspended) {
+        return res.status(403).json({ error: 'Account suspended. Contact support.', code: 'AUTH_ACCOUNT_SUSPENDED' });
+      }
+
+      // Auto-link safety: require Google email_verified, block relay emails
+      if (!email_verified || isAppleRelayEmail(normalizedEmail)) {
+        return res.status(409).json({ error: 'An account with this email already exists. Try signing in with a different method.' });
+      }
+
+      // Auto-link: set google_user_id, update email_verified and display_name if needed
+      const updates = ['google_user_id = $2'];
+      const params = [user.id, sub];
+      let paramIdx = 3;
+
+      updates.push(`email_verified = true`);
+
+      if (!user.display_name && name) {
+        updates.push(`display_name = $${paramIdx}`);
+        params.push(name);
+        paramIdx++;
+      }
+
+      await pool.query(
+        `UPDATE users SET ${updates.join(', ')} WHERE id = $1`,
+        params
+      );
+
+      // Re-fetch to get updated data
+      const updated = await pool.query(`SELECT ${USER_SELECT} FROM users WHERE id = $1`, [user.id]);
+      setTokenCookie(res, user.id);
+      return res.json({ user: sanitizeUser(updated.rows[0]), isNewUser: false });
+    }
+
+    // 3. Create new user
+    const newUser = await pool.query(
+      `INSERT INTO users (email, display_name, google_user_id, email_verified, plan, trial_ends_at)
+       VALUES ($1, $2, $3, true, 'trial', NOW() + INTERVAL '7 days')
+       RETURNING ${USER_SELECT}`,
+      [normalizedEmail, name || null, sub]
+    );
+
+    const user = newUser.rows[0];
+    setTokenCookie(res, user.id);
+    res.status(201).json({ user: sanitizeUser(user), isNewUser: true });
+  } catch (err) {
+    if (err.message?.includes('Token used too late') || err.message?.includes('Invalid token')) {
+      return res.status(401).json({ error: 'Invalid or expired Google token' });
+    }
+    console.error('Google auth error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+export default router;
