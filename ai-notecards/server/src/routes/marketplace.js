@@ -59,7 +59,7 @@ router.get('/', async (req, res) => {
       SELECT ml.id, ml.title, ml.description, ml.price_cents, ml.purchase_count,
              ml.average_rating, ml.rating_count, ml.created_at,
              mc.name AS category_name, mc.slug AS category_slug,
-             u.display_name AS seller_name, u.study_score AS seller_study_score,
+             COALESCE(u.display_name, 'Deleted User') AS seller_name, u.study_score AS seller_study_score,
              (SELECT COUNT(*)::int FROM cards WHERE deck_id = ml.deck_id) AS card_count,
              ARRAY(SELECT tag FROM listing_tags WHERE listing_id = ml.id) AS tags
       FROM marketplace_listings ml
@@ -116,12 +116,12 @@ router.get('/:id', async (req, res) => {
   try {
     const { rows: listings } = await pool.query(`
       SELECT ml.*, mc.name AS category_name, mc.slug AS category_slug,
-             u.display_name AS seller_name, u.study_score AS seller_study_score, u.id AS seller_user_id,
+             COALESCE(u.display_name, 'Deleted User') AS seller_name, u.study_score AS seller_study_score, u.id AS seller_user_id,
              ARRAY(SELECT tag FROM listing_tags WHERE listing_id = ml.id) AS tags
       FROM marketplace_listings ml
       JOIN marketplace_categories mc ON mc.id = ml.category_id
       JOIN users u ON u.id = ml.seller_id
-      WHERE ml.id = $1
+      WHERE ml.id = $1 AND ml.status != 'removed'
     `, [req.params.id]);
 
     if (listings.length === 0) {

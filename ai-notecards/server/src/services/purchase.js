@@ -175,18 +175,17 @@ export async function fulfillPurchase(paymentIntentId, metadata) {
 
     // Batch insert cards
     if (sourceCards.length > 0) {
-      const values = sourceCards.map((_, i) => {
-        const offset = i * 3;
-        return `($${offset + 1}, $${offset + 2}, $${offset + 3}, ${newDeckId ? `'${newDeckId}'::uuid` : 'NULL'})`;
-      });
-
-      // Simpler approach: individual inserts are fine for <= 30 cards
-      for (const card of sourceCards) {
-        await client.query(
-          'INSERT INTO cards (deck_id, front, back, position) VALUES ($1, $2, $3, $4)',
-          [newDeckId, card.front, card.back, card.position]
-        );
+      const values = [];
+      const params = [];
+      for (let i = 0; i < sourceCards.length; i++) {
+        const offset = i * 4;
+        values.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4})`);
+        params.push(newDeckId, sourceCards[i].front, sourceCards[i].back, sourceCards[i].position);
       }
+      await client.query(
+        `INSERT INTO cards (deck_id, front, back, position) VALUES ${values.join(', ')}`,
+        params
+      );
     }
 
     // Atomically increment purchase count
