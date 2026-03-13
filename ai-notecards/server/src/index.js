@@ -45,6 +45,62 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/marketplace', marketplaceRoutes);
 app.use('/api/seller', sellerRoutes);
 
+// Stripe Connect webhook (separate endpoint, separate signing secret)
+import Stripe from 'stripe';
+app.post('/webhooks/stripe-connect', async (req, res) => {
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  const sig = req.headers['stripe-signature'];
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_CONNECT_WEBHOOK_SECRET);
+  } catch (err) {
+    console.error('Connect webhook signature verification failed:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  try {
+    switch (event.type) {
+      case 'account.updated': {
+        const account = event.data.object;
+        await pool.query(
+          `UPDATE users SET connect_charges_enabled = $1, connect_payouts_enabled = $2
+           WHERE stripe_connect_account_id = $3`,
+          [account.charges_enabled, account.payouts_enabled, account.id]
+        );
+        if (account.requirements?.currently_due?.length > 0) {
+          console.log(`Connect account ${account.id} has pending requirements:`, account.requirements.currently_due);
+        }
+        break;
+      }
+
+      case 'account.application.deauthorized': {
+        const account = event.data.object;
+        // Mark seller as disconnected and delist all active listings
+        await pool.query(
+          `UPDATE users SET connect_charges_enabled = false, connect_payouts_enabled = false,
+           stripe_connect_account_id = NULL WHERE stripe_connect_account_id = $1`,
+          [account.id]
+        );
+        await pool.query(
+          `UPDATE marketplace_listings SET status = 'delisted', updated_at = NOW()
+           WHERE seller_id = (SELECT id FROM users WHERE stripe_connect_account_id = $1)
+           AND status = 'active'`,
+          [account.id]
+        );
+        console.log(`Connect account ${account.id} deauthorized — listings delisted`);
+        break;
+      }
+
+      default:
+        break;
+    }
+  } catch (err) {
+    console.error(`Connect webhook ${event.type} error:`, err);
+  }
+
+  res.json({ received: true });
+});
+
 // Health check with DB connection test
 app.get('/api/health', async (req, res) => {
   try {
