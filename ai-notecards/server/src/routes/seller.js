@@ -1,7 +1,12 @@
 import { Router } from 'express';
+import Stripe from 'stripe';
 import { authenticate } from '../middleware/auth.js';
 import { checkTrialExpiry, requirePlan } from '../middleware/plan.js';
 import pool from '../db/pool.js';
+
+function getStripe() {
+  return new Stripe(process.env.STRIPE_SECRET_KEY);
+}
 
 const router = Router();
 
@@ -283,17 +288,112 @@ router.get('/dashboard', authenticate, async (req, res) => {
   }
 });
 
-// Stripe Connect onboarding — placeholder, fully implemented in Phase 3
-router.post('/onboard', authenticate, async (req, res) => {
-  res.status(501).json({ error: 'Not yet implemented' });
+// Stripe Connect onboarding — create Express account + account link
+router.post('/onboard', authenticate, checkTrialExpiry, requirePlan('pro'), async (req, res) => {
+  try {
+    const stripe = getStripe();
+    const { rows } = await pool.query(
+      'SELECT email, stripe_connect_account_id FROM users WHERE id = $1',
+      [req.userId]
+    );
+    const user = rows[0];
+
+    let accountId = user.stripe_connect_account_id;
+
+    if (!accountId) {
+      // Create Express connected account with prefilled info
+      const account = await stripe.accounts.create({
+        type: 'express',
+        email: user.email,
+        capabilities: {
+          card_payments: { requested: true },
+          transfers: { requested: true },
+        },
+        metadata: { user_id: req.userId },
+      });
+      accountId = account.id;
+      await pool.query(
+        'UPDATE users SET stripe_connect_account_id = $1 WHERE id = $2',
+        [accountId, req.userId]
+      );
+    }
+
+    // Create account link
+    const accountLink = await stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: `${process.env.CLIENT_URL}/seller?connect=refresh`,
+      return_url: `${process.env.CLIENT_URL}/seller?connect=return`,
+      type: 'account_onboarding',
+      collection_options: { fields: 'eventually_due' },
+    });
+
+    res.json({ url: accountLink.url });
+  } catch (err) {
+    console.error('Connect onboarding error:', err);
+    res.status(500).json({ error: 'Failed to start onboarding' });
+  }
 });
 
+// Regenerate account link (they're single-use and expire)
 router.get('/onboard/refresh', authenticate, async (req, res) => {
-  res.status(501).json({ error: 'Not yet implemented' });
+  try {
+    const stripe = getStripe();
+    const { rows } = await pool.query(
+      'SELECT stripe_connect_account_id FROM users WHERE id = $1',
+      [req.userId]
+    );
+    const accountId = rows[0]?.stripe_connect_account_id;
+    if (!accountId) {
+      return res.status(400).json({ error: 'No Connect account found. Start onboarding first.' });
+    }
+
+    const accountLink = await stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: `${process.env.CLIENT_URL}/seller?connect=refresh`,
+      return_url: `${process.env.CLIENT_URL}/seller?connect=return`,
+      type: 'account_onboarding',
+      collection_options: { fields: 'eventually_due' },
+    });
+
+    res.json({ url: accountLink.url });
+  } catch (err) {
+    console.error('Connect refresh error:', err);
+    res.status(500).json({ error: 'Failed to regenerate onboarding link' });
+  }
 });
 
+// Verify Connect status after return from Stripe
 router.get('/onboard/return', authenticate, async (req, res) => {
-  res.status(501).json({ error: 'Not yet implemented' });
+  try {
+    const stripe = getStripe();
+    const { rows } = await pool.query(
+      'SELECT stripe_connect_account_id FROM users WHERE id = $1',
+      [req.userId]
+    );
+    const accountId = rows[0]?.stripe_connect_account_id;
+    if (!accountId) {
+      return res.json({ onboarded: false });
+    }
+
+    // Return URL does NOT mean onboarding is complete — verify via API
+    const account = await stripe.accounts.retrieve(accountId);
+
+    await pool.query(
+      `UPDATE users SET connect_charges_enabled = $1, connect_payouts_enabled = $2 WHERE id = $3`,
+      [account.charges_enabled, account.payouts_enabled, req.userId]
+    );
+
+    res.json({
+      onboarded: account.charges_enabled && account.details_submitted,
+      charges_enabled: account.charges_enabled,
+      payouts_enabled: account.payouts_enabled,
+      details_submitted: account.details_submitted,
+      requirements: account.requirements?.currently_due || [],
+    });
+  } catch (err) {
+    console.error('Connect return check error:', err);
+    res.status(500).json({ error: 'Failed to verify onboarding status' });
+  }
 });
 
 export default router;
