@@ -72,7 +72,10 @@ export async function syncRevenueCatIdentity(appUserID: string | null) {
   if (appUserID) {
     await Purchases.logIn(appUserID);
   } else {
-    await Purchases.logOut();
+    const currentInfo = await Purchases.getCustomerInfo();
+    if (!currentInfo.originalAppUserId.startsWith('$RCAnonymousID')) {
+      await Purchases.logOut();
+    }
   }
 
   return Purchases.getCustomerInfo();

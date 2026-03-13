@@ -83,7 +83,7 @@ describe('revenuecat lib', () => {
   });
 
   it('logs in and logs out with identity sync', async () => {
-    const customerInfo = { entitlements: { active: {} } };
+    const customerInfo = { originalAppUserId: 'abc123', entitlements: { active: {} } };
     purchasesMock.getCustomerInfo.mockResolvedValue(customerInfo);
 
     const { syncRevenueCatIdentity } = await loadModule();
@@ -95,6 +95,20 @@ describe('revenuecat lib', () => {
     const logoutInfo = await syncRevenueCatIdentity(null);
     expect(purchasesMock.logOut).toHaveBeenCalled();
     expect(logoutInfo).toBe(customerInfo);
+  });
+
+  it('skips logOut when current user is already anonymous', async () => {
+    const anonymousCustomerInfo = {
+      originalAppUserId: '$RCAnonymousID:somerandombits',
+      entitlements: { active: {} },
+    };
+    purchasesMock.getCustomerInfo.mockResolvedValue(anonymousCustomerInfo);
+    purchasesMock.logOut.mockClear();
+
+    const { syncRevenueCatIdentity } = await loadModule();
+
+    await syncRevenueCatIdentity(null);
+    expect(purchasesMock.logOut).not.toHaveBeenCalled();
   });
 
   it('maps packages by monthly yearly lifetime identifiers', async () => {

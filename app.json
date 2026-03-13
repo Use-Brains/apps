@@ -2,7 +2,7 @@
   "expo": {
     "name": "Trade Journal",
     "slug": "trade-journal",
-    "version": "1.0.0",
+    "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "trade-journal",
@@ -28,20 +28,13 @@
       },
       "allowBackup": false,
       "package": "com.tradejournal.app",
-      "permissions": [
-        "android.permission.RECORD_AUDIO",
-        "com.android.vending.BILLING"
-      ]
+      "permissions": ["android.permission.RECORD_AUDIO", "com.android.vending.BILLING"]
     },
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
-    "plugins": [
-      "expo-router",
-      "expo-secure-store",
-      "expo-image-picker"
-    ],
+    "plugins": ["expo-router", "expo-secure-store", "expo-image-picker"],
     "extra": {
       "router": {},
       "eas": {
