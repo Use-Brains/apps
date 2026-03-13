@@ -17,12 +17,12 @@ export interface PickedImage {
   error?: string;
 }
 
-export function useImages() {
+export function useImages(bucketName: string = 'trade-images', maxImages: number = MAX_IMAGES) {
   const [images, setImages] = useState<PickedImage[]>([]);
 
   const pickImages = useCallback(async () => {
-    if (images.length >= MAX_IMAGES) {
-      Alert.alert('Limit reached', `Maximum ${MAX_IMAGES} images per trade.`);
+    if (images.length >= maxImages) {
+      Alert.alert('Limit reached', `Maximum ${maxImages} images.`);
       return;
     }
 
@@ -35,7 +35,7 @@ export function useImages() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsMultipleSelection: true,
-      selectionLimit: MAX_IMAGES - images.length,
+      selectionLimit: maxImages - images.length,
       quality: 1,
     });
 
@@ -43,7 +43,7 @@ export function useImages() {
       const newImages: PickedImage[] = result.assets.map((asset) => ({
         uri: asset.uri,
       }));
-      setImages((prev) => [...prev, ...newImages].slice(0, MAX_IMAGES));
+      setImages((prev) => [...prev, ...newImages].slice(0, maxImages));
     }
   }, [images.length]);
 
@@ -84,7 +84,7 @@ export function useImages() {
           // Upload
           const path = `${user.id}/${tradeId}/${Date.now()}_${i}.jpg`;
           const { error } = await supabase.storage
-            .from('trade-images')
+            .from(bucketName)
             .upload(path, decode(base64), {
               contentType: 'image/jpeg',
             });
@@ -126,14 +126,14 @@ export function useImages() {
   };
 }
 
-export function getImageUrl(storagePath: string): string {
-  const { data } = supabase.storage.from('trade-images').getPublicUrl(storagePath);
+export function getImageUrl(storagePath: string, bucketName: string = 'trade-images'): string {
+  const { data } = supabase.storage.from(bucketName).getPublicUrl(storagePath);
   return data.publicUrl;
 }
 
-export function getSignedImageUrl(storagePath: string): Promise<string> {
+export function getSignedImageUrl(storagePath: string, bucketName: string = 'trade-images'): Promise<string> {
   return supabase.storage
-    .from('trade-images')
+    .from(bucketName)
     .createSignedUrl(storagePath, 3600) // 1 hour
     .then(({ data, error }) => {
       if (error) throw error;

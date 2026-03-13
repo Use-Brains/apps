@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { tradeKeys, type Trade, type TradeInsert, type TradeUpdate } from '@/types/trades';
+import { strategyKeys } from '@/types/strategies';
 import {
   applyTradeFilterOperations,
   buildTradeFilterOperations,
@@ -109,6 +110,8 @@ export function useDeleteTrade() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: tradeKeys.all });
+      // Invalidate strategy stats since linked trades may have been deleted
+      queryClient.invalidateQueries({ queryKey: strategyKeys.all });
     },
   });
 }

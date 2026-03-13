@@ -131,9 +131,169 @@ export interface Database {
           },
         ];
       };
+      strategies: {
+        Row: {
+          id: string;
+          user_id: string;
+          title: string;
+          emoji: string | null;
+          color: string | null;
+          status: 'active' | 'testing' | 'archived';
+          active_from: string | null;
+          active_to: string | null;
+          description: string | null;
+          entry_criteria: string | null;
+          exit_criteria: string | null;
+          expected_win_rate: number | null;
+          risk_reward_ratio: number | null;
+          market_conditions: string[];
+          asset_classes: string[];
+          timeframes: string[];
+          notes: string | null;
+          favorite_order: number | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          title: string;
+          emoji?: string | null;
+          color?: string | null;
+          status?: 'active' | 'testing' | 'archived';
+          active_from?: string | null;
+          active_to?: string | null;
+          description?: string | null;
+          entry_criteria?: string | null;
+          exit_criteria?: string | null;
+          expected_win_rate?: number | null;
+          risk_reward_ratio?: number | null;
+          market_conditions?: string[];
+          asset_classes?: string[];
+          timeframes?: string[];
+          notes?: string | null;
+          favorite_order?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          title?: string;
+          emoji?: string | null;
+          color?: string | null;
+          status?: 'active' | 'testing' | 'archived';
+          active_from?: string | null;
+          active_to?: string | null;
+          description?: string | null;
+          entry_criteria?: string | null;
+          exit_criteria?: string | null;
+          expected_win_rate?: number | null;
+          risk_reward_ratio?: number | null;
+          market_conditions?: string[];
+          asset_classes?: string[];
+          timeframes?: string[];
+          notes?: string | null;
+          favorite_order?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'strategies_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      trade_strategies: {
+        Row: {
+          trade_id: string;
+          strategy_id: string;
+        };
+        Insert: {
+          trade_id: string;
+          strategy_id: string;
+        };
+        Update: {
+          trade_id?: string;
+          strategy_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'trade_strategies_trade_id_fkey';
+            columns: ['trade_id'];
+            isOneToOne: false;
+            referencedRelation: 'trades';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'trade_strategies_strategy_id_fkey';
+            columns: ['strategy_id'];
+            isOneToOne: false;
+            referencedRelation: 'strategies';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      strategy_images: {
+        Row: {
+          id: string;
+          strategy_id: string;
+          user_id: string;
+          storage_path: string;
+          caption: string | null;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          strategy_id: string;
+          user_id: string;
+          storage_path: string;
+          caption?: string | null;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          strategy_id?: string;
+          user_id?: string;
+          storage_path?: string;
+          caption?: string | null;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'strategy_images_strategy_id_fkey';
+            columns: ['strategy_id'];
+            isOneToOne: false;
+            referencedRelation: 'strategies';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'strategy_images_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
     };
     Views: {};
-    Functions: {};
+    Functions: {
+      compact_favorites: {
+        Args: {
+          p_user_id: string;
+          p_strategy_id: string;
+        };
+        Returns: undefined;
+      };
+    };
     Enums: {};
   };
 }

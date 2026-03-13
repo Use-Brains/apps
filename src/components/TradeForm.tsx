@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { tradeFormSchema, type TradeFormData } from '@/types/trades';
 import { useDistinctTags } from '@/hooks/use-trades';
 import { useImages } from '@/hooks/use-images';
@@ -29,7 +30,9 @@ import {
 } from '@/features/assets/quotes';
 import { TagInput } from './TagInput';
 import { ImagePickerButton } from './ImagePickerButton';
+import { StrategyTagsSection } from './StrategyTagsSection';
 import { fontSize, spacing, borderRadius, fontWeight, useTheme, useThemedStyles, type AppTheme } from '@/lib/theme';
+import type { Strategy } from '@/types/strategies';
 
 const ASSET_CLASSES = ['crypto', 'stocks', 'options', 'futures', 'forex'] as const;
 const SYMBOL_PLACEHOLDERS: Record<(typeof ASSET_CLASSES)[number], string> = {
@@ -42,10 +45,14 @@ const SYMBOL_PLACEHOLDERS: Record<(typeof ASSET_CLASSES)[number], string> = {
 
 interface TradeFormProps {
   defaultValues?: Partial<TradeFormData>;
-  onSubmit: (data: TradeFormData, imagePaths: string[]) => Promise<void>;
+  onSubmit: (data: TradeFormData, imagePaths: string[], strategyIds: string[]) => Promise<void>;
   submitLabel?: string;
   resetOnSuccess?: boolean;
   mode?: 'create' | 'edit';
+  initialStrategies?: Strategy[];
+  strategiesLoading?: boolean;
+  strategiesError?: boolean;
+  onStrategiesRetry?: () => void;
 }
 
 export function TradeForm({
@@ -54,13 +61,23 @@ export function TradeForm({
   submitLabel = 'Save Trade',
   resetOnSuccess = false,
   mode = 'create',
+  initialStrategies,
+  strategiesLoading,
+  strategiesError,
+  onStrategiesRetry,
 }: TradeFormProps) {
-  const { theme } = useTheme();
+  const { theme, selection } = useTheme();
   const { colors } = theme;
+  const isGlass = selection.style === 'ios_glass';
   const styles = useThemedStyles(createStyles);
+  const insets = useSafeAreaInsets();
   const isEditMode = mode === 'edit';
   const enablePriceAutomation = mode === 'create';
   const [submitting, setSubmitting] = useState(false);
+  const [selectedStrategies, setSelectedStrategies] = useState<Strategy[]>(
+    initialStrategies ?? []
+  );
+  const strategiesWereTouched = useRef(false);
   const [isSymbolFocused, setIsSymbolFocused] = useState(false);
   const [prefillLoading, setPrefillLoading] = useState(false);
   const [prefillMessage, setPrefillMessage] = useState<string | null>(null);
@@ -71,6 +88,18 @@ export function TradeForm({
   const suggestionPriceRequestRef = useRef(0);
   const { data: tagData } = useDistinctTags();
   const { images, pickImages, removeImage, uploadImages, reset: resetImages } = useImages();
+
+  // Sync initialStrategies when they load in edit mode (don't mark as touched)
+  useEffect(() => {
+    if (initialStrategies && initialStrategies.length > 0) {
+      setSelectedStrategies(initialStrategies);
+    }
+  }, [initialStrategies]);
+
+  const handleStrategiesChange = (strategies: Strategy[]) => {
+    setSelectedStrategies(strategies);
+    strategiesWereTouched.current = true;
+  };
 
   const {
     control,
@@ -235,14 +264,35 @@ export function TradeForm({
   };
 
   const handleFormSubmit = handleSubmit(async (data) => {
+    // Block save in edit mode if strategies are loading/errored
+    if (isEditMode && (strategiesLoading || strategiesError)) return;
+
+    // No-strategy nudge
+    if (selectedStrategies.length === 0) {
+      const proceed = await new Promise<boolean>((resolve) => {
+        Alert.alert(
+          'No Strategy Tagged',
+          'Save without linking a strategy?',
+          [
+            { text: 'Add Strategy', style: 'cancel', onPress: () => resolve(false) },
+            { text: 'Save Anyway', style: 'default', onPress: () => resolve(true) },
+          ]
+        );
+      });
+      if (!proceed) return;
+    }
+
     setSubmitting(true);
     try {
+      const strategyIds = selectedStrategies.map((s) => s.id);
       // Upload images first (will be linked to trade after creation)
       const imagePaths = images.length > 0 ? await uploadImages('pending') : [];
-      await onSubmit(data, imagePaths);
+      await onSubmit(data, imagePaths, strategyIds);
 
       if (resetOnSuccess) {
         reset();
+        setSelectedStrategies([]);
+        strategiesWereTouched.current = false;
         setIsSymbolFocused(false);
         setPrefillLoading(false);
         setPrefillMessage(null);
@@ -265,9 +315,13 @@ export function TradeForm({
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.flex}
+      style={[styles.flex, isGlass && { backgroundColor: 'transparent' }]}
     >
-      <ScrollView style={styles.flex} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        style={[styles.flex, isGlass && { backgroundColor: 'transparent' }]}
+        contentContainerStyle={[styles.content, { paddingTop: spacing.lg + insets.top }]}
+        keyboardShouldPersistTaps="handled"
+      >
         {!isEditMode && (
           <View style={styles.field}>
             <Text style={styles.label}>Asset Class</Text>
@@ -546,9 +600,18 @@ export function TradeForm({
           />
         </View>
 
-        {/* Setup Tags */}
+        {/* Strategy Tags */}
+        <StrategyTagsSection
+          selectedStrategies={selectedStrategies}
+          onStrategiesChange={handleStrategiesChange}
+          strategiesLoading={strategiesLoading}
+          strategiesError={strategiesError}
+          onRetry={onStrategiesRetry}
+        />
+
+        {/* Other Tags (formerly Setup Tags) */}
         <View style={styles.field}>
-          <Text style={styles.label}>Setup Tags</Text>
+          <Text style={styles.label}>Other Tags</Text>
           <Controller
             control={control}
             name="setup_tags"
@@ -557,7 +620,7 @@ export function TradeForm({
                 tags={value ?? []}
                 onChange={onChange}
                 suggestions={tagData?.setupTags}
-                placeholder="e.g. breakout, support bounce..."
+                placeholder="e.g. earnings, news catalyst..."
               />
             )}
           />
@@ -652,7 +715,7 @@ export function TradeForm({
 
 const createStyles = ({ colors }: AppTheme) =>
   StyleSheet.create({
-  flex: { flex: 1 },
+  flex: { flex: 1, backgroundColor: colors.surface },
   content: {
     padding: spacing.lg,
     paddingBottom: spacing['4xl'],
@@ -737,9 +800,9 @@ const createStyles = ({ colors }: AppTheme) =>
     flexWrap: 'wrap',
   },
   toggle: {
-    flex: 1,
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: 'center',
@@ -758,8 +821,8 @@ const createStyles = ({ colors }: AppTheme) =>
   },
   chip: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.full,
+    paddingVertical: spacing.xs,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.border,
   },

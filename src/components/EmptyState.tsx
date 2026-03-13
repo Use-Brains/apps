@@ -1,12 +1,14 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { fontSize, spacing, useTheme, useThemedStyles, type AppTheme } from '@/lib/theme';
 
 interface EmptyStateProps {
   title: string;
   message: string;
+  actionLabel?: string;
+  onAction?: () => void;
 }
 
-export function EmptyState({ title, message }: EmptyStateProps) {
+export function EmptyState({ title, message, actionLabel, onAction }: EmptyStateProps) {
   const { theme } = useTheme();
   const { colors } = theme;
   const styles = useThemedStyles(createStyles);
@@ -15,6 +17,11 @@ export function EmptyState({ title, message }: EmptyStateProps) {
     <View style={styles.container}>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.message}>{message}</Text>
+      {actionLabel && onAction && (
+        <Pressable style={styles.actionButton} onPress={onAction}>
+          <Text style={styles.actionText}>{actionLabel}</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -39,5 +46,17 @@ const createStyles = ({ colors }: AppTheme) =>
     color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 24,
+  },
+  actionButton: {
+    marginTop: spacing.lg,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+  },
+  actionText: {
+    color: colors.textInverse,
+    fontWeight: '600',
+    fontSize: fontSize.md,
   },
 });

@@ -1,9 +1,10 @@
 import { z } from 'zod';
 import type { Database } from './database';
+import { ASSET_CLASS_VALUES } from './common';
 
 // ---------- Zod Schemas ----------
 
-const assetClasses = ['crypto', 'stocks', 'options', 'futures', 'forex'] as const;
+const assetClasses = ASSET_CLASS_VALUES;
 const sides = ['long', 'short'] as const;
 const statuses = ['open', 'closed'] as const;
 
