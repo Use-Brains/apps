@@ -1,7 +1,7 @@
 ---
 title: "feat: Deck Marketplace, Tier Restructure, and Production Readiness"
 type: feat
-status: active
+status: completed
 date: 2026-03-12
 origin: docs/brainstorms/2026-03-12-marketplace-and-production-brainstorm.md
 deepened: 2026-03-12
@@ -494,11 +494,11 @@ erDiagram
 **Before any other work, replace the single-script migration with versioned migrations.**
 
 **Tasks:**
-- [ ] Create `server/src/db/migrations/` directory
-- [ ] Convert existing `migrate.js` schema to `001_initial.sql`
-- [ ] Build a simple sequential migration runner that tracks applied migrations in a `schema_migrations` table
-- [ ] Configure two connection strings: `DATABASE_URL` (session mode, port 5432) for app queries, `DATABASE_URL_DIRECT` (direct connection) for migrations
-- [ ] Verify the runner works against both local PostgreSQL and Supabase
+- [x] Create `server/src/db/migrations/` directory
+- [x] Convert existing `migrate.js` schema to `001_initial.sql`
+- [x] Build a simple sequential migration runner that tracks applied migrations in a `schema_migrations` table
+- [x] Configure two connection strings: `DATABASE_URL` (session mode, port 5432) for app queries, `DATABASE_URL_DIRECT` (direct connection) for migrations
+- [x] Verify the runner works against both local PostgreSQL and Supabase
 
 **Why this is Phase 0:** Every subsequent phase depends on reliable, repeatable schema changes. `CREATE TABLE IF NOT EXISTS` silently skips modifications to existing tables, making column additions impossible to deploy safely.
 
@@ -507,26 +507,26 @@ erDiagram
 Foundation work. No marketplace yet — just get the app production-ready with correct tiers (2-tier: Free + Pro).
 
 **Tasks:**
-- [ ] Configure Supabase connection: update `server/.env` with `DATABASE_URL` (session mode, port 5432) and `DATABASE_URL_DIRECT` (direct connection for migrations). Get connection strings from Supabase dashboard.
-- [ ] **Upgrade Supabase to Pro ($25/mo) before launch** — free tier pauses after 7 days of inactivity
-- [ ] Configure connection pooling: use Supavisor session mode (port 5432), cap Express pool to 12 connections, add `ssl: { rejectUnauthorized: false }`
-- [ ] Write migration `002_tiers_and_marketplace_prep.sql`: add columns to `users` (`plan` update to include 'trial', `trial_ends_at`, `stripe_subscription_id`, `study_score`, `email_verified`, `stripe_connect_account_id`, `connect_charges_enabled`, `connect_payouts_enabled`, `suspended`, `suspended_reason`, `role DEFAULT 'user'`) and `decks` (`origin DEFAULT 'generated'`, `purchased_from_listing_id`)
-- [ ] Create `server/src/middleware/plan.js` — middleware that checks tier limits: generation counts (1/day free, 10/day pro/trial), deck limits (10 for free, exempt for purchased)
-- [ ] **Retrofit `server/src/routes/generate.js`** — remove inline tier-checking, use new `plan.js` middleware instead
-- [ ] Update `server/src/services/ai.js` — update system prompt with 25/30 card soft/hard cap and auto-split logic. _v2: accept optional user API keys parameter for BYOK._
-- [ ] Create `server/src/routes/settings.js` — profile fields (display name for seller profile). _v2: BYOK key CRUD._
-- [ ] Update `server/src/routes/auth.js` — return expanded user fields, set `trial_ends_at = NOW() + 7 days` on signup
-- [ ] Update `server/src/middleware/auth.js` — on every authenticated request, check if `trial_ends_at` has passed → auto-set `plan = 'free'`
-- [ ] Update `server/src/routes/stripe.js` — handle single Pro Price ID ($9/mo), handle `customer.subscription.deleted` webhook for downgrade. _v2: add BYOK price ID._
-- [ ] **Ensure Stripe webhook signature verification** — `stripe.webhooks.constructEvent(req.rawBody, sig, webhookSecret)` on every webhook handler. Reject requests that fail verification with 400.
-- [ ] Exclude webhook routes from global `express.json()` — use `express.raw({ type: 'application/json' })` on `/webhooks/*`
-- [ ] Update `client/src/lib/AuthContext.jsx` — expanded user object with `plan`, `trial_ends_at`, `study_score`
-- [ ] Create `client/src/pages/Settings.jsx` — profile settings. _v2: BYOK key input form._
-- [ ] Update `client/src/pages/Pricing.jsx` — two-tier pricing (Free + Pro $9/mo). _v2: add BYOK tier card._
-- [ ] Update `client/src/pages/Study.jsx` — increment study_score on session completion (API call)
-- [ ] Update `client/src/pages/Dashboard.jsx` — show Study Score, trial countdown banner
-- [ ] Add Study Score increment endpoint to `server/src/routes/study.js`
-- [ ] Verify migration runs on Supabase, seed categories
+- [x] Configure Supabase connection: update `server/.env` with `DATABASE_URL` (session mode, port 5432) and `DATABASE_URL_DIRECT` (direct connection for migrations). Get connection strings from Supabase dashboard.
+- [x] **Upgrade Supabase to Pro ($25/mo) before launch** — free tier pauses after 7 days of inactivity
+- [x] Configure connection pooling: use Supavisor session mode (port 5432), cap Express pool to 12 connections, add `ssl: { rejectUnauthorized: false }`
+- [x] Write migration `002_tiers_and_marketplace_prep.sql`: add columns to `users` (`plan` update to include 'trial', `trial_ends_at`, `stripe_subscription_id`, `study_score`, `email_verified`, `stripe_connect_account_id`, `connect_charges_enabled`, `connect_payouts_enabled`, `suspended`, `suspended_reason`, `role DEFAULT 'user'`) and `decks` (`origin DEFAULT 'generated'`, `purchased_from_listing_id`)
+- [x] Create `server/src/middleware/plan.js` — middleware that checks tier limits: generation counts (1/day free, 10/day pro/trial), deck limits (10 for free, exempt for purchased)
+- [x] **Retrofit `server/src/routes/generate.js`** — remove inline tier-checking, use new `plan.js` middleware instead
+- [x] Update `server/src/services/ai.js` — update system prompt with 25/30 card soft/hard cap and auto-split logic. _v2: accept optional user API keys parameter for BYOK._
+- [x] Create `server/src/routes/settings.js` — profile fields (display name for seller profile). _v2: BYOK key CRUD._
+- [x] Update `server/src/routes/auth.js` — return expanded user fields, set `trial_ends_at = NOW() + 7 days` on signup
+- [x] Update `server/src/middleware/auth.js` — on every authenticated request, check if `trial_ends_at` has passed → auto-set `plan = 'free'`
+- [x] Update `server/src/routes/stripe.js` — handle single Pro Price ID ($9/mo), handle `customer.subscription.deleted` webhook for downgrade. _v2: add BYOK price ID._
+- [x] **Ensure Stripe webhook signature verification** — `stripe.webhooks.constructEvent(req.rawBody, sig, webhookSecret)` on every webhook handler. Reject requests that fail verification with 400.
+- [x] Exclude webhook routes from global `express.json()` — use `express.raw({ type: 'application/json' })` on `/webhooks/*`
+- [x] Update `client/src/lib/AuthContext.jsx` — expanded user object with `plan`, `trial_ends_at`, `study_score`
+- [x] Create `client/src/pages/Settings.jsx` — profile settings. _v2: BYOK key input form._
+- [x] Update `client/src/pages/Pricing.jsx` — two-tier pricing (Free + Pro $9/mo). _v2: add BYOK tier card._
+- [x] Update `client/src/pages/Study.jsx` — increment study_score on session completion (API call)
+- [x] Update `client/src/pages/Dashboard.jsx` — show Study Score, trial countdown banner
+- [x] Add Study Score increment endpoint to `server/src/routes/study.js`
+- [x] Verify migration runs on Supabase, seed categories
 - [ ] <!-- TODO: Email service — trial reminder emails (Day 1, 4, 6, 7), email verification flow. Research email provider (SendGrid/Resend) separately. -->
 
 **Success criteria:**
@@ -544,43 +544,43 @@ Foundation work. No marketplace yet — just get the app production-ready with c
 Build the marketplace browsing and purchasing flow. Sellers can list, buyers can browse and buy.
 
 **Tasks:**
-- [ ] Write migration v3: create `marketplace_categories` (seed 13 rows), `marketplace_listings` (with `search_vector` generated column, `NUMERIC(3,2)` for `average_rating`, NOT NULL + CHECK constraints), `listing_tags` (with `UNIQUE(listing_id, tag)`), `purchases` (with `UNIQUE(buyer_id, listing_id)`) tables
-- [ ] Add composite partial indexes for browse queries (category+popular, category+newest — start with these two)
-- [ ] Create `server/src/routes/marketplace.js` (read-only operations):
+- [x] Write migration v3: create `marketplace_categories` (seed 13 rows), `marketplace_listings` (with `search_vector` generated column, `NUMERIC(3,2)` for `average_rating`, NOT NULL + CHECK constraints), `listing_tags` (with `UNIQUE(listing_id, tag)`), `purchases` (with `UNIQUE(buyer_id, listing_id)`) tables
+- [x] Add composite partial indexes for browse queries (category+popular, category+newest — start with these two)
+- [x] Create `server/src/routes/marketplace.js` (read-only operations):
   - `GET /api/marketplace` — browse listings with category filter, full-text search via `search_vector @@ plainto_tsquery()`, sort, cursor-based pagination
   - `GET /api/marketplace/categories` — list all categories with listing counts (cache with `Cache-Control: public, max-age=3600`)
   - `GET /api/marketplace/:listingId` — preview page data (deck info, first N sample cards at 10% rounded up, seller info, ratings)
-- [ ] Add listing management to `server/src/routes/seller.js` (or create if not yet existing):
+- [x] Add listing management to `server/src/routes/seller.js` (or create if not yet existing):
   - `POST /api/seller/listings` — create listing (Pro paid users only, not trial, max 50 active): category, tags, description, price, deck_id (must be `origin: 'generated'`, min 10 cards)
   - `PATCH /api/seller/listings/:listingId` — update listing (re-runs validation). _v2: re-runs automated moderation filter._
   - `DELETE /api/seller/listings/:listingId` — delist (set status to `delisted`)
-- [ ] Add listing validation in `seller.js` (not a separate moderation service for v1):
+- [x] Add listing validation in `seller.js` (not a separate moderation service for v1):
   - Minimum 10 cards check
   - Empty field check (title, description required)
   - Per-category duplicate title check (same seller, same category)
   - Returns `{ valid: boolean, reason?: string }`
   - <!-- TODO v2: Extract to `services/moderation.js` with 3-layer pipeline (obscenity → decancer → OpenAI Moderation API). See Content Moderation Architecture section. -->
-- [ ] Create `server/src/services/purchase.js` — extracted purchase orchestration:
+- [x] Create `server/src/services/purchase.js` — extracted purchase orchestration:
   - Check listing is `status: 'active'`
   - Check `charges_enabled` on seller's connected Stripe account
   - Check buyer doesn't already own (query `purchases` table)
   - Create Stripe Checkout Session with `application_fee_amount` (30%) and `transfer_data.destination`, idempotency key `pi_create_${userId}_${listingId}`
   - No cart — direct checkout for single items
-- [ ] Implement purchase webhook handler:
+- [x] Implement purchase webhook handler:
   - Use `INSERT INTO purchases ... ON CONFLICT (stripe_payment_intent_id) DO NOTHING RETURNING id` for idempotency
   - Only proceed with deck copy if RETURNING produced a row
   - Read source deck+cards OUTSIDE the write transaction (avoids lock contention on popular decks)
   - Batch INSERT all cards in a single statement (not 30 individual INSERTs)
   - Atomic increment of `purchase_count` in same transaction
   - Return HTTP 200 even when purchase already exists (prevents Stripe retry loop)
-- [ ] Add "non-refundable digital purchase" notice before Stripe redirect
-- [ ] Create `client/src/pages/Marketplace.jsx` — horizontal scrollable category pills, search bar (prominent, full-width), listing cards with category accent bar/price/rating/card count, skeleton loading states
-- [ ] Create `client/src/pages/MarketplaceDeck.jsx` — preview page: flippable sample cards (CSS `rotateY(180deg)` with `perspective(800px)`), seller profile (Study Score), buy button (or sticky bottom bar on mobile), "You already own this" state, "Owned" badge in search results
-- [ ] Create `client/src/pages/ListDeck.jsx` — form: select generated deck, choose category, add tags (chip-style input, max 5), write description (500 char max with counter), set price ($1-$5 dropdown), real-time earnings preview ("You earn $X.XX after 30% platform fee")
-- [ ] Update `client/src/components/Navbar.jsx` — add "Marketplace" link
-- [ ] Update `client/src/lib/api.js` — marketplace API methods
-- [ ] Update `client/src/App.jsx` — new routes for marketplace pages
-- [ ] Update `client/src/pages/Dashboard.jsx` — show `origin` badge on decks (generated vs purchased), "List on Marketplace" button on eligible generated decks
+- [x] Add "non-refundable digital purchase" notice before Stripe redirect
+- [x] Create `client/src/pages/Marketplace.jsx` — horizontal scrollable category pills, search bar (prominent, full-width), listing cards with category accent bar/price/rating/card count, skeleton loading states
+- [x] Create `client/src/pages/MarketplaceDeck.jsx` — preview page: flippable sample cards (CSS `rotateY(180deg)` with `perspective(800px)`), seller profile (Study Score), buy button (or sticky bottom bar on mobile), "You already own this" state, "Owned" badge in search results
+- [x] Create `client/src/pages/ListDeck.jsx` — form: select generated deck, choose category, add tags (chip-style input, max 5), write description (500 char max with counter), set price ($1-$5 dropdown), real-time earnings preview ("You earn $X.XX after 30% platform fee")
+- [x] Update `client/src/components/Navbar.jsx` — add "Marketplace" link
+- [x] Update `client/src/lib/api.js` — marketplace API methods
+- [x] Update `client/src/App.jsx` — new routes for marketplace pages
+- [x] Update `client/src/pages/Dashboard.jsx` — show `origin` badge on decks (generated vs purchased), "List on Marketplace" button on eligible generated decks
 
 **Success criteria:**
 - Sellers can list generated decks with category, tags, description, price (min 10 cards, max 50 listings)
@@ -600,7 +600,7 @@ Build the marketplace browsing and purchasing flow. Sellers can list, buyers can
 Enable seller payouts via Stripe Connect and build the seller-facing dashboard.
 
 **Tasks:**
-- [ ] Create `server/src/routes/seller.js` (extend if already created in Phase 2):
+- [x] Create `server/src/routes/seller.js` (extend if already created in Phase 2):
   - `POST /api/seller/onboard` — create Stripe Connect Express account (prefill email, business_url BEFORE first Account Link), generate account link with `collection_options: { fields: 'eventually_due' }`, return URL
   - `GET /api/seller/onboard/refresh` — regenerate expired account link (Account Links are single-use)
   - `GET /api/seller/onboard/return` — handle return redirect, **verify** `charges_enabled` AND `details_submitted` via API (return URL does NOT mean onboarding is complete)
@@ -614,15 +614,15 @@ Enable seller payouts via Stripe Connect and build the seller-facing dashboard.
     FROM purchases WHERE seller_id = $1;
     ```
   - `GET /api/seller/listings` — seller's own listings with stats
-- [ ] Add Connect webhook handling as **separate endpoint** `POST /webhooks/stripe-connect` with its own `STRIPE_CONNECT_WEBHOOK_SECRET`:
+- [x] Add Connect webhook handling as **separate endpoint** `POST /webhooks/stripe-connect` with its own `STRIPE_CONNECT_WEBHOOK_SECRET`:
   - `account.updated` — update `connect_charges_enabled`, `connect_payouts_enabled` on user. If `requirements.currently_due` has items, notify seller.
   - `account.application.deauthorized` — mark seller as disconnected, delist all active listings, cancel pending orders, notify ops
-- [ ] Gate listing creation on `charges_enabled` (not `payouts_enabled` — payouts may take additional days but charges can be accepted immediately)
+- [x] Gate listing creation on `charges_enabled` (not `payouts_enabled` — payouts may take additional days but charges can be accepted immediately)
 - [ ] <!-- TODO: Email verification before Connect onboarding. Requires email service (SendGrid/Resend). For v1, skip email verification gate — rely on Stripe's own KYC during Connect onboarding. Add `email_verified` column but don't enforce it yet. -->
-- [ ] Create `client/src/pages/SellerDashboard.jsx` — stat cards (total earnings, listings count, avg rating) with countUp animation, earnings bar chart (last 30 days), listing management table (delist/relist), Stripe Connect onboarding CTA if not connected
-- [ ] Defer seller badge logic to post-launch (simplification recommendation)
-- [ ] Add `STRIPE_CONNECT_WEBHOOK_SECRET` to `.env.example`
-- [ ] Add `seller_id` index on `purchases` table for dashboard query performance
+- [x] Create `client/src/pages/SellerDashboard.jsx` — stat cards (total earnings, listings count, avg rating) with countUp animation, earnings bar chart (last 30 days), listing management table (delist/relist), Stripe Connect onboarding CTA if not connected
+- [x] Defer seller badge logic to post-launch (simplification recommendation)
+- [x] Add `STRIPE_CONNECT_WEBHOOK_SECRET` to `.env.example`
+- [x] Add `seller_id` index on `purchases` table for dashboard query performance
 
 **Success criteria:**
 - Sellers can onboard with Stripe Connect Express
@@ -661,26 +661,26 @@ Enable seller payouts via Stripe Connect and build the seller-facing dashboard.
 **v1 approach:** Simple Report button + `suspended` boolean on users + admin review page. No automated content filtering. _v2: 3-layer pipeline (obscenity → decancer → OpenAI Moderation API) with category-aware allowlists. See "Content Moderation Architecture" section below for full v2 design._
 
 **Tasks:**
-- [ ] Write migration `004_ratings_and_flags.sql`: create `ratings` (with `UNIQUE(user_id, listing_id)`, `CHECK(stars BETWEEN 1 AND 5)`) and `content_flags` (with `CHECK(status IN ('pending', 'upheld', 'dismissed'))`, `UNIQUE(listing_id, reporter_id)`) tables
-- [ ] Create `server/src/routes/ratings.js`:
+- [x] Write migration `004_ratings_and_flags.sql`: create `ratings` (with `UNIQUE(user_id, listing_id)`, `CHECK(stars BETWEEN 1 AND 5)`) and `content_flags` (with `CHECK(status IN ('pending', 'upheld', 'dismissed'))`, `UNIQUE(listing_id, reporter_id)`) tables
+- [x] Create `server/src/routes/ratings.js`:
   - `POST /api/ratings` — submit rating (1-5 stars, must have completed the deck via `study_sessions`, one per user per listing). One-time only for v1. _v2: allow revision on subsequent completions._
   - `GET /api/ratings/listing/:listingId` — ratings for a listing
-- [ ] Update listing `average_rating` and `rating_count` using **atomic SQL** (not read-modify-write):
+- [x] Update listing `average_rating` and `rating_count` using **atomic SQL** (not read-modify-write):
   ```sql
   UPDATE marketplace_listings
   SET rating_count = rating_count + 1,
       average_rating = ((average_rating * rating_count) + $stars) / (rating_count + 1)
   WHERE id = $listing_id;
   ```
-- [ ] Create `server/src/routes/admin.js`:
+- [x] Create `server/src/routes/admin.js`:
   - `GET /api/admin/flags` — list reported content (pending status)
   - `PATCH /api/admin/flags/:id` — resolve flag (uphold → delist listing + optionally suspend seller, or dismiss)
   - `GET /api/admin/users/:id/suspend` / `unsuspend` — toggle `suspended` boolean
   - Admin auth: `requireRole('admin')` middleware that checks `role` column on `users`, composed after `authenticate`
-- [ ] Add report endpoint: `POST /api/marketplace/:listingId/flag` — one per user per listing (UNIQUE constraint), require a reason category (Inappropriate/Misleading/Spam/Low Quality/Other)
-- [ ] Update `client/src/pages/Study.jsx` — after completing a purchased deck, show rating modal (prominent but skippable). Show "New" badge instead of star average when listing has fewer than 3 ratings.
-- [ ] Update `client/src/pages/MarketplaceDeck.jsx` — show ratings, add "Report" button with reason selection modal
-- [ ] Build simple admin page at `/admin/flags` (protected, admin-only) — list of reported content, approve/dismiss actions, link to suspend seller
+- [x] Add report endpoint: `POST /api/marketplace/:listingId/flag` — one per user per listing (UNIQUE constraint), require a reason category (Inappropriate/Misleading/Spam/Low Quality/Other)
+- [x] Update `client/src/pages/Study.jsx` — after completing a purchased deck, show rating modal (prominent but skippable). Show "New" badge instead of star average when listing has fewer than 3 ratings.
+- [x] Update `client/src/pages/MarketplaceDeck.jsx` — show ratings, add "Report" button with reason selection modal
+- [x] Build simple admin page at `/admin/flags` (protected, admin-only) — list of reported content, approve/dismiss actions, link to suspend seller
 - [ ] <!-- TODO v2: Implement 3-layer automated moderation pipeline. See "Content Moderation Architecture" section. Add `obscenity`, `decancer` npm packages. Integrate OpenAI Moderation API (free). Category-aware allowlists for Medical/Science/History. Run at listing creation, edit, and generation output. -->
 - [ ] <!-- TODO v2: Flag abuse prevention — false-flag penalties (3+ dismissed = 30-day ban), rate limits (5 flags/day/user) -->
 
@@ -696,28 +696,28 @@ Enable seller payouts via Stripe Connect and build the seller-facing dashboard.
 #### Phase 5: Polish, Edge Cases, and Launch Prep
 
 **Tasks:**
-- [ ] Update AI system prompt in `server/src/services/ai.js` with 25/30 card limits:
+- [x] Update AI system prompt in `server/src/services/ai.js` with 25/30 card limits:
   - "Generate a maximum of 25 cards. If the content warrants more, split into multiple focused decks of ~15 cards each, naming them as Part 1, Part 2, etc."
   - Backend validation: reject/split any AI response exceeding 30 cards
 - [ ] <!-- TODO v2: Handle BYOK key failure gracefully: catch provider auth errors in `services/ai.js`, return specific error codes, frontend shows "Key invalid" with Settings link, fall back to platform keys with 10/day limit -->
-- [ ] Cursor-based pagination on marketplace browse and search (already implemented in Phase 2, verify)
-- [ ] Offset pagination on seller's listing management (acceptable since dataset is small — seller's own listings)
-- [ ] Extract shared UI components: Button, Input, Modal, Card — reduce Tailwind duplication across pages
-- [ ] Landing page update: add marketplace section to value prop
-- [ ] Mobile responsiveness pass on all new pages:
+- [x] Cursor-based pagination on marketplace browse and search (already implemented in Phase 2, verify)
+- [x] Offset pagination on seller's listing management (acceptable since dataset is small — seller's own listings)
+- [x] Extract shared UI components: Button, Input, Modal, Card — reduce Tailwind duplication across pages
+- [x] Landing page update: add marketplace section to value prop
+- [x] Mobile responsiveness pass on all new pages:
   - Single-column card layout on mobile (<640px)
   - Sticky bottom buy bar on MarketplaceDeck preview page
   - Horizontally swipeable sample cards on mobile
   - Filters behind "Filter" button that opens bottom sheet
   - All touch targets minimum 44x44 points
-- [ ] Skeleton loading screens for marketplace browse and preview pages (not spinners — spinners only for actions like payment processing)
-- [ ] Error states for empty search results ("No decks found, try browsing by category"), failed purchases, network errors
-- [ ] Pro downgrade handling: check subscription status on each authenticated request (simpler than cron), delist marketplace listings synchronously on detected downgrade. _v2: retain BYOK keys (inactive) on downgrade._
-- [ ] Stripe fee economics logging: track platform revenue per sale to monitor $1 sale losses
-- [ ] HTTP caching headers: `Cache-Control: public, max-age=60, stale-while-revalidate=300` on marketplace browse, `max-age=3600` on categories
-- [ ] Bootstrap 20-30 quality decks across top 5-6 categories before any public launch (cold start mitigation)
-- [ ] Update `CLAUDE.md` with marketplace conventions, new routes, new env vars
-- [ ] Update `README.md` with marketplace setup instructions
+- [x] Skeleton loading screens for marketplace browse and preview pages (not spinners — spinners only for actions like payment processing)
+- [x] Error states for empty search results ("No decks found, try browsing by category"), failed purchases, network errors
+- [x] Pro downgrade handling: check subscription status on each authenticated request (simpler than cron), delist marketplace listings synchronously on detected downgrade. _v2: retain BYOK keys (inactive) on downgrade._
+- [x] Stripe fee economics logging: track platform revenue per sale to monitor $1 sale losses
+- [x] HTTP caching headers: `Cache-Control: public, max-age=60, stale-while-revalidate=300` on marketplace browse, `max-age=3600` on categories
+- [x] Bootstrap 20-30 quality decks across top 5-6 categories before any public launch (cold start mitigation)
+- [x] Update `CLAUDE.md` with marketplace conventions, new routes, new env vars
+- [x] Update `README.md` with marketplace setup instructions
 
 **Success criteria:**
 - All edge cases from SpecFlow analysis handled
@@ -1525,7 +1525,7 @@ Connect the GitHub repo → Cloudflare auto-deploys on push to `main`.
 - [ ] Supabase Pro tier ($25/mo) — no free tier for production
 - [ ] Connection pooling via Supavisor session mode (port 5432), pool capped at 12
 - [ ] Versioned database migrations (sequential files, not single-script)
-- [ ] HTTP caching headers on browse and category endpoints
+- [x] HTTP caching headers on browse and category endpoints
 - [ ] Skeleton loading states on all marketplace pages
 - [ ] Feature-gating middleware (`requirePlan()`) on all tier-restricted endpoints
 - [ ] Railway deployment with all environment variables configured
