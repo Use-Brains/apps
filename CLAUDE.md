@@ -36,6 +36,16 @@ AI-powered flashcard app. Paste notes or type a topic, AI generates study flashc
 - **AI**: Claude (Anthropic API)
 - **Payments**: Stripe (scaffolded)
 
+### trade-journal (`trade-journal/`)
+
+Mobile-first trade journaling app for active crypto/stock/options traders.
+
+- **Framework**: React Native + Expo SDK 55 (managed workflow)
+- **Routing**: Expo Router v4 (file-based)
+- **Backend**: Supabase (Postgres + Auth + Storage)
+- **State**: TanStack Query v5
+- **Testing**: Vitest + Maestro (E2E)
+
 ## Conventions
 
 - Each app gets its own subdirectory with a `CLAUDE.md` describing its stack and conventions
