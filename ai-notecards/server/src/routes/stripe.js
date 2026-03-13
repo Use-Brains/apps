@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import Stripe from 'stripe';
 import { authenticate } from '../middleware/auth.js';
+import { fulfillPurchase } from '../services/purchase.js';
 import pool from '../db/pool.js';
 
 const router = Router();
@@ -143,6 +144,21 @@ router.post('/webhook', async (req, res) => {
           [customerId]
         ).catch(() => {}); // Table may not exist yet during Phase 1
         console.log(`Customer ${customerId} downgraded to free`);
+        break;
+      }
+
+      case 'payment_intent.succeeded': {
+        const paymentIntent = event.data.object;
+        const meta = paymentIntent.metadata;
+        // Marketplace purchase fulfillment
+        if (meta?.listing_id && meta?.buyer_id) {
+          try {
+            await fulfillPurchase(paymentIntent.id, meta);
+          } catch (err) {
+            console.error('Purchase fulfillment failed:', err);
+            // Still return 200 — log for manual resolution
+          }
+        }
         break;
       }
 
