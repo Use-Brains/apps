@@ -1,0 +1,7 @@
+pyproject.toml
+shared.py
+niche_research_tools.egg-info/PKG-INFO
+niche_research_tools.egg-info/SOURCES.txt
+niche_research_tools.egg-info/dependency_links.txt
+niche_research_tools.egg-info/requires.txt
+niche_research_tools.egg-info/top_level.txt

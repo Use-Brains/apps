@@ -14,7 +14,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (searchParams.get('upgraded') === 'true') {
-      toast.success('Welcome to Pro! Enjoy unlimited access.');
+      toast.success('Welcome to Pro! Enjoy full access.');
       refreshUser();
     }
   }, []);
@@ -40,9 +40,15 @@ export default function Dashboard() {
     }
   };
 
+  const isTrialActive = user?.plan === 'trial' && user?.trial_ends_at && new Date(user.trial_ends_at) > new Date();
+  const trialDaysLeft = isTrialActive
+    ? Math.max(0, Math.ceil((new Date(user.trial_ends_at) - new Date()) / (1000 * 60 * 60 * 24)))
+    : 0;
+  const generatedDeckCount = decks.filter((d) => d.origin !== 'purchased').length;
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-[#FAF7F2]">
         <Navbar />
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -59,38 +65,49 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#FAF7F2]">
       <Navbar />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-        {/* Stats */}
-        {stats && stats.total_sessions > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-            {[
-              { label: 'Sessions', value: stats.total_sessions },
-              { label: 'Cards studied', value: stats.total_cards_studied },
-              { label: 'Correct', value: stats.total_correct },
-              { label: 'Accuracy', value: `${stats.accuracy}%` },
-            ].map((s) => (
-              <div key={s.label} className="bg-white rounded-xl p-4 border border-gray-100">
-                <p className="text-sm text-gray-500">{s.label}</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{s.value}</p>
-              </div>
-            ))}
+        {/* Trial banner */}
+        {isTrialActive && (
+          <div className="bg-[#E8F5F0] border border-[#1B6B5A]/20 rounded-xl p-4 mb-6 flex items-center justify-between">
+            <p className="text-[#1B6B5A] text-sm">
+              <span className="font-semibold">Pro trial active</span> — {trialDaysLeft} day{trialDaysLeft !== 1 ? 's' : ''} remaining.
+              You have 10 generations/day and unlimited decks.
+            </p>
+            <Link to="/pricing" className="text-[#1B6B5A] text-sm font-semibold hover:underline shrink-0 ml-4">
+              Subscribe now
+            </Link>
           </div>
         )}
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+          {[
+            { label: 'Study Score', value: user?.study_score ?? 0 },
+            { label: 'Sessions', value: stats?.total_sessions ?? 0 },
+            { label: 'Cards studied', value: stats?.total_cards_studied ?? 0 },
+            { label: 'Accuracy', value: `${stats?.accuracy ?? 0}%` },
+          ].map((s) => (
+            <div key={s.label} className="bg-white rounded-xl p-4 border border-gray-100">
+              <p className="text-sm text-[#6B635A]">{s.label}</p>
+              <p className="text-2xl font-bold text-[#1A1614] mt-1">{s.value}</p>
+            </div>
+          ))}
+        </div>
 
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Your Decks</h1>
-            <p className="text-gray-500 text-sm mt-1">
+            <h1 className="text-2xl font-bold text-[#1A1614]">Your Decks</h1>
+            <p className="text-[#6B635A] text-sm mt-1">
               {decks.length} deck{decks.length !== 1 ? 's' : ''}
-              {user?.plan === 'free' && ` of 10`}
+              {user?.plan === 'free' && ` (${generatedDeckCount}/10 generated)`}
             </p>
           </div>
           <Link
             to="/generate"
-            className="px-5 py-2.5 bg-brand-600 text-white rounded-xl font-medium hover:bg-brand-700 transition-colors flex items-center gap-2"
+            className="px-5 py-2.5 bg-[#1B6B5A] text-white rounded-xl font-medium hover:bg-[#155a4a] transition-colors flex items-center gap-2"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -102,40 +119,59 @@ export default function Dashboard() {
         {/* Deck Grid */}
         {decks.length === 0 ? (
           <div className="text-center py-20">
-            <div className="w-16 h-16 bg-brand-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <div className="w-16 h-16 bg-[#E8F5F0] rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-[#1B6B5A]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
               </svg>
             </div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">No decks yet</h2>
-            <p className="text-gray-500 mb-6">Generate your first AI flashcard deck to get started</p>
-            <Link
-              to="/generate"
-              className="inline-flex px-6 py-3 bg-brand-600 text-white rounded-xl font-medium hover:bg-brand-700 transition-colors"
-            >
-              Generate your first deck
-            </Link>
+            <h2 className="text-xl font-semibold text-[#1A1614] mb-2">No decks yet</h2>
+            <p className="text-[#6B635A] mb-6">Generate your first AI flashcard deck to get started</p>
+            <div className="flex gap-3 justify-center">
+              <Link
+                to="/generate"
+                className="inline-flex px-6 py-3 bg-[#1B6B5A] text-white rounded-xl font-medium hover:bg-[#155a4a] transition-colors"
+              >
+                Generate your first deck
+              </Link>
+              <Link
+                to="/marketplace"
+                className="inline-flex px-6 py-3 bg-white text-[#1A1614] border border-gray-200 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+              >
+                Browse marketplace
+              </Link>
+            </div>
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {decks.map((deck) => (
               <div
                 key={deck.id}
-                className="bg-white rounded-2xl p-6 border border-gray-100 hover:border-brand-200 hover:shadow-md transition-all group"
+                className="bg-white rounded-2xl p-6 border border-gray-100 hover:border-[#1B6B5A]/30 hover:shadow-md transition-all group"
               >
                 <Link to={`/decks/${deck.id}`} className="block">
-                  <h3 className="font-semibold text-gray-900 group-hover:text-brand-700 transition-colors line-clamp-2">
-                    {deck.title}
-                  </h3>
-                  <p className="text-sm text-gray-500 mt-2">
-                    {deck.card_count} card{deck.card_count !== 1 ? 's' : ''} &middot;{' '}
-                    {new Date(deck.created_at).toLocaleDateString()}
-                  </p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-semibold text-[#1A1614] group-hover:text-[#1B6B5A] transition-colors line-clamp-2">
+                      {deck.title}
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <p className="text-sm text-[#6B635A]">
+                      {deck.card_count} card{deck.card_count !== 1 ? 's' : ''}
+                    </p>
+                    {deck.origin === 'purchased' && (
+                      <span className="px-1.5 py-0.5 bg-[#E8F5F0] text-[#1B6B5A] text-xs font-medium rounded">
+                        Purchased
+                      </span>
+                    )}
+                    <span className="text-sm text-[#6B635A]">
+                      · {new Date(deck.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
                 </Link>
                 <div className="flex gap-2 mt-4 pt-4 border-t border-gray-50">
                   <Link
                     to={`/study/${deck.id}`}
-                    className="flex-1 text-center px-3 py-2 bg-brand-50 text-brand-700 rounded-lg text-sm font-medium hover:bg-brand-100 transition-colors"
+                    className="flex-1 text-center px-3 py-2 bg-[#E8F5F0] text-[#1B6B5A] rounded-lg text-sm font-medium hover:bg-[#d0ebe3] transition-colors"
                   >
                     Study
                   </Link>

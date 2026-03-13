@@ -1,0 +1,20 @@
+{
+    "pipeline_version": "0.1.0",
+    "timestamp": "2026-03-12T12:00:00Z",
+    "keywords": [
+        "care coordination app",
+        "caregiver scheduling app",
+        "family caregiver app",
+        "care team organizer",
+        "patient care coordinator"
+    ],
+    "niche_slug": "care-coordination-caregiver-app",
+    "tools": {
+        "app_discovery": {"status": "success", "duration_s": 15, "error": null},
+        "review_miner": {"status": "success", "duration_s": 45, "error": null},
+        "reddit_miner": {"status": "success", "duration_s": 30, "error": null},
+        "trends_checker": {"status": "failed", "duration_s": 10, "error": "Google Trends rate limited (429)"},
+        "appstore_autocomplete": {"status": "success", "duration_s": 8, "error": null}
+    },
+    "total_duration_s": 108
+}
