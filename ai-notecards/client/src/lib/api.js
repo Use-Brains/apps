@@ -46,4 +46,33 @@ export const api = {
 
   // Stripe
   createCheckout: () => request('/stripe/checkout', { method: 'POST' }),
+  cancelSubscription: () => request('/stripe/cancel', { method: 'POST' }),
+
+  // Settings
+  getProfile: () => request('/settings'),
+  updateProfile: (data) => request('/settings', { method: 'PATCH', body: JSON.stringify(data) }),
+
+  // Marketplace
+  getMarketplace: (params) => request(`/marketplace?${new URLSearchParams(params)}`),
+  getCategories: () => request('/marketplace/categories'),
+  getListing: (id) => request(`/marketplace/${id}`),
+  createPurchase: (listingId) => request(`/marketplace/${listingId}/purchase`, { method: 'POST' }),
+  flagListing: (listingId, reason) => request(`/marketplace/${listingId}/flag`, { method: 'POST', body: JSON.stringify({ reason }) }),
+
+  // Seller
+  getSellerDashboard: () => request('/seller/dashboard'),
+  getSellerListings: () => request('/seller/listings'),
+  createListing: (data) => request('/seller/listings', { method: 'POST', body: JSON.stringify(data) }),
+  updateListing: (id, data) => request(`/seller/listings/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  delistListing: (id) => request(`/seller/listings/${id}`, { method: 'DELETE' }),
+  startSellerOnboarding: () => request('/seller/onboard', { method: 'POST' }),
+  refreshOnboarding: () => request('/seller/onboard/refresh'),
+
+  // Ratings
+  submitRating: (listingId, stars) => request('/ratings', { method: 'POST', body: JSON.stringify({ listingId, stars }) }),
+  getListingRatings: (listingId) => request(`/ratings/listing/${listingId}`),
+
+  // Admin
+  getFlags: () => request('/admin/flags'),
+  resolveFlag: (id, data) => request(`/admin/flags/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
 };

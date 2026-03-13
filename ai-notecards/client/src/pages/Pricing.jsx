@@ -4,6 +4,22 @@ import { useAuth } from '../lib/AuthContext.jsx';
 import { api } from '../lib/api.js';
 import Navbar from '../components/Navbar.jsx';
 
+const FREE_FEATURES = [
+  '1 AI generation per day',
+  'Up to 10 decks',
+  'Browse & buy marketplace decks',
+  'Full study mode',
+  'Progress tracking',
+];
+
+const PRO_FEATURES = [
+  '10 AI generations per day',
+  'Unlimited decks',
+  'Sell decks on marketplace',
+  'Seller dashboard & analytics',
+  'Everything in Free',
+];
+
 export default function Pricing() {
   const { user } = useAuth();
 
@@ -18,32 +34,42 @@ export default function Pricing() {
     }
   };
 
+  const isTrialActive = user?.plan === 'trial' && user?.trial_ends_at && new Date(user.trial_ends_at) > new Date();
+  const trialDaysLeft = isTrialActive
+    ? Math.ceil((new Date(user.trial_ends_at) - new Date()) / (1000 * 60 * 60 * 24))
+    : 0;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-brand-50/30 to-gray-50">
+    <div className="min-h-screen bg-[#FAF7F2]">
       <Navbar />
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-20">
-        <h1 className="text-4xl font-bold text-center text-gray-900 mb-4">Choose your plan</h1>
-        <p className="text-center text-gray-600 mb-12 max-w-lg mx-auto">
-          Start free. Upgrade when you need unlimited access.
+        <h1 className="text-4xl font-bold text-center text-[#1A1614] mb-4">Choose your plan</h1>
+        <p className="text-center text-[#6B635A] mb-4 max-w-lg mx-auto">
+          Start with a free 7-day Pro trial. No credit card required.
         </p>
+        {isTrialActive && (
+          <p className="text-center text-[#1B6B5A] font-medium mb-8">
+            Your trial ends in {trialDaysLeft} day{trialDaysLeft !== 1 ? 's' : ''}
+          </p>
+        )}
 
-        <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
+        <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto mt-8">
           {/* Free */}
-          <div className={`bg-white rounded-2xl p-8 border shadow-sm ${user?.plan === 'free' ? 'border-brand-300 ring-2 ring-brand-100' : 'border-gray-200'}`}>
+          <div className={`bg-white rounded-2xl p-8 border shadow-sm ${user?.plan === 'free' ? 'border-[#1B6B5A] ring-2 ring-[#E8F5F0]' : 'border-gray-200'}`}>
             {user?.plan === 'free' && (
-              <span className="inline-block px-3 py-1 bg-brand-100 text-brand-700 text-xs font-semibold rounded-full mb-4">
+              <span className="inline-block px-3 py-1 bg-[#E8F5F0] text-[#1B6B5A] text-xs font-semibold rounded-full mb-4">
                 Current plan
               </span>
             )}
-            <h3 className="text-lg font-semibold text-gray-900">Free</h3>
+            <h3 className="text-lg font-semibold text-[#1A1614]">Free</h3>
             <div className="mt-4 flex items-baseline gap-1">
-              <span className="text-4xl font-extrabold text-gray-900">$0</span>
-              <span className="text-gray-500">/month</span>
+              <span className="text-4xl font-extrabold text-[#1A1614]">$0</span>
+              <span className="text-[#6B635A]">/month</span>
             </div>
-            <ul className="mt-6 space-y-3 text-gray-600">
-              {['3 AI generations per day', 'Up to 10 decks', 'Full study mode', 'Progress tracking'].map((f) => (
+            <ul className="mt-6 space-y-3 text-[#6B635A]">
+              {FREE_FEATURES.map((f) => (
                 <li key={f} className="flex items-start gap-2">
-                  <svg className="w-5 h-5 text-green-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <svg className="w-5 h-5 text-[#2D8A5E] mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
                   {f}
@@ -65,29 +91,29 @@ export default function Pricing() {
           </div>
 
           {/* Pro */}
-          <div className={`rounded-2xl p-8 shadow-lg relative ${
+          <div className={`rounded-2xl p-8 shadow-lg relative transform md:scale-[1.03] ${
             user?.plan === 'pro'
-              ? 'bg-gradient-to-br from-brand-600 to-brand-800 text-white border border-brand-400 ring-2 ring-brand-300'
-              : 'bg-gradient-to-br from-brand-600 to-brand-800 text-white shadow-brand-500/20'
+              ? 'bg-gradient-to-br from-[#1B6B5A] to-[#0d4a3d] text-white border-2 border-[#2D8A5E]'
+              : 'bg-gradient-to-br from-[#1B6B5A] to-[#0d4a3d] text-white shadow-[#1B6B5A]/20'
           }`}>
             {user?.plan === 'pro' ? (
-              <span className="absolute -top-3 right-6 px-3 py-1 bg-green-400 text-green-900 text-xs font-bold rounded-full">
+              <span className="absolute -top-3 right-6 px-3 py-1 bg-[#2D8A5E] text-white text-xs font-bold rounded-full">
                 ACTIVE
               </span>
             ) : (
-              <span className="absolute -top-3 right-6 px-3 py-1 bg-amber-400 text-amber-900 text-xs font-bold rounded-full">
-                POPULAR
+              <span className="absolute -top-3 right-6 px-3 py-1 bg-[#C8A84E] text-[#1A1614] text-xs font-bold rounded-full">
+                RECOMMENDED
               </span>
             )}
             <h3 className="text-lg font-semibold">Pro</h3>
             <div className="mt-4 flex items-baseline gap-1">
-              <span className="text-4xl font-extrabold">$5</span>
-              <span className="text-brand-200">/month</span>
+              <span className="text-4xl font-extrabold">$9</span>
+              <span className="text-white/60">/month</span>
             </div>
-            <ul className="mt-6 space-y-3 text-brand-100">
-              {['Unlimited AI generations', 'Unlimited decks', 'Priority generation speed', 'Everything in Free'].map((f) => (
+            <ul className="mt-6 space-y-3 text-white/80">
+              {PRO_FEATURES.map((f) => (
                 <li key={f} className="flex items-start gap-2">
-                  <svg className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <svg className="w-5 h-5 text-[#C8A84E] mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
                   {f}
@@ -97,9 +123,9 @@ export default function Pricing() {
             {!user ? (
               <Link
                 to="/signup"
-                className="mt-8 block text-center px-6 py-3 bg-white text-brand-700 rounded-xl font-semibold hover:bg-brand-50 transition-colors"
+                className="mt-8 block text-center px-6 py-3 bg-white text-[#1B6B5A] rounded-xl font-semibold hover:bg-[#E8F5F0] transition-colors"
               >
-                Start free trial
+                Start 7-day free trial
               </Link>
             ) : user.plan === 'pro' ? (
               <div className="mt-8 block text-center px-6 py-3 bg-white/20 text-white rounded-xl font-medium">
@@ -108,9 +134,9 @@ export default function Pricing() {
             ) : (
               <button
                 onClick={handleUpgrade}
-                className="mt-8 w-full px-6 py-3 bg-white text-brand-700 rounded-xl font-semibold hover:bg-brand-50 transition-colors"
+                className="mt-8 w-full px-6 py-3 bg-white text-[#1B6B5A] rounded-xl font-semibold hover:bg-[#E8F5F0] transition-colors"
               >
-                Upgrade to Pro
+                {isTrialActive ? 'Subscribe to Pro' : 'Upgrade to Pro — $9/mo'}
               </button>
             )}
           </div>

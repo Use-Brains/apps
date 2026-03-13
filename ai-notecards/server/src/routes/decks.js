@@ -8,7 +8,8 @@ const router = Router();
 router.get('/', authenticate, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT d.*, COUNT(c.id)::int AS card_count
+      `SELECT d.id, d.user_id, d.title, d.source_text, d.origin, d.purchased_from_listing_id,
+              d.created_at, d.updated_at, COUNT(c.id)::int AS card_count
        FROM decks d
        LEFT JOIN cards c ON c.deck_id = d.id
        WHERE d.user_id = $1

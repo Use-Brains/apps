@@ -29,21 +29,52 @@ router.post('/', authenticate, async (req, res) => {
   }
 });
 
-// Complete a study session
+// Complete a study session — also increments study_score
 router.patch('/:id', authenticate, async (req, res) => {
   const { correct, totalCards } = req.body;
   try {
-    const result = await pool.query(
-      `UPDATE study_sessions
-       SET correct = $1, total_cards = $2, completed_at = NOW()
-       WHERE id = $3 AND user_id = $4
-       RETURNING *`,
-      [correct, totalCards, req.params.id, req.userId]
-    );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Session not found' });
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const result = await client.query(
+        `UPDATE study_sessions
+         SET correct = $1, total_cards = $2, completed_at = NOW()
+         WHERE id = $3 AND user_id = $4 AND completed_at IS NULL
+         RETURNING *`,
+        [correct, totalCards, req.params.id, req.userId]
+      );
+      if (result.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Session not found or already completed' });
+      }
+
+      // Increment study_score (counts completed study sessions)
+      await client.query(
+        'UPDATE users SET study_score = study_score + 1 WHERE id = $1',
+        [req.userId]
+      );
+
+      await client.query('COMMIT');
+
+      // Return session along with the deck info for rating prompt
+      const session = result.rows[0];
+      const deck = await pool.query(
+        'SELECT origin, purchased_from_listing_id FROM decks WHERE id = $1',
+        [session.deck_id]
+      );
+
+      res.json({
+        session,
+        deck_origin: deck.rows[0]?.origin,
+        listing_id: deck.rows[0]?.purchased_from_listing_id,
+      });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
     }
-    res.json({ session: result.rows[0] });
   } catch (err) {
     console.error('Complete session error:', err);
     res.status(500).json({ error: 'Internal server error' });
