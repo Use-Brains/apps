@@ -113,7 +113,7 @@ struct ListingRow: View {
                 Spacer()
                 Text(listing.priceFormatted)
                     .font(.subheadline.bold())
-                    .foregroundStyle(.accent)
+                    .foregroundStyle(.tint)
             }
 
             HStack(spacing: 12) {

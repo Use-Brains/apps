@@ -1,4 +1,13 @@
+need to create a clean and clear and detailed prd.json with full specs
+designate certain things for v1 and others v2 or higher
+
+
 v1 features:
+---
+soft delete a user's deck when they delete it. i will keep a warehouse of deleted decks and still sell them
+
+do all decks that get created go onto the marketplace? or only decks that a user selects? 
+
 ---
 ai model control
 which model will i use as number 1. groq or gemini free. 

@@ -73,7 +73,7 @@ struct BYOKSettingsView: View {
                                     Spacer()
                                     if selectedModel == model.id {
                                         Image(systemName: "checkmark")
-                                            .foregroundStyle(.accent)
+                                            .foregroundStyle(.tint)
                                     }
                                 }
                             }

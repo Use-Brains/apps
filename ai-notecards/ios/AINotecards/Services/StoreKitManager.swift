@@ -79,7 +79,7 @@ final class StoreKitManager {
             }
 
             // Send to backend for verification
-            try await verifySubscription(transaction: transaction)
+            try await verifySubscription(jwsRepresentation: verification.jwsRepresentation)
             await transaction.finish()
 
         case .pending:
@@ -133,7 +133,7 @@ final class StoreKitManager {
 
             // Send to backend for verification + fulfillment
             let deckId = try await verifyConsumablePurchase(
-                transaction: transaction,
+                jwsRepresentation: verification.jwsRepresentation,
                 listingId: listingId,
                 priceCents: priceCents
             )
@@ -165,12 +165,8 @@ final class StoreKitManager {
 
     // MARK: - Backend Verification
 
-    private func verifySubscription(transaction: Transaction) async throws {
+    private func verifySubscription(jwsRepresentation: String) async throws {
         struct VerifyBody: Encodable { let signedTransaction: String }
-
-        guard let jwsRepresentation = transaction.jwsRepresentation as? String else {
-            return
-        }
 
         struct UserResp: Decodable { let user: User }
         let _: UserResp = try await APIClient.shared.post(
@@ -180,7 +176,7 @@ final class StoreKitManager {
     }
 
     private func verifyConsumablePurchase(
-        transaction: Transaction,
+        jwsRepresentation: String,
         listingId: String,
         priceCents: Int
     ) async throws -> String? {
@@ -188,10 +184,6 @@ final class StoreKitManager {
             let signedTransaction: String
             let listingId: String
             let expectedPriceCents: Int
-        }
-
-        guard let jwsRepresentation = transaction.jwsRepresentation as? String else {
-            return nil
         }
 
         struct PurchaseResp: Decodable { let ok: Bool; let deckId: String? }
@@ -213,7 +205,7 @@ final class StoreKitManager {
             guard case .verified(let transaction) = result else { continue }
 
             if Constants.Products.subscriptionIDs.contains(transaction.productID) {
-                try? await verifySubscription(transaction: transaction)
+                try? await verifySubscription(jwsRepresentation: result.jwsRepresentation)
                 await transaction.finish()
                 await checkEntitlements()
             } else if Constants.Products.consumableIDs.contains(transaction.productID) {
@@ -223,7 +215,7 @@ final class StoreKitManager {
                    let listingId = pendingData["listingId"] as? String,
                    let priceCents = pendingData["priceCents"] as? Int {
                     _ = try? await verifyConsumablePurchase(
-                        transaction: transaction,
+                        jwsRepresentation: result.jwsRepresentation,
                         listingId: listingId,
                         priceCents: priceCents
                     )

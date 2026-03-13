@@ -17,7 +17,7 @@ struct SettingsView: View {
                     }
                     LabeledContent("Plan") {
                         Text(planDisplayName(user.plan))
-                            .foregroundStyle(user.isPro ? .accent : .secondary)
+                            .foregroundColor(user.isPro ? .accentColor : .secondary)
                     }
                     LabeledContent("Study Score", value: "\(user.studyScore)")
                 }

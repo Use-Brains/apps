@@ -29,7 +29,7 @@ struct StudyView: View {
                     // Progress
                     VStack(spacing: 4) {
                         ProgressView(value: progress)
-                            .tint(.accent)
+                            .tint(.accentColor)
                         Text("Card \(currentIndex + 1) of \(cards.count)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -131,7 +131,7 @@ struct StudyView: View {
                 let pct = cards.isEmpty ? 0 : Int(Double(correctCount) / Double(cards.count) * 100)
                 Text("\(pct)%")
                     .font(.largeTitle.bold())
-                    .foregroundStyle(.accent)
+                    .foregroundStyle(.tint)
             }
 
             Spacer()

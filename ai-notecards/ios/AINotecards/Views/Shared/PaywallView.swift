@@ -13,7 +13,7 @@ struct PaywallView: View {
                 VStack(spacing: 12) {
                     Image(systemName: "sparkles")
                         .font(.system(size: 48))
-                        .foregroundStyle(.accent)
+                        .foregroundStyle(.tint)
 
                     Text("Upgrade to Pro")
                         .font(.title.bold())
@@ -56,7 +56,7 @@ struct FeatureRow: View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .frame(width: 24)
-                .foregroundStyle(.accent)
+                .foregroundStyle(.tint)
             Text(text)
         }
     }

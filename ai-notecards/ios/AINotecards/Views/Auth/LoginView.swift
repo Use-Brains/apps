@@ -17,7 +17,7 @@ struct LoginView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "rectangle.stack.fill")
                         .font(.system(size: 48))
-                        .foregroundStyle(.accent)
+                        .foregroundStyle(.tint)
                     Text("AI Notecards")
                         .font(.largeTitle.bold())
                     Text("Generate flashcards with AI")
