@@ -14,7 +14,7 @@ const MAX_ACTIVE_LISTINGS = 50;
 const MIN_CARD_COUNT = 10;
 
 // Create a new listing
-router.post('/listings', authenticate, checkTrialExpiry, requirePlan('pro'), async (req, res) => {
+router.post('/listings', authenticate, checkTrialExpiry, requirePlan('pro', 'byok_pro'), async (req, res) => {
   const { deck_id, category_id, description, price_cents, tags = [] } = req.body;
 
   if (!deck_id || !category_id || !description || !price_cents) {
@@ -126,7 +126,7 @@ router.post('/listings', authenticate, checkTrialExpiry, requirePlan('pro'), asy
 });
 
 // Update a listing
-router.patch('/listings/:id', authenticate, checkTrialExpiry, requirePlan('pro'), async (req, res) => {
+router.patch('/listings/:id', authenticate, checkTrialExpiry, requirePlan('pro', 'byok_pro'), async (req, res) => {
   const { description, price_cents, tags } = req.body;
 
   try {
@@ -212,7 +212,7 @@ router.delete('/listings/:id', authenticate, async (req, res) => {
 });
 
 // Relist a delisted listing
-router.post('/listings/:id/relist', authenticate, checkTrialExpiry, requirePlan('pro'), async (req, res) => {
+router.post('/listings/:id/relist', authenticate, checkTrialExpiry, requirePlan('pro', 'byok_pro'), async (req, res) => {
   try {
     const { rows: userRows } = await pool.query(
       'SELECT connect_charges_enabled FROM users WHERE id = $1',
@@ -289,7 +289,7 @@ router.get('/dashboard', authenticate, async (req, res) => {
 });
 
 // Stripe Connect onboarding — create Express account + account link
-router.post('/onboard', authenticate, checkTrialExpiry, requirePlan('pro'), async (req, res) => {
+router.post('/onboard', authenticate, checkTrialExpiry, requirePlan('pro', 'byok_pro'), async (req, res) => {
   try {
     const stripe = getStripe();
     const { rows } = await pool.query(

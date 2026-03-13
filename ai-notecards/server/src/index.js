@@ -10,6 +10,8 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 
 import authRoutes from './routes/auth.js';
+import authAppleRoutes from './routes/auth-apple.js';
+import authAccountRoutes from './routes/auth-account.js';
 import generateRoutes from './routes/generate.js';
 import deckRoutes from './routes/decks.js';
 import studyRoutes from './routes/study.js';
@@ -24,11 +26,16 @@ import pool from './db/pool.js';
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Stripe webhooks need raw body — must be before express.json()
+// Raw body for Stripe webhooks — must be before any JSON parsers
 app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
-app.use('/webhooks', express.raw({ type: 'application/json' }));
+app.use('/webhooks/stripe-connect', express.raw({ type: 'application/json' }));
 
-app.use(express.json({ limit: '1mb' }));
+// Per-route JSON body limits:
+// - /api/generate gets 500KB (BYOK users can send large input)
+// - Everything else gets 100KB default
+app.use('/api/generate', express.json({ limit: '500kb' }));
+app.use(express.json({ limit: '100kb' }));
+
 app.use(cookieParser());
 app.use(
   cors({
@@ -39,6 +46,8 @@ app.use(
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/auth/apple', authAppleRoutes);
+app.use('/api/auth', authAccountRoutes);
 app.use('/api/generate', generateRoutes);
 app.use('/api/decks', deckRoutes);
 app.use('/api/study', studyRoutes);
@@ -79,16 +88,23 @@ app.post('/webhooks/stripe-connect', async (req, res) => {
 
       case 'account.application.deauthorized': {
         const account = event.data.object;
-        // Mark seller as disconnected and delist all active listings
+        // Get seller ID before nulling the connect account
+        const { rows } = await pool.query(
+          `SELECT id FROM users WHERE stripe_connect_account_id = $1`,
+          [account.id]
+        );
+        // Delist listings using seller ID (not connect account, which gets nulled)
+        if (rows[0]) {
+          await pool.query(
+            `UPDATE marketplace_listings SET status = 'delisted', updated_at = NOW()
+             WHERE seller_id = $1 AND status = 'active'`,
+            [rows[0].id]
+          );
+        }
+        // Then null the connect account
         await pool.query(
           `UPDATE users SET connect_charges_enabled = false, connect_payouts_enabled = false,
            stripe_connect_account_id = NULL WHERE stripe_connect_account_id = $1`,
-          [account.id]
-        );
-        await pool.query(
-          `UPDATE marketplace_listings SET status = 'delisted', updated_at = NOW()
-           WHERE seller_id = (SELECT id FROM users WHERE stripe_connect_account_id = $1)
-           AND status = 'active'`,
           [account.id]
         );
         console.log(`Connect account ${account.id} deauthorized — listings delisted`);
@@ -105,11 +121,19 @@ app.post('/webhooks/stripe-connect', async (req, res) => {
   res.json({ received: true });
 });
 
-// Health check with DB connection test
+// Apple webhook placeholder (full implementation in routes/iap.js)
+// Uses express.json() (not raw) — Apple sends JWS-signed JSON
+app.post('/webhooks/apple', express.json(), async (req, res) => {
+  // Placeholder — will be implemented in Phase 4 via iap.js route
+  console.log('Apple webhook received (placeholder)');
+  res.json({ received: true });
+});
+
+// Health check with DB connection test + API version for iOS force-update
 app.get('/api/health', async (req, res) => {
   try {
     await pool.query('SELECT 1');
-    res.json({ status: 'ok', db: 'connected' });
+    res.json({ status: 'ok', db: 'connected', minClientVersion: '1.0.0' });
   } catch {
     res.status(503).json({ status: 'error', db: 'disconnected' });
   }
