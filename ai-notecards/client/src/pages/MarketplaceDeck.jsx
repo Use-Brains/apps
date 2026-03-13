@@ -28,12 +28,73 @@ function FlipCard({ card }) {
   );
 }
 
+const REPORT_REASONS = ['Inappropriate', 'Misleading', 'Spam', 'Low Quality', 'Other'];
+
+function ReportModal({ listingId, onClose }) {
+  const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!reason) return;
+    setSubmitting(true);
+    try {
+      await api.flagListing(listingId, reason);
+      toast.success('Report submitted — thanks for helping keep the marketplace safe');
+      onClose();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
+        <h2 className="text-lg font-bold text-[#1A1614] mb-1">Report this listing</h2>
+        <p className="text-sm text-[#6B635A] mb-4">Select a reason for reporting.</p>
+        <div className="space-y-2 mb-5">
+          {REPORT_REASONS.map((r) => (
+            <button
+              key={r}
+              onClick={() => setReason(r)}
+              className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                reason === r
+                  ? 'bg-[#1B6B5A] text-white'
+                  : 'bg-gray-50 text-[#1A1614] hover:bg-gray-100'
+              }`}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={handleSubmit}
+            disabled={!reason || submitting}
+            className="flex-1 py-2.5 bg-red-500 text-white rounded-xl font-semibold hover:bg-red-600 transition-colors disabled:opacity-50 text-sm"
+          >
+            {submitting ? 'Submitting...' : 'Submit Report'}
+          </button>
+          <button
+            onClick={onClose}
+            className="px-4 py-2.5 text-[#6B635A] text-sm hover:text-[#1A1614] transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function MarketplaceDeck() {
   const { id } = useParams();
   const { user } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(false);
+  const [showReport, setShowReport] = useState(false);
 
   useEffect(() => {
     api.getListing(id)
@@ -99,6 +160,7 @@ export default function MarketplaceDeck() {
   return (
     <div className="min-h-screen bg-[#FAF7F2]">
       <Navbar />
+      {showReport && <ReportModal listingId={id} onClose={() => setShowReport(false)} />}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-[#6B635A] mb-6">
@@ -147,6 +209,14 @@ export default function MarketplaceDeck() {
                     <span className="ml-1">· Study Score: {listing.seller_study_score}</span>
                   )}
                 </p>
+              )}
+              {user && (
+                <button
+                  onClick={() => setShowReport(true)}
+                  className="mt-3 text-xs text-[#6B635A]/60 hover:text-red-500 transition-colors"
+                >
+                  Report this listing
+                </button>
               )}
             </div>
             <div className="sm:text-right shrink-0">
