@@ -17,6 +17,8 @@ import stripeRoutes from './routes/stripe.js';
 import settingsRoutes from './routes/settings.js';
 import marketplaceRoutes from './routes/marketplace.js';
 import sellerRoutes from './routes/seller.js';
+import ratingsRoutes from './routes/ratings.js';
+import adminRoutes from './routes/admin.js';
 import pool from './db/pool.js';
 
 const app = express();
@@ -44,6 +46,8 @@ app.use('/api/stripe', stripeRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/marketplace', marketplaceRoutes);
 app.use('/api/seller', sellerRoutes);
+app.use('/api/ratings', ratingsRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Stripe Connect webhook (separate endpoint, separate signing secret)
 import Stripe from 'stripe';
