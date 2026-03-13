@@ -1,0 +1,69 @@
+[
+  {
+    "query": "care coordination app",
+    "suggestions": [
+      "Care Coordinations",
+      "CaringBridge",
+      "POC Care Coordination",
+      "AxisCare Mobile",
+      "WellSky Personal Care",
+      "HealthPartners\u00ae",
+      "AlayaCare"
+    ],
+    "result_saturation": "low",
+    "saturation_detail": "Top 2 results: avg rating 2.1, avg reviews 14. Opportunity."
+  },
+  {
+    "query": "caregiver scheduling app",
+    "suggestions": [
+      "AxisCare Mobile",
+      "MedFlyt",
+      "CareConnect for Caregivers",
+      "WellSky Personal Care"
+    ],
+    "result_saturation": "medium",
+    "saturation_detail": "Top 3 results: avg rating 3.6, avg reviews 7283. Moderate."
+  },
+  {
+    "query": "family caregiver app",
+    "suggestions": [
+      "CaringBridge",
+      "Family Caregiver",
+      "Lively Link",
+      "MedFlyt",
+      "AxisCare Mobile",
+      "WellSky Personal Care",
+      "Care.com Caregiver: Find Jobs"
+    ],
+    "result_saturation": "medium",
+    "saturation_detail": "Top 3 results: avg rating 4.1, avg reviews 7167. Moderate."
+  },
+  {
+    "query": "care team organizer",
+    "suggestions": [
+      "Care.com: Hire Caregivers",
+      "Care.com Caregiver: Find Jobs",
+      "MedFlyt",
+      "AxisCare Mobile",
+      "WellSky Personal Care",
+      "AlayaCare"
+    ],
+    "result_saturation": "high",
+    "saturation_detail": "Top 3 results: avg rating 4.5, avg reviews 73360. Well-served."
+  },
+  {
+    "query": "patient care coordinator",
+    "suggestions": [
+      "CarePort Intake",
+      "MedFlyt",
+      "WellSky Personal Care",
+      "HealthPartners\u00ae",
+      "athenaPatient",
+      "Sutter Health My Health Online",
+      "AxisCare Mobile",
+      "Vivian - Find Healthcare Jobs"
+    ],
+    "result_saturation": "medium",
+    "saturation_detail": "Top 3 results: avg rating 4.6, avg reviews 3316. Moderate."
+  }
+]
