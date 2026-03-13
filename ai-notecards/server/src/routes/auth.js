@@ -1,17 +1,18 @@
 import { Router } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import rateLimit from 'express-rate-limit';
 import pool from '../db/pool.js';
 
 const router = Router();
 const SALT_ROUNDS = 12;
 const TOKEN_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-const USER_SELECT = `id, email, plan, trial_ends_at, daily_generation_count, last_generation_date,
+export const USER_SELECT = `id, email, plan, trial_ends_at, daily_generation_count, last_generation_date,
   study_score, stripe_customer_id, stripe_connect_account_id, connect_charges_enabled,
-  display_name, role, suspended, created_at`;
+  display_name, role, suspended, google_user_id, created_at`;
 
-function setTokenCookie(res, userId) {
+export function setTokenCookie(res, userId) {
   const token = jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '7d' });
   res.cookie('token', token, {
     httpOnly: true,
@@ -21,7 +22,7 @@ function setTokenCookie(res, userId) {
   });
 }
 
-function sanitizeUser(user) {
+export function sanitizeUser(user) {
   return {
     id: user.id,
     email: user.email,
@@ -40,7 +41,10 @@ function sanitizeUser(user) {
   };
 }
 
-router.post('/signup', async (req, res) => {
+const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false });
+const signupLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 5, standardHeaders: true, legacyHeaders: false });
+
+router.post('/signup', signupLimiter, async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required' });
@@ -72,7 +76,7 @@ router.post('/signup', async (req, res) => {
   }
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required' });

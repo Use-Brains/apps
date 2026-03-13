@@ -10,6 +10,8 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 
 import authRoutes from './routes/auth.js';
+import authMagicRoutes from './routes/auth-magic.js';
+import authGoogleRoutes from './routes/auth-google.js';
 import generateRoutes from './routes/generate.js';
 import deckRoutes from './routes/decks.js';
 import studyRoutes from './routes/study.js';
@@ -37,8 +39,22 @@ app.use(
   })
 );
 
+// Validate required env vars for auth revamp
+const requiredEnvVars = ['JWT_SECRET'];
+if (process.env.NODE_ENV === 'production') {
+  requiredEnvVars.push('RESEND_API_KEY', 'GOOGLE_CLIENT_ID');
+}
+for (const key of requiredEnvVars) {
+  if (!process.env[key]) {
+    console.error(`Missing required env var: ${key}`);
+    process.exit(1);
+  }
+}
+
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/auth/magic-link', authMagicRoutes);
+app.use('/api/auth/google', authGoogleRoutes);
 app.use('/api/generate', generateRoutes);
 app.use('/api/decks', deckRoutes);
 app.use('/api/study', studyRoutes);
