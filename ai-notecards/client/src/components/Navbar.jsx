@@ -93,10 +93,10 @@ export default function Navbar() {
                 Log in
               </Link>
               <Link
-                to="/signup"
+                to="/login"
                 className="px-4 py-2 bg-[#1B6B5A] text-white rounded-lg text-sm font-medium hover:bg-[#155a4a] transition-colors"
               >
-                Sign up free
+                Get started
               </Link>
             </>
           )}

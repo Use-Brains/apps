@@ -78,7 +78,7 @@ export default function Pricing() {
             </ul>
             {!user ? (
               <Link
-                to="/signup"
+                to="/login"
                 className="mt-8 block text-center px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
               >
                 Get started
@@ -122,7 +122,7 @@ export default function Pricing() {
             </ul>
             {!user ? (
               <Link
-                to="/signup"
+                to="/login"
                 className="mt-8 block text-center px-6 py-3 bg-white text-[#1B6B5A] rounded-xl font-semibold hover:bg-[#E8F5F0] transition-colors"
               >
                 Start 7-day free trial
