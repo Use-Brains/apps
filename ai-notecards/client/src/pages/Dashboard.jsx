@@ -78,14 +78,16 @@ function getDeckSellState(deck, user) {
 
   if (deck.listing_id && deck.listing_status === 'active') return 'view';
   if (deck.listing_id && deck.listing_status === 'delisted') return 'relist';
-  if (!isSeller) return 'disabled';
-  if (deck.origin === 'purchased') return 'disabled';
+  if (!isSeller) return 'hidden';
+  if (deck.origin === 'purchased') return 'hidden';
   if (deck.card_count < 10) return 'disabled';
   return 'sell';
 }
 
 function SellIcon({ state, deck, onRelist }) {
   const navigate = useNavigate();
+
+  if (state === 'hidden') return null;
 
   if (state === 'disabled') {
     return (
