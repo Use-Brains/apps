@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Type } from '@google/genai';
 
 const SYSTEM_PROMPT = `You are a flashcard generation expert. Given text or a topic, create study flashcards.
 
@@ -16,6 +16,45 @@ RULES:
 - Avoid trivially obvious or overly niche cards.`;
 
 const USER_PROMPT = (input) => `Generate flashcards from the following:\n\n${input}`;
+
+// --- Vision (Gemini) ---
+
+// Lazy-initialized singleton — avoids creating a new SDK client per request
+let geminiClient;
+function getGeminiClient() {
+  if (!geminiClient) {
+    geminiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  }
+  return geminiClient;
+}
+
+const VISION_SYSTEM_PROMPT = `You are a flashcard generation expert. Examine the provided images carefully — they may contain handwritten notes, printed text, textbook pages, whiteboard photos, diagrams, or charts.
+
+Extract the key concepts, facts, definitions, and relationships visible in the images. If additional text context is provided, use it to focus your card generation.
+
+Generate 8-25 cards based on content density.
+- Front: concise question or term (under 30 words)
+- Back: clear answer or definition (under 60 words)
+- Progress from basic to advanced concepts
+- If an image is blurry or unreadable, skip it and work with what you can read`;
+
+const FLASHCARD_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    cards: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          front: { type: Type.STRING },
+          back: { type: Type.STRING },
+        },
+        required: ['front', 'back'],
+      },
+    },
+  },
+  required: ['cards'],
+};
 
 function parseCards(text) {
   // Strip markdown code fences if the model wraps its response
@@ -97,4 +136,66 @@ export async function generateCards(input) {
     console.error('Failed to parse AI response:', text);
     throw new Error('Failed to parse AI-generated cards');
   }
+}
+
+export async function generateCardsWithVision(input, files) {
+  const ai = getGeminiClient();
+
+  // Build multimodal contents array
+  const contents = [];
+  const userPrompt = input?.trim()
+    ? `Generate flashcards from these images.\n\nAdditional context: ${input}`
+    : 'Generate flashcards from the content in these images.';
+  contents.push(userPrompt);
+
+  // Add image parts, null out buffers after encoding
+  for (const file of files) {
+    contents.push({
+      inlineData: {
+        data: file.buffer.toString('base64'),
+        mimeType: file.detectedMime || file.mimetype,
+      },
+    });
+    file.buffer = null; // free memory immediately
+  }
+
+  // 60-second timeout — Gemini SDK retries can hang 5+ minutes without this
+  let timeoutId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error('Vision request timed out after 60 seconds.')), 60000);
+  });
+
+  let response;
+  try {
+    response = await Promise.race([
+      ai.models.generateContent({
+        model: 'gemini-2.5-flash-lite',
+        contents,
+        config: {
+          systemInstruction: VISION_SYSTEM_PROMPT,
+          responseMimeType: 'application/json',
+          responseJsonSchema: FLASHCARD_SCHEMA,
+          temperature: 0.2,
+          maxOutputTokens: 8192,
+        },
+      }),
+      timeoutPromise,
+    ]);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  const text = response.text;
+  if (!text || text.trim().length === 0) {
+    throw new Error('AI returned empty response. The image may have been blocked by content filters.');
+  }
+
+  const result = JSON.parse(text);
+  if (!result.cards?.length) {
+    const err = new Error('No flashcards could be generated from the provided images.');
+    err.code = 'NO_CARDS';
+    throw err;
+  }
+
+  return result.cards.slice(0, 30); // hard cap, same as text generation
 }

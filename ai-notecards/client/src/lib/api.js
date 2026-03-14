@@ -1,10 +1,14 @@
 const BASE = '/api';
 
 async function request(path, options = {}) {
+  const isFormData = options.body instanceof FormData;
+  const { headers: optHeaders, ...restOptions } = options;
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
+    headers: isFormData
+      ? { 'X-Requested-With': 'XMLHttpRequest', ...optHeaders }
+      : { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', ...optHeaders },
     credentials: 'include',
-    ...options,
+    ...restOptions,
   });
 
   if (!res.ok) {
@@ -34,6 +38,13 @@ export const api = {
 
   // Generate
   generate: (input, title) => request('/generate', { method: 'POST', body: JSON.stringify({ input, title }) }),
+  generateWithPhotos: (input, title, files) => {
+    const form = new FormData();
+    if (input) form.append('input', input);
+    if (title) form.append('title', title);
+    files.forEach(f => form.append('photos', f));
+    return request('/generate', { method: 'POST', body: form });
+  },
 
   // Decks
   getDecks: () => request('/decks'),

@@ -475,50 +475,50 @@ const deckTitle = title || (input ? input.slice(0, 60).trim() + (input.length > 
 ## Acceptance Criteria
 
 ### Core Functionality
-- [ ] User can upload 1-5 photos on the Generate page
-- [ ] Photos are previewed as thumbnails with remove buttons
-- [ ] User can submit photos alone (no text required)
-- [ ] User can submit photos + text together
-- [ ] Text-only generation works exactly as before (no regression)
-- [ ] Photo generations count toward the same daily generation limit
-- [ ] Mobile users can use camera capture to take photos directly
-- [ ] Loading state shows appropriate message for photo uploads (~10-20 seconds)
-- [ ] Deck title defaults to "Photo flashcards" when no text or title provided
+- [x] User can upload 1-5 photos on the Generate page
+- [x] Photos are previewed as thumbnails with remove buttons
+- [x] User can submit photos alone (no text required)
+- [x] User can submit photos + text together
+- [x] Text-only generation works exactly as before (no regression)
+- [x] Photo generations count toward the same daily generation limit
+- [x] Mobile users can use camera capture to take photos directly
+- [x] Loading state shows appropriate message for photo uploads (~10-20 seconds)
+- [x] Deck title defaults to "Photo flashcards" when no text or title provided
 
 ### Client-Side
-- [ ] Photos are resized to 1568px max and JPEG quality 1.0 client-side before upload
-- [ ] Images processed sequentially on client (not parallel)
-- [ ] File input does NOT include `image/heic` (iOS auto-converts)
-- [ ] `URL.revokeObjectURL` called on photo removal and component unmount
-- [ ] Double-submit prevented via `useRef` guard (not just `disabled` prop)
-- [ ] Resize failure shows toast error, does not crash
-- [ ] Photo upload button hidden in browsers without `createImageBitmap` support
-- [ ] Upload/remove buttons have `aria-label` attributes; preview thumbnails have `alt` text
-- [ ] `X-Requested-With: XMLHttpRequest` header sent on all requests (JSON and FormData)
+- [x] Photos are resized to 1568px max and JPEG quality 1.0 client-side before upload
+- [x] Images processed sequentially on client (not parallel)
+- [x] File input does NOT include `image/heic` (iOS auto-converts)
+- [x] `URL.revokeObjectURL` called on photo removal and component unmount
+- [x] Double-submit prevented via `useRef` guard (not just `disabled` prop)
+- [x] Resize failure shows toast error, does not crash
+- [x] Photo upload button hidden in browsers without `createImageBitmap` support
+- [x] Upload/remove buttons have `aria-label` attributes; preview thumbnails have `alt` text
+- [x] `X-Requested-With: XMLHttpRequest` header sent on all requests (JSON and FormData)
 
 ### Server Security
-- [ ] Server validates `X-Requested-With: XMLHttpRequest` header (CSRF defense)
-- [ ] Server validates file magic bytes (not just MIME type) via `file-type`
-- [ ] Server enforces 5MB per file, 5 files max
-- [ ] Multer errors (file too large, too many files, unsupported type) return user-friendly JSON, not 500
-- [ ] Multer only runs on `multipart/form-data` requests (JSON requests bypass multer)
-- [ ] Rate limiter on generate endpoint (30 req/15 min per IP) with JSON error response
-- [ ] Input text limited to 50,000 characters (both JSON and multipart paths)
-- [ ] Title limited to 200 characters
+- [x] Server validates `X-Requested-With: XMLHttpRequest` header (CSRF defense)
+- [x] Server validates file magic bytes (not just MIME type) via `file-type`
+- [x] Server enforces 5MB per file, 5 files max
+- [x] Multer errors (file too large, too many files, unsupported type) return user-friendly JSON, not 500
+- [x] Multer only runs on `multipart/form-data` requests (JSON requests bypass multer)
+- [x] Rate limiter on generate endpoint (30 req/15 min per IP) with JSON error response
+- [x] Input text limited to 50,000 characters (both JSON and multipart paths)
+- [x] Title limited to 200 characters
 
 ### Server Performance
-- [ ] Vision requests use Gemini with JSON schema enforcement
-- [ ] DB connection acquired only after AI call (not during)
-- [ ] `file.buffer` nulled after base64 encoding
-- [ ] Concurrency semaphore limits simultaneous vision requests (default 3, configurable via `MAX_CONCURRENT_VISION` env var)
-- [ ] 60-second timeout on Gemini API call prevents zombie requests
-- [ ] Gemini SDK client instantiated once (module-scope singleton), not per-request
+- [x] Vision requests use Gemini with JSON schema enforcement
+- [x] DB connection acquired only after AI call (not during)
+- [x] `file.buffer` nulled after base64 encoding
+- [x] Concurrency semaphore limits simultaneous vision requests (default 3, configurable via `MAX_CONCURRENT_VISION` env var)
+- [x] 60-second timeout on Gemini API call prevents zombie requests
+- [x] Gemini SDK client instantiated once (module-scope singleton), not per-request
 
 ### Error Handling
-- [ ] If Gemini fails on a photo request, user sees "Photo processing failed" (502)
-- [ ] If photos produce no cards (blurry/unreadable), user sees specific message (422)
-- [ ] If vision concurrency limit reached, user sees "Photo processing is busy" (503)
-- [ ] If rate limit hit, user sees JSON error (not plain text)
+- [x] If Gemini fails on a photo request, user sees "Photo processing failed" (502)
+- [x] If photos produce no cards (blurry/unreadable), user sees specific message (422)
+- [x] If vision concurrency limit reached, user sees "Photo processing is busy" (503)
+- [x] If rate limit hit, user sees JSON error (not plain text)
 
 ### Pre-Launch Validation
 - [ ] Test 5 worst-case photos (800KB each, ~4MB total) through Vercel proxy in staging

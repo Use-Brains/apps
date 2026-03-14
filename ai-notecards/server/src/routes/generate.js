@@ -1,68 +1,190 @@
 import { Router } from 'express';
+import multer from 'multer';
+import { fileTypeFromBuffer } from 'file-type';
+import rateLimit from 'express-rate-limit';
 import { authenticate } from '../middleware/auth.js';
 import { checkTrialExpiry, checkGenerationLimits } from '../middleware/plan.js';
-import { generateCards } from '../services/ai.js';
+import { generateCards, generateCardsWithVision } from '../services/ai.js';
 import pool from '../db/pool.js';
 
 const router = Router();
 
-router.post('/', authenticate, checkTrialExpiry, checkGenerationLimits, async (req, res) => {
-  const { input, title } = req.body;
-  if (!input || input.trim().length === 0) {
-    return res.status(400).json({ error: 'Input text is required' });
+// CSRF defense — any custom header forces a CORS preflight,
+// which the server's CORS policy will block for unauthorized origins
+function requireXHR(req, res, next) {
+  if (req.get('X-Requested-With') !== 'XMLHttpRequest') {
+    return res.status(403).json({ error: 'Forbidden' });
   }
+  next();
+}
 
-  try {
-    const cards = await generateCards(input);
+// Rate limiter — JSON message so client's request() can parse it
+const generateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please try again later.' },
+});
 
-    const client = await pool.connect();
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 5, fieldSize: 250 * 1024, parts: 15 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowed.includes(file.mimetype)) {
+      return cb(new Error('Unsupported file type. Accepted: JPEG, PNG, WebP.'));
+    }
+    cb(null, true);
+  },
+});
+
+// Conditional multer — only apply on multipart requests so JSON text-only flow is unaffected
+function optionalMulter(req, res, next) {
+  if (req.is('multipart/form-data')) {
+    return upload.array('photos', 5)(req, res, (err) => {
+      if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(413).json({ error: 'File too large. Maximum 5MB per photo.' });
+        }
+        if (err.code === 'LIMIT_FILE_COUNT') {
+          return res.status(400).json({ error: 'Too many files. Maximum 5 photos.' });
+        }
+        if (err.code === 'LIMIT_FIELD_VALUE') {
+          return res.status(400).json({ error: 'Text input too large.' });
+        }
+        return res.status(400).json({ error: 'Upload error.' });
+      }
+      if (err) {
+        return res.status(422).json({ error: err.message });
+      }
+      next();
+    });
+  }
+  next();
+}
+
+// Magic byte validation — runs after multer
+async function validateImageContent(req, res, next) {
+  if (!req.files?.length) return next();
+  const allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
+  for (const file of req.files) {
+    const type = await fileTypeFromBuffer(file.buffer);
+    if (!type || !allowedMimes.includes(type.mime)) {
+      return res.status(422).json({ error: 'File content does not match an allowed image format.' });
+    }
+    file.detectedMime = type.mime;
+  }
+  next();
+}
+
+// Concurrency semaphore — prevent OOM and Gemini rate exhaustion
+let activeVisionRequests = 0;
+const MAX_CONCURRENT_VISION = parseInt(process.env.MAX_CONCURRENT_VISION, 10) || 3;
+
+router.post(
+  '/',
+  generateLimiter,
+  requireXHR,
+  authenticate,
+  checkTrialExpiry,
+  checkGenerationLimits,
+  optionalMulter,
+  validateImageContent,
+  async (req, res) => {
+    const { input, title } = req.body;
+
+    // Input validation (applies to both JSON and multipart)
+    if (input && input.length > 50000) {
+      return res.status(400).json({ error: 'Input text is too long. Maximum 50,000 characters.' });
+    }
+    if (title && title.length > 200) {
+      return res.status(400).json({ error: 'Title is too long. Maximum 200 characters.' });
+    }
+    if (!input?.trim() && (!req.files || req.files.length === 0)) {
+      return res.status(400).json({ error: 'Input text or photos are required.' });
+    }
+
     try {
-      await client.query('BEGIN');
+      let cards;
 
-      const deckTitle = title || input.slice(0, 60).trim() + (input.length > 60 ? '...' : '');
-      const deckResult = await client.query(
-        'INSERT INTO decks (user_id, title, source_text) VALUES ($1, $2, $3) RETURNING *',
-        [req.userId, deckTitle, input]
-      );
-      const deck = deckResult.rows[0];
-
-      for (let i = 0; i < cards.length; i++) {
-        await client.query(
-          'INSERT INTO cards (deck_id, front, back, position) VALUES ($1, $2, $3, $4)',
-          [deck.id, cards[i].front, cards[i].back, i]
-        );
+      if (req.files?.length) {
+        // Vision path
+        if (activeVisionRequests >= MAX_CONCURRENT_VISION) {
+          return res.status(503).json({ error: 'Photo processing is busy. Please try again in a moment.' });
+        }
+        activeVisionRequests++;
+        try {
+          cards = await generateCardsWithVision(input, req.files);
+        } catch (err) {
+          if (err.code === 'NO_CARDS') {
+            return res.status(422).json({ error: err.message });
+          }
+          console.error('Vision generation error:', err);
+          return res.status(502).json({
+            error: 'Photo processing failed. Try clearer photos, or remove them to generate from text.',
+          });
+        } finally {
+          activeVisionRequests--;
+        }
+      } else {
+        // Text-only path (existing behavior)
+        cards = await generateCards(input);
       }
 
-      const today = new Date().toISOString().split('T')[0];
-      await client.query(
-        'UPDATE users SET daily_generation_count = $1, last_generation_date = $2 WHERE id = $3',
-        [req.generationCount + 1, today, req.userId]
-      );
+      // Deck title with fallback for photo-only generations
+      const deckTitle =
+        title || (input ? input.slice(0, 60).trim() + (input.length > 60 ? '...' : '') : 'Photo flashcards');
 
-      await client.query('COMMIT');
+      // Acquire DB connection only after AI call completes
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
 
-      const savedCards = await pool.query(
-        'SELECT id, front, back, position FROM cards WHERE deck_id = $1 ORDER BY position',
-        [deck.id]
-      );
+        const deckResult = await client.query(
+          'INSERT INTO decks (user_id, title, source_text) VALUES ($1, $2, $3) RETURNING *',
+          [req.userId, deckTitle, input || null]
+        );
+        const deck = deckResult.rows[0];
 
-      res.status(201).json({
-        deck: { ...deck, cards: savedCards.rows },
-        generationsRemaining: req.generationLimit - (req.generationCount + 1),
-      });
+        for (let i = 0; i < cards.length; i++) {
+          await client.query(
+            'INSERT INTO cards (deck_id, front, back, position) VALUES ($1, $2, $3, $4)',
+            [deck.id, cards[i].front, cards[i].back, i]
+          );
+        }
+
+        const today = new Date().toISOString().split('T')[0];
+        await client.query(
+          'UPDATE users SET daily_generation_count = $1, last_generation_date = $2 WHERE id = $3',
+          [req.generationCount + 1, today, req.userId]
+        );
+
+        await client.query('COMMIT');
+
+        const savedCards = await pool.query(
+          'SELECT id, front, back, position FROM cards WHERE deck_id = $1 ORDER BY position',
+          [deck.id]
+        );
+
+        res.status(201).json({
+          deck: { ...deck, cards: savedCards.rows },
+          generationsRemaining: req.generationLimit - (req.generationCount + 1),
+        });
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      } finally {
+        client.release();
+      }
     } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
+      console.error('Generation error:', err);
+      if (err.message === 'Failed to parse AI-generated cards') {
+        return res.status(502).json({ error: 'AI returned an invalid response. Please try again.' });
+      }
+      res.status(500).json({ error: 'Internal server error' });
     }
-  } catch (err) {
-    console.error('Generation error:', err);
-    if (err.message === 'Failed to parse AI-generated cards') {
-      return res.status(502).json({ error: 'AI returned an invalid response. Please try again.' });
-    }
-    res.status(500).json({ error: 'Internal server error' });
   }
-});
+);
 
 export default router;
