@@ -358,6 +358,11 @@ export default function Dashboard() {
                           Purchased
                         </span>
                       )}
+                      {deck.has_rated && (
+                        <span className="px-1.5 py-0.5 bg-[#C8A84E]/10 text-[#C8A84E] text-xs font-medium rounded">
+                          Rated
+                        </span>
+                      )}
                       <span className="text-sm text-[#6B635A]">
                         · {new Date(deck.created_at).toLocaleDateString()}
                       </span>

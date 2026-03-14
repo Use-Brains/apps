@@ -75,7 +75,7 @@ export const api = {
   getCategories: () => request('/marketplace/categories'),
   getListing: (id) => request(`/marketplace/${id}`),
   createPurchase: (listingId) => request(`/marketplace/${listingId}/purchase`, { method: 'POST' }),
-  flagListing: (listingId, reason) => request(`/marketplace/${listingId}/flag`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  flagListing: (listingId, reason, flagType = 'listing', ratingId = null) => request(`/marketplace/${listingId}/flag`, { method: 'POST', body: JSON.stringify({ reason, flagType, ratingId }) }),
 
   // Seller
   getSellerDashboard: () => request('/seller/dashboard'),
@@ -89,7 +89,7 @@ export const api = {
   refreshOnboarding: () => request('/seller/onboard/refresh'),
 
   // Ratings
-  submitRating: (listingId, stars) => request('/ratings', { method: 'POST', body: JSON.stringify({ listingId, stars }) }),
+  submitRating: (listingId, stars, reviewText) => request('/ratings', { method: 'POST', body: JSON.stringify({ listingId, stars, reviewText }) }),
   getListingRatings: (listingId) => request(`/ratings/listing/${listingId}`),
 
   // Admin

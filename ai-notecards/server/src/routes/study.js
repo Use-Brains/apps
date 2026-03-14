@@ -29,13 +29,34 @@ router.post('/', authenticate, async (req, res) => {
   }
 });
 
-// Complete a study session — also increments study_score
+// Complete a study session — also increments study_score and upserts deck_stats
 router.patch('/:id', authenticate, async (req, res) => {
   const { correct, totalCards } = req.body;
   try {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+
+      // Validate session exists and fetch stored total_cards BEFORE updating
+      const sessionCheck = await client.query(
+        'SELECT total_cards, deck_id FROM study_sessions WHERE id = $1 AND user_id = $2 AND completed_at IS NULL',
+        [req.params.id, req.userId]
+      );
+      if (sessionCheck.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Session not found or already completed' });
+      }
+      const storedTotal = sessionCheck.rows[0].total_cards;
+      const deckId = sessionCheck.rows[0].deck_id;
+
+      if (totalCards !== storedTotal) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Card count mismatch' });
+      }
+      if (correct < 0 || correct > totalCards) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Invalid correct count' });
+      }
 
       const result = await client.query(
         `UPDATE study_sessions
@@ -44,10 +65,6 @@ router.patch('/:id', authenticate, async (req, res) => {
          RETURNING *`,
         [correct, totalCards, req.params.id, req.userId]
       );
-      if (result.rows.length === 0) {
-        await client.query('ROLLBACK');
-        return res.status(404).json({ error: 'Session not found or already completed' });
-      }
 
       // Increment study_score (counts completed study sessions)
       await client.query(
@@ -55,19 +72,39 @@ router.patch('/:id', authenticate, async (req, res) => {
         [req.userId]
       );
 
+      // UPSERT deck_stats — DO UPDATE pattern (accumulating, not deduplicating)
+      const accuracy = totalCards > 0 ? (correct / totalCards) * 100 : 0;
+      const statsResult = await client.query(
+        `INSERT INTO deck_stats (user_id, deck_id, times_completed, best_accuracy)
+         VALUES ($1, $2, 1, $3)
+         ON CONFLICT (user_id, deck_id) DO UPDATE SET
+           times_completed = deck_stats.times_completed + 1,
+           best_accuracy = GREATEST(deck_stats.best_accuracy, EXCLUDED.best_accuracy),
+           updated_at = NOW()
+         RETURNING times_completed, best_accuracy`,
+        [req.userId, deckId, accuracy]
+      );
+
       await client.query('COMMIT');
 
-      // Return session along with the deck info for rating prompt
+      // Combined post-commit query: deck info + has_rated (single round-trip)
       const session = result.rows[0];
-      const deck = await pool.query(
-        'SELECT origin, purchased_from_listing_id FROM decks WHERE id = $1',
-        [session.deck_id]
+      const deckInfo = await pool.query(
+        `SELECT d.origin AS deck_origin, d.purchased_from_listing_id AS listing_id,
+                (r.id IS NOT NULL) AS has_rated
+         FROM decks d
+         LEFT JOIN ratings r ON r.user_id = $1
+           AND r.listing_id = d.purchased_from_listing_id
+         WHERE d.id = $2`,
+        [req.userId, deckId]
       );
 
       res.json({
         session,
-        deck_origin: deck.rows[0]?.origin,
-        listing_id: deck.rows[0]?.purchased_from_listing_id,
+        deck_origin: deckInfo.rows[0]?.deck_origin,
+        listing_id: deckInfo.rows[0]?.listing_id,
+        has_rated: deckInfo.rows[0]?.has_rated || false,
+        deck_stats: statsResult.rows[0],
       });
     } catch (err) {
       await client.query('ROLLBACK');

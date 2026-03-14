@@ -156,25 +156,45 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Flag a listing
+// Flag a listing or review
 router.post('/:id/flag', authenticate, async (req, res) => {
-  const { reason } = req.body;
+  const { reason, flagType = 'listing', ratingId = null } = req.body;
   const VALID_REASONS = ['Inappropriate', 'Misleading', 'Spam', 'Low Quality', 'Other'];
 
   if (!reason || !VALID_REASONS.includes(reason)) {
     return res.status(400).json({ error: `Reason must be one of: ${VALID_REASONS.join(', ')}` });
   }
+  if (!['listing', 'review'].includes(flagType)) {
+    return res.status(400).json({ error: "flag_type must be 'listing' or 'review'" });
+  }
+  if (flagType === 'review' && !ratingId) {
+    return res.status(400).json({ error: 'rating_id is required when flagging a review' });
+  }
+  if (flagType === 'listing' && ratingId) {
+    return res.status(400).json({ error: 'rating_id must not be set when flagging a listing' });
+  }
 
   try {
+    // When flagging a review, verify the rating belongs to this listing
+    if (flagType === 'review') {
+      const { rows } = await pool.query(
+        'SELECT id FROM ratings WHERE id = $1 AND listing_id = $2',
+        [ratingId, req.params.id]
+      );
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'Rating not found for this listing' });
+      }
+    }
+
     await pool.query(
-      `INSERT INTO content_flags (listing_id, reporter_id, reason)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (listing_id, reporter_id) DO NOTHING`,
-      [req.params.id, req.userId, reason]
+      `INSERT INTO content_flags (listing_id, reporter_id, reason, flag_type, rating_id)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (listing_id, reporter_id, flag_type) DO NOTHING`,
+      [req.params.id, req.userId, reason, flagType, flagType === 'review' ? ratingId : null]
     );
     res.status(201).json({ ok: true });
   } catch (err) {
-    console.error('Flag listing error:', err);
+    console.error('Flag error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

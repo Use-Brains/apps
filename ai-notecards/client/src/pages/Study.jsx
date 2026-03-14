@@ -1,75 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { api } from '../lib/api.js';
-
-function RatingModal({ listingId, onClose }) {
-  const [selectedStars, setSelectedStars] = useState(0);
-  const [hoveredStars, setHoveredStars] = useState(0);
-  const [submitting, setSubmitting] = useState(false);
-
-  const handleSubmit = async () => {
-    if (selectedStars === 0) return;
-    setSubmitting(true);
-    try {
-      await api.submitRating(listingId, selectedStars);
-      toast.success('Thanks for rating!');
-      onClose();
-    } catch (err) {
-      toast.error(err.message);
-      onClose();
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center">
-        <h2 className="text-xl font-bold text-[#1A1614] mb-2">Rate this deck</h2>
-        <p className="text-[#6B635A] text-sm mb-6">How was your study experience?</p>
-
-        <div className="flex justify-center gap-2 mb-6">
-          {[1, 2, 3, 4, 5].map((star) => (
-            <button
-              key={star}
-              onClick={() => setSelectedStars(star)}
-              onMouseEnter={() => setHoveredStars(star)}
-              onMouseLeave={() => setHoveredStars(0)}
-              className="p-1 transition-transform hover:scale-110"
-            >
-              <svg
-                className={`w-10 h-10 ${
-                  star <= (hoveredStars || selectedStars) ? 'text-[#C8A84E]' : 'text-gray-200'
-                } transition-colors`}
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-              </svg>
-            </button>
-          ))}
-        </div>
-
-        <div className="flex gap-3">
-          <button
-            onClick={handleSubmit}
-            disabled={selectedStars === 0 || submitting}
-            className="flex-1 py-3 bg-[#1B6B5A] text-white rounded-xl font-semibold hover:bg-[#155a4a] transition-colors disabled:opacity-50"
-          >
-            {submitting ? 'Submitting...' : 'Submit Rating'}
-          </button>
-          <button
-            onClick={onClose}
-            className="px-4 py-3 text-[#6B635A] text-sm hover:text-[#1A1614] transition-colors"
-          >
-            Skip
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function Study() {
   const { deckId } = useParams();
@@ -82,8 +14,24 @@ export default function Study() {
   const [sessionId, setSessionId] = useState(null);
   const [phase, setPhase] = useState('loading');
   const [loading, setLoading] = useState(true);
-  const [showRating, setShowRating] = useState(false);
+
+  // Results screen state
+  const [deckStats, setDeckStats] = useState(null);
+  const [hasRated, setHasRated] = useState(false);
   const [listingId, setListingId] = useState(null);
+  const [isRestarting, setIsRestarting] = useState(false);
+
+  // Rating screen state
+  const [selectedStars, setSelectedStars] = useState(0);
+  const [hoveredStars, setHoveredStars] = useState(0);
+  const [reviewText, setReviewText] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Refs for synchronous guards
+  const completingRef = useRef(false);
+  const submittingRef = useRef(false);
+  const advancingRef = useRef(false);
+  const advanceTimeoutRef = useRef(null);
 
   useEffect(() => {
     Promise.all([api.getDeck(deckId), api.startSession(deckId)])
@@ -101,28 +49,50 @@ export default function Study() {
       .finally(() => setLoading(false));
   }, [deckId]);
 
+  // Cleanup advance timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
+    };
+  }, []);
+
   const handleRate = useCallback(
     async (rating) => {
+      if (advancingRef.current) return;
+
       const newResults = [...results, rating];
       setResults(newResults);
-      setFlipped(false);
 
-      if (currentIndex + 1 >= cards.length) {
-        const correct = newResults.filter((r) => r === 'correct').length;
-        try {
-          const response = await api.completeSession(sessionId, correct, cards.length);
-          // Check if this is a purchased deck that can be rated
-          if (response.deck_origin === 'purchased' && response.listing_id) {
-            setListingId(response.listing_id);
-            setShowRating(true);
-          }
-        } catch {}
-        setPhase('summary');
-      } else {
-        setTimeout(() => setCurrentIndex((i) => i + 1), 200);
+      if (newResults.length < cards.length) {
+        // Not the last card — advance with input lock
+        advancingRef.current = true;
+        setFlipped(false);
+        advanceTimeoutRef.current = setTimeout(() => {
+          setCurrentIndex((i) => i + 1);
+          advancingRef.current = false;
+        }, 200);
+        return;
+      }
+
+      // Last card — complete session
+      if (completingRef.current) return;
+      completingRef.current = true;
+
+      const correct = newResults.filter((r) => r === 'correct').length;
+      const totalCards = cards.length;
+
+      try {
+        const res = await api.completeSession(sessionId, correct, totalCards);
+        setDeckStats(res.deck_stats);
+        setHasRated(res.has_rated);
+        setListingId(res.listing_id);
+        setPhase('results');
+      } catch (err) {
+        toast.error('Failed to save results. Please try again.');
+        completingRef.current = false;
       }
     },
-    [currentIndex, cards.length, results, sessionId]
+    [results, cards, sessionId]
   );
 
   useEffect(() => {
@@ -143,6 +113,54 @@ export default function Study() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [phase, flipped, handleRate]);
 
+  const handleStudyAgain = async () => {
+    if (isRestarting) return;
+    setIsRestarting(true);
+    if (advanceTimeoutRef.current) {
+      clearTimeout(advanceTimeoutRef.current);
+      advanceTimeoutRef.current = null;
+    }
+    try {
+      const res = await api.startSession(deckId);
+      setSessionId(res.session.id);
+      setCurrentIndex(0);
+      setResults([]);
+      setFlipped(false);
+      setCards((prev) => [...prev].sort(() => Math.random() - 0.5));
+      setPhase('studying');
+      completingRef.current = false;
+      advancingRef.current = false;
+    } catch (err) {
+      toast.error('Failed to start new session');
+    } finally {
+      setIsRestarting(false);
+    }
+  };
+
+  const handleContinue = () => {
+    const deckOrigin = deck?.origin;
+    if (deckOrigin === 'purchased' && listingId && !hasRated) {
+      setPhase('rating');
+    } else {
+      navigate('/dashboard');
+    }
+  };
+
+  const handleSubmitRating = async () => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setIsSubmitting(true);
+    try {
+      await api.submitRating(listingId, selectedStars, reviewText.trim() || null);
+      toast.success('Rating submitted!');
+      navigate('/dashboard', { replace: true });
+    } catch (err) {
+      toast.error(err.message || 'Failed to submit rating');
+      submittingRef.current = false;
+      setIsSubmitting(false);
+    }
+  };
+
   if (loading || phase === 'loading') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#1A1614] via-[#0d4a3d] to-[#1A1614] flex items-center justify-center">
@@ -151,16 +169,22 @@ export default function Study() {
     );
   }
 
-  if (phase === 'summary') {
+  // Results Screen
+  if (phase === 'results') {
     const correct = results.filter((r) => r === 'correct').length;
     const total = results.length;
-    const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
+    const currentAccuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
+    const bestAccuracy = deckStats ? Math.round(Number(deckStats.best_accuracy)) : currentAccuracy;
+    const timesCompleted = deckStats?.times_completed || 1;
+
+    const isFirstCompletion = timesCompleted === 1;
+    const isPersonalBest = !isFirstCompletion && currentAccuracy >= bestAccuracy;
+
+    const continueLabel =
+      deck?.origin === 'purchased' && listingId && !hasRated ? 'Rate this deck' : 'Continue';
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#1A1614] via-[#0d4a3d] to-[#1A1614] flex items-center justify-center p-4">
-        {showRating && listingId && (
-          <RatingModal listingId={listingId} onClose={() => setShowRating(false)} />
-        )}
         <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 sm:p-12 max-w-lg w-full text-center border border-white/10">
           <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-[#2D8A5E] to-[#1B6B5A] flex items-center justify-center">
             <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -169,58 +193,132 @@ export default function Study() {
           </div>
 
           <h1 className="text-3xl font-bold text-white mb-2">Session Complete!</h1>
-          <p className="text-white/60 mb-8">{deck.title}</p>
+          <p className="text-white/60 mb-2">{deck.title}</p>
 
-          <div className="grid grid-cols-3 gap-4 mb-8">
+          {isFirstCompletion && (
+            <p className="text-[#C8A84E] font-semibold mb-6">First completion!</p>
+          )}
+          {isPersonalBest && (
+            <p className="text-[#C8A84E] font-semibold mb-6">New personal best!</p>
+          )}
+          {!isFirstCompletion && !isPersonalBest && <div className="mb-6" />}
+
+          <div className="grid grid-cols-2 gap-4 mb-8">
             <div className="bg-white/5 rounded-xl p-4">
-              <p className="text-3xl font-bold text-white">{total}</p>
-              <p className="text-sm text-white/50">Cards</p>
-            </div>
-            <div className="bg-white/5 rounded-xl p-4">
-              <p className="text-3xl font-bold text-[#2D8A5E]">{correct}</p>
+              <p className="text-3xl font-bold text-[#2D8A5E]">{correct}/{total}</p>
               <p className="text-sm text-white/50">Correct</p>
             </div>
             <div className="bg-white/5 rounded-xl p-4">
-              <p className={`text-3xl font-bold ${pct >= 70 ? 'text-[#2D8A5E]' : pct >= 40 ? 'text-[#C8A84E]' : 'text-[#C0392B]'}`}>
-                {pct}%
+              <p className={`text-3xl font-bold ${currentAccuracy >= 70 ? 'text-[#2D8A5E]' : currentAccuracy >= 40 ? 'text-[#C8A84E]' : 'text-[#C0392B]'}`}>
+                {currentAccuracy}%
               </p>
               <p className="text-sm text-white/50">Accuracy</p>
+            </div>
+            <div className="bg-white/5 rounded-xl p-4">
+              <p className="text-3xl font-bold text-white">{bestAccuracy}%</p>
+              <p className="text-sm text-white/50">Best</p>
+            </div>
+            <div className="bg-white/5 rounded-xl p-4">
+              <p className="text-3xl font-bold text-white">{timesCompleted}</p>
+              <p className="text-sm text-white/50">Completions</p>
             </div>
           </div>
 
           <div className="h-3 bg-white/10 rounded-full overflow-hidden mb-8">
             <div
               className="h-full bg-gradient-to-r from-[#2D8A5E] to-[#1B6B5A] rounded-full transition-all"
-              style={{ width: `${pct}%` }}
+              style={{ width: `${currentAccuracy}%` }}
             />
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
             <button
-              onClick={() => {
-                setCurrentIndex(0);
-                setFlipped(false);
-                setResults([]);
-                setPhase('studying');
-                setCards((prev) => [...prev].sort(() => Math.random() - 0.5));
-                api.startSession(deckId).then((d) => setSessionId(d.session.id));
-              }}
-              className="flex-1 px-6 py-3 bg-[#1B6B5A] text-white rounded-xl font-semibold hover:bg-[#155a4a] transition-colors"
+              onClick={handleStudyAgain}
+              disabled={isRestarting}
+              className="flex-1 px-6 py-3 bg-[#1B6B5A] text-white rounded-xl font-semibold hover:bg-[#155a4a] transition-colors disabled:opacity-50"
             >
-              Study again
+              {isRestarting ? 'Starting...' : 'Study again'}
             </button>
-            <Link
-              to="/dashboard"
-              className="flex-1 px-6 py-3 bg-white/10 text-white rounded-xl font-medium hover:bg-white/20 transition-colors text-center"
+            <button
+              onClick={handleContinue}
+              disabled={isRestarting}
+              className="flex-1 px-6 py-3 bg-white/10 text-white rounded-xl font-medium hover:bg-white/20 transition-colors disabled:opacity-50"
             >
-              Back to decks
-            </Link>
+              {continueLabel}
+            </button>
           </div>
         </div>
       </div>
     );
   }
 
+  // Rating Screen
+  if (phase === 'rating') {
+    const charCount = [...reviewText].length;
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#1A1614] via-[#0d4a3d] to-[#1A1614] flex items-center justify-center p-4">
+        <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 sm:p-12 max-w-md w-full text-center border border-white/10">
+          <h1 className="text-2xl font-bold text-white mb-2">Rate this deck</h1>
+          <p className="text-white/60 mb-1">{deck.title}</p>
+          <p className="text-white/40 text-sm mb-8">{cards.length} cards</p>
+
+          <div className="flex justify-center gap-2 mb-8">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button
+                key={star}
+                onClick={() => setSelectedStars(star)}
+                onMouseEnter={() => setHoveredStars(star)}
+                onMouseLeave={() => setHoveredStars(0)}
+                aria-label={`${star} star${star !== 1 ? 's' : ''}`}
+                className="p-1 transition-transform hover:scale-110"
+              >
+                <svg
+                  className={`w-10 h-10 ${
+                    star <= (hoveredStars || selectedStars) ? 'text-[#C8A84E]' : 'text-white/20'
+                  } transition-colors`}
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                </svg>
+              </button>
+            ))}
+          </div>
+
+          <div className="mb-6 text-left">
+            <label className="text-sm text-white/60 mb-2 block">Review (optional)</label>
+            <textarea
+              value={reviewText}
+              onChange={(e) => {
+                if ([...e.target.value].length <= 200) {
+                  setReviewText(e.target.value);
+                }
+              }}
+              placeholder="Share your thoughts on this deck..."
+              rows={3}
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 resize-none focus:outline-none focus:border-[#1B6B5A]"
+            />
+            <p className={`text-xs mt-1 text-right ${charCount >= 200 ? 'text-red-400' : 'text-white/40'}`}>
+              {charCount}/200
+            </p>
+          </div>
+
+          <p className="text-white/40 text-xs mb-6">This rating is final and cannot be changed</p>
+
+          <button
+            onClick={handleSubmitRating}
+            disabled={selectedStars === 0 || isSubmitting}
+            className="w-full py-3 bg-[#1B6B5A] text-white rounded-xl font-semibold hover:bg-[#155a4a] transition-colors disabled:opacity-50"
+          >
+            {isSubmitting ? 'Submitting...' : 'Submit Rating'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Studying phase
   const card = cards[currentIndex];
   const progress = ((currentIndex) / cards.length) * 100;
 

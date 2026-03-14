@@ -30,7 +30,7 @@ function FlipCard({ card }) {
 
 const REPORT_REASONS = ['Inappropriate', 'Misleading', 'Spam', 'Low Quality', 'Other'];
 
-function ReportModal({ listingId, onClose }) {
+function ReportModal({ listingId, onClose, flagType = 'listing', ratingId = null }) {
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -38,7 +38,7 @@ function ReportModal({ listingId, onClose }) {
     if (!reason) return;
     setSubmitting(true);
     try {
-      await api.flagListing(listingId, reason);
+      await api.flagListing(listingId, reason, flagType, ratingId);
       toast.success('Report submitted — thanks for helping keep the marketplace safe');
       onClose();
     } catch (err) {
@@ -51,7 +51,7 @@ function ReportModal({ listingId, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
-        <h2 className="text-lg font-bold text-[#1A1614] mb-1">Report this listing</h2>
+        <h2 className="text-lg font-bold text-[#1A1614] mb-1">Report this {flagType === 'review' ? 'review' : 'listing'}</h2>
         <p className="text-sm text-[#6B635A] mb-4">Select a reason for reporting.</p>
         <div className="space-y-2 mb-5">
           {REPORT_REASONS.map((r) => (
@@ -95,10 +95,15 @@ export default function MarketplaceDeck() {
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(false);
   const [showReport, setShowReport] = useState(false);
+  const [ratings, setRatings] = useState([]);
+  const [reportTarget, setReportTarget] = useState({ flagType: 'listing', ratingId: null });
 
   useEffect(() => {
-    api.getListing(id)
-      .then(setData)
+    Promise.all([api.getListing(id), api.getListingRatings(id)])
+      .then(([listingData, ratingsData]) => {
+        setData(listingData);
+        setRatings(ratingsData.ratings || []);
+      })
       .catch((err) => toast.error(err.message))
       .finally(() => setLoading(false));
   }, [id]);
@@ -160,7 +165,14 @@ export default function MarketplaceDeck() {
   return (
     <div className="min-h-screen bg-[#FAF7F2]">
       <Navbar />
-      {showReport && <ReportModal listingId={id} onClose={() => setShowReport(false)} />}
+      {showReport && (
+        <ReportModal
+          listingId={id}
+          flagType={reportTarget.flagType}
+          ratingId={reportTarget.ratingId}
+          onClose={() => setShowReport(false)}
+        />
+      )}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-[#6B635A] mb-6">
@@ -212,7 +224,10 @@ export default function MarketplaceDeck() {
               )}
               {user && (
                 <button
-                  onClick={() => setShowReport(true)}
+                  onClick={() => {
+                    setReportTarget({ flagType: 'listing', ratingId: null });
+                    setShowReport(true);
+                  }}
                   className="mt-3 text-xs text-[#6B635A]/60 hover:text-red-500 transition-colors"
                 >
                   Report this listing
@@ -244,6 +259,49 @@ export default function MarketplaceDeck() {
             <FlipCard key={i} card={card} />
           ))}
         </div>
+
+        {/* Reviews */}
+        {ratings.filter((r) => r.review_text).length > 0 && (
+          <>
+            <h2 className="text-lg font-semibold text-[#1A1614] mt-10 mb-4">Reviews</h2>
+            <div className="space-y-4">
+              {ratings
+                .filter((r) => r.review_text)
+                .map((review) => (
+                  <div key={review.id} className="bg-white rounded-xl p-5 border border-gray-100">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="flex">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <svg
+                            key={star}
+                            className={`w-4 h-4 ${star <= review.stars ? 'text-[#C8A84E]' : 'text-gray-200'}`}
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        ))}
+                      </div>
+                      <span className="text-sm font-medium text-[#1A1614]">{review.display_name}</span>
+                      <span className="text-xs text-[#6B635A]">{new Date(review.created_at).toLocaleDateString()}</span>
+                    </div>
+                    <p className="text-sm text-[#1A1614]">{review.review_text}</p>
+                    {user && (
+                      <button
+                        onClick={() => {
+                          setReportTarget({ flagType: 'review', ratingId: review.id });
+                          setShowReport(true);
+                        }}
+                        className="mt-2 text-xs text-[#6B635A]/60 hover:text-red-500 transition-colors"
+                      >
+                        Report
+                      </button>
+                    )}
+                  </div>
+                ))}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Mobile sticky buy bar */}
