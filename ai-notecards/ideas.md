@@ -1,5 +1,10 @@
 v1 features:
 ---
+upload photos to go on front or back of flashcards
+something to consider, if we have designated models for image generation, then users who BYOK need to know this. 
+
+
+---
 ai model control
 which model will i use as number 1. groq or gemini free. 
 either way i will need a system that can create a ton of theseapi keys if i need them. 
