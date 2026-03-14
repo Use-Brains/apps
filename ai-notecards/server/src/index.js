@@ -20,6 +20,7 @@ import settingsRoutes from './routes/settings.js';
 import marketplaceRoutes from './routes/marketplace.js';
 import sellerRoutes from './routes/seller.js';
 import ratingsRoutes from './routes/ratings.js';
+import accountRoutes from './routes/account.js';
 import adminRoutes from './routes/admin.js';
 import pool from './db/pool.js';
 
@@ -65,6 +66,7 @@ app.use('/api/decks', deckRoutes);
 app.use('/api/study', studyRoutes);
 app.use('/api/stripe', stripeRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/account', accountRoutes);
 app.use('/api/marketplace', marketplaceRoutes);
 app.use('/api/seller', sellerRoutes);
 app.use('/api/ratings', ratingsRoutes);

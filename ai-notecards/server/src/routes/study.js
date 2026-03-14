@@ -141,4 +141,52 @@ router.get('/stats', authenticate, async (req, res) => {
   }
 });
 
+// Get study history — cursor-paginated completed sessions
+router.get('/history', authenticate, async (req, res) => {
+  try {
+    const { cursor_date, cursor_id } = req.query;
+    const limit = 20;
+
+    const { rows } = await pool.query(`
+      SELECT ss.id, ss.total_cards, ss.correct, ss.completed_at, d.title AS deck_title
+      FROM study_sessions ss
+      JOIN decks d ON d.id = ss.deck_id
+      WHERE ss.user_id = $1
+        AND ss.completed_at IS NOT NULL
+        AND ($2::timestamptz IS NULL OR (ss.completed_at, ss.id) < ($2::timestamptz, $3::uuid))
+      ORDER BY ss.completed_at DESC, ss.id DESC
+      LIMIT $4
+    `, [req.userId, cursor_date || null, cursor_id || null, limit + 1]);
+
+    const hasMore = rows.length > limit;
+    const sessions = rows.slice(0, limit);
+    const nextCursor = hasMore && sessions.length > 0
+      ? { cursor_date: sessions[sessions.length - 1].completed_at, cursor_id: sessions[sessions.length - 1].id }
+      : null;
+
+    res.json({ sessions, nextCursor });
+  } catch (err) {
+    console.error('Study history error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get per-deck stats
+router.get('/deck-stats', authenticate, async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT ds.deck_id, ds.times_completed, ds.best_accuracy, ds.updated_at, d.title AS deck_title
+      FROM deck_stats ds
+      JOIN decks d ON d.id = ds.deck_id
+      WHERE ds.user_id = $1
+      ORDER BY ds.updated_at DESC
+      LIMIT 100
+    `, [req.userId]);
+    res.json({ deckStats: rows });
+  } catch (err) {
+    console.error('Deck stats error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;

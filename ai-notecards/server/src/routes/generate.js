@@ -3,20 +3,12 @@ import multer from 'multer';
 import { fileTypeFromBuffer } from 'file-type';
 import rateLimit from 'express-rate-limit';
 import { authenticate } from '../middleware/auth.js';
+import { requireXHR } from '../middleware/csrf.js';
 import { checkTrialExpiry, checkGenerationLimits } from '../middleware/plan.js';
 import { generateCards, generateCardsWithVision } from '../services/ai.js';
 import pool from '../db/pool.js';
 
 const router = Router();
-
-// CSRF defense — any custom header forces a CORS preflight,
-// which the server's CORS policy will block for unauthorized origins
-function requireXHR(req, res, next) {
-  if (req.get('X-Requested-With') !== 'XMLHttpRequest') {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
-  next();
-}
 
 // Rate limiter — JSON message so client's request() can parse it
 const generateLimiter = rateLimit({
