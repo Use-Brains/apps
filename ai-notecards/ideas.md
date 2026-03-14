@@ -1,7 +1,23 @@
 v1 features:
 ---
-upload photos to go on front or back of flashcards
-something to consider, if we have designated models for image generation, then users who BYOK need to know this. 
+                                                                                                                                                                                                                                   
+  A few ideas that might be worth considering:                                                                                                                                                                                                              
+                                                                                                                                                                                                                                                            
+  Seller experience:                                                                                                                                                                                                                                        
+  - Earnings badge on listed decks — next to "view" on already-listed decks, show a small earnings amount like "$4.50 earned" so sellers get that dopamine hit right from their deck library                                                                
+  - "Quick relist" — if a seller delisted a deck, the icon could say "relist" instead of "sell" since the listing data already exists, skipping the form                                                                                                    
+                                                                                                                                                                                                                                                          
+  Seller onboarding:                                                                                                                                                                                                                                        
+  - Tooltip on greyed-out icons — when a non-seller hovers/taps a greyed-out sell icon, show a tooltip: "Become a seller to list this deck" linking to Settings. Turns the disabled state into a conversion opportunity rather than a dead end            
+  - Minimum card count nudge — if a deck has <10 cards and the icon is greyed out, the tooltip could say "Add at least 10 cards to sell this deck" — tells them why it's disabled and what to do about it                                                   
+                                                                                                                                                                                                                                                          
+  Quality & trust:                                                                                                                                                                                                                                          
+  - Seller rating displayed on their profile — aggregate average across all their listings, visible on their seller dashboard. Motivates quality                                                                                                            
+  - "Seller since" date — small trust signal on marketplace listings, rewards early sellers                                                                                                                                                                 
+                                                                                                                                                                                                                                                            
+  Post-checkout seller prompt:                                                                                                                                                                                                                              
+  - Skip vs. "Remind me later" — instead of just a dismiss, offer to surface the seller prompt again next time they visit Dashboard (a one-time banner). Less aggressive than nothing, less annoying than recurring                                       
+                                                                                                                                                                                                                       
 
 
 ---
