@@ -88,6 +88,32 @@ export const api = {
   startSellerOnboarding: () => request('/seller/onboard', { method: 'POST' }),
   refreshOnboarding: () => request('/seller/onboard/refresh'),
 
+  // Account
+  uploadAvatar: (file) => {
+    const form = new FormData();
+    form.append('avatar', file);
+    return request('/account/avatar', { method: 'POST', body: form });
+  },
+  deleteAvatar: () => request('/account/avatar', { method: 'DELETE' }),
+  changePassword: (currentPassword, newPassword) => request('/account/password', { method: 'PATCH', body: JSON.stringify({ currentPassword, newPassword }) }),
+  deleteAccount: (confirmation) => request('/account', { method: 'DELETE', body: JSON.stringify({ confirmation }) }),
+
+  // Study — extended
+  getStudyHistory: (cursorDate, cursorId) => {
+    const params = new URLSearchParams();
+    if (cursorDate) params.set('cursor_date', cursorDate);
+    if (cursorId) params.set('cursor_id', cursorId);
+    return request(`/study/history?${params}`);
+  },
+  getDeckStats: () => request('/study/deck-stats'),
+
+  // Settings — extended
+  updatePreferences: (prefs) => request('/settings/preferences', { method: 'PATCH', body: JSON.stringify(prefs) }),
+  exportDecks: () => fetch('/api/settings/export', {
+    credentials: 'include',
+    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+  }),
+
   // Ratings
   submitRating: (listingId, stars, reviewText) => request('/ratings', { method: 'POST', body: JSON.stringify({ listingId, stars, reviewText }) }),
   getListingRatings: (listingId) => request(`/ratings/listing/${listingId}`),

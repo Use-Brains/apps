@@ -16,6 +16,7 @@ import Marketplace from './pages/Marketplace.jsx';
 import MarketplaceDeck from './pages/MarketplaceDeck.jsx';
 import ListDeck from './pages/ListDeck.jsx';
 import SellerDashboard from './pages/SellerDashboard.jsx';
+import Profile from './pages/Profile.jsx';
 import Admin from './pages/Admin.jsx';
 
 function ProtectedRoute({ children }) {
@@ -64,6 +65,7 @@ export default function App() {
           <Route path="/decks/:id" element={<ProtectedRoute><DeckView /></ProtectedRoute>} />
           <Route path="/generate" element={<ProtectedRoute><Generate /></ProtectedRoute>} />
           <Route path="/study/:deckId" element={<ProtectedRoute><Study /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="/sell/:deckId" element={<ProtectedRoute><ListDeck /></ProtectedRoute>} />
           <Route path="/seller" element={<ProtectedRoute><SellerDashboard /></ProtectedRoute>} />
