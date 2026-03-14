@@ -1,17 +1,42 @@
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/AuthContext.jsx';
 
-export default function Navbar() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
+function AvatarDropdown({ user, onLogout }) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef(null);
+  const buttonRef = useRef(null);
 
-  const handleLogout = async () => {
-    await logout();
-    navigate('/');
-  };
+  // Click outside closes dropdown (mousedown to prevent toggle-bounce)
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (menuRef.current?.contains(e.target)) return;
+      if (buttonRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  // Escape key closes dropdown
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (e.key === 'Escape') {
+        setOpen(false);
+        buttonRef.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [open]);
+
+  const initials = user.display_name
+    ? user.display_name.charAt(0).toUpperCase()
+    : user.email.charAt(0).toUpperCase();
 
   const planBadge = () => {
-    if (!user) return null;
     if (user.plan === 'pro') {
       return (
         <span className="px-2 py-0.5 bg-gradient-to-r from-[#C8A84E] to-[#b8943e] text-white text-xs font-semibold rounded-full">
@@ -30,6 +55,93 @@ export default function Navbar() {
       );
     }
     return null;
+  };
+
+  return (
+    <div className="relative">
+      <button
+        ref={buttonRef}
+        aria-haspopup="true"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className="w-8 h-8 rounded-full bg-[#1B6B5A] text-white text-sm font-medium flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-[#1B6B5A]/30 transition-shadow overflow-hidden"
+      >
+        {user.avatar_url ? (
+          <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+        ) : (
+          initials
+        )}
+      </button>
+
+      {open && (
+        <div role="menu" aria-label="Account menu" ref={menuRef}
+          className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50"
+        >
+          {/* User info */}
+          <div className="px-4 py-2.5 border-b border-gray-100">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium text-[#1A1614] truncate">
+                {user.display_name || user.email}
+              </p>
+              {planBadge()}
+            </div>
+            {user.display_name && (
+              <p className="text-xs text-[#6B635A] truncate mt-0.5">{user.email}</p>
+            )}
+          </div>
+
+          {/* Menu items */}
+          <div className="py-1">
+            <Link
+              role="menuitem"
+              to="/profile"
+              onClick={() => setOpen(false)}
+              className="block w-full text-left px-4 py-2.5 text-sm text-[#1A1614] hover:bg-[#FAF7F2] transition-colors"
+            >
+              Profile
+            </Link>
+            <Link
+              role="menuitem"
+              to="/settings"
+              onClick={() => setOpen(false)}
+              className="block w-full text-left px-4 py-2.5 text-sm text-[#1A1614] hover:bg-[#FAF7F2] transition-colors"
+            >
+              Settings
+            </Link>
+            {user.connect_charges_enabled && (
+              <Link
+                role="menuitem"
+                to="/seller"
+                onClick={() => setOpen(false)}
+                className="block w-full text-left px-4 py-2.5 text-sm text-[#1A1614] hover:bg-[#FAF7F2] transition-colors"
+              >
+                Seller Dashboard
+              </Link>
+            )}
+          </div>
+
+          {/* Divider + logout */}
+          <div className="my-1 border-t border-gray-100" />
+          <button
+            role="menuitem"
+            onClick={() => { setOpen(false); onLogout(); }}
+            className="block w-full text-left px-4 py-2.5 text-sm text-[#6B635A] hover:bg-[#FAF7F2] transition-colors"
+          >
+            Log out
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function Navbar() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/');
   };
 
   return (
@@ -63,23 +175,7 @@ export default function Navbar() {
               >
                 Decks
               </Link>
-              {user.connect_charges_enabled && (
-                <Link
-                  to="/seller"
-                  className="px-3 py-2 text-sm text-[#6B635A] hover:text-[#1A1614] transition-colors"
-                >
-                  Seller
-                </Link>
-              )}
-              <div className="flex items-center gap-2 ml-2">
-                {planBadge()}
-                <button
-                  onClick={handleLogout}
-                  className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
-                >
-                  Log out
-                </button>
-              </div>
+              <AvatarDropdown user={user} onLogout={handleLogout} />
             </>
           ) : (
             <>
