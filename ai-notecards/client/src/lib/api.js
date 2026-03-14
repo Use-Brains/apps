@@ -83,6 +83,8 @@ export const api = {
   createListing: (data) => request('/seller/listings', { method: 'POST', body: JSON.stringify(data) }),
   updateListing: (id, data) => request(`/seller/listings/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delistListing: (id) => request(`/seller/listings/${id}`, { method: 'DELETE' }),
+  relistListing: (id) => request(`/seller/listings/${id}/relist`, { method: 'POST' }),
+  acceptSellerTerms: () => request('/seller/accept-terms', { method: 'POST' }),
   startSellerOnboarding: () => request('/seller/onboard', { method: 'POST' }),
   refreshOnboarding: () => request('/seller/onboard/refresh'),
 

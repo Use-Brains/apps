@@ -65,8 +65,8 @@ export async function createPurchaseCheckout(userId, listingId) {
     await pool.query('UPDATE users SET stripe_customer_id = $1 WHERE id = $2', [customerId, userId]);
   }
 
-  // 30% platform fee
-  const platformFeeCents = Math.round(listing.price_cents * 0.3);
+  // 50% platform fee
+  const platformFeeCents = Math.round(listing.price_cents * 0.5);
 
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
@@ -136,7 +136,7 @@ export async function fulfillPurchase(paymentIntentId, metadata) {
     [listing_id]
   );
   const priceCents = listings[0]?.price_cents || 0;
-  const platformFeeCents = Math.round(priceCents * 0.3);
+  const platformFeeCents = Math.round(priceCents * 0.5);
 
   // Write transaction: create purchase record + copy deck + cards
   const client = await pool.connect();
@@ -173,14 +173,8 @@ export async function fulfillPurchase(paymentIntentId, metadata) {
       [newDeckId, purchaseRows[0].id]
     );
 
-    // Batch insert cards
+    // Copy cards — individual inserts are fine for <= 30 cards
     if (sourceCards.length > 0) {
-      const values = sourceCards.map((_, i) => {
-        const offset = i * 3;
-        return `($${offset + 1}, $${offset + 2}, $${offset + 3}, ${newDeckId ? `'${newDeckId}'::uuid` : 'NULL'})`;
-      });
-
-      // Simpler approach: individual inserts are fine for <= 30 cards
       for (const card of sourceCards) {
         await client.query(
           'INSERT INTO cards (deck_id, front, back, position) VALUES ($1, $2, $3, $4)',

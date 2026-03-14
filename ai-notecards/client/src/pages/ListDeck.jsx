@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { api } from '../lib/api.js';
+import { useAuth } from '../lib/AuthContext.jsx';
 import Navbar from '../components/Navbar.jsx';
 
 const PRICE_OPTIONS = [
@@ -15,6 +16,7 @@ const PRICE_OPTIONS = [
 export default function ListDeck() {
   const { deckId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [deck, setDeck] = useState(null);
   const [categories, setCategories] = useState([]);
   const [categoryId, setCategoryId] = useState('');
@@ -26,6 +28,12 @@ export default function ListDeck() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!user?.connect_charges_enabled || !user?.seller_terms_accepted_at) {
+      toast.error('Complete seller setup to list decks');
+      navigate('/seller');
+      return;
+    }
+
     Promise.all([api.getDeck(deckId), api.getCategories()])
       .then(([deckData, catData]) => {
         setDeck(deckData);
@@ -55,7 +63,7 @@ export default function ListDeck() {
     }
   };
 
-  const platformFee = Math.round(priceCents * 0.3);
+  const platformFee = Math.round(priceCents * 0.5);
   const sellerEarnings = priceCents - platformFee;
 
   const handleSubmit = async (e) => {
@@ -190,7 +198,7 @@ export default function ListDeck() {
               ))}
             </div>
             <p className="text-sm text-[#6B635A] mt-2">
-              You earn <span className="font-mono font-semibold text-[#1B6B5A]">${(sellerEarnings / 100).toFixed(2)}</span> after 30% platform fee
+              You earn <span className="font-mono font-semibold text-[#1B6B5A]">${(sellerEarnings / 100).toFixed(2)}</span> after 50% platform fee
             </p>
           </div>
 

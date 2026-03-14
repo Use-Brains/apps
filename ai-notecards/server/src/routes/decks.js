@@ -9,11 +9,13 @@ router.get('/', authenticate, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT d.id, d.user_id, d.title, d.source_text, d.origin, d.purchased_from_listing_id,
-              d.created_at, d.updated_at, COUNT(c.id)::int AS card_count
+              d.created_at, d.updated_at, COUNT(c.id)::int AS card_count,
+              ml.id AS listing_id, ml.status AS listing_status
        FROM decks d
        LEFT JOIN cards c ON c.deck_id = d.id
+       LEFT JOIN marketplace_listings ml ON ml.deck_id = d.id
        WHERE d.user_id = $1
-       GROUP BY d.id
+       GROUP BY d.id, ml.id, ml.status
        ORDER BY d.created_at DESC`,
       [req.userId]
     );

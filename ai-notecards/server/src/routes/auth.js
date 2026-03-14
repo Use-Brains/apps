@@ -10,6 +10,7 @@ const TOKEN_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 export const USER_SELECT = `id, email, plan, trial_ends_at, daily_generation_count, last_generation_date,
   study_score, stripe_customer_id, stripe_connect_account_id, connect_charges_enabled,
+  connect_payouts_enabled, seller_terms_accepted_at,
   display_name, role, suspended, google_user_id, created_at`;
 
 export function setTokenCookie(res, userId) {
@@ -34,6 +35,8 @@ export function sanitizeUser(user) {
     stripe_customer_id: user.stripe_customer_id,
     stripe_connect_account_id: user.stripe_connect_account_id,
     connect_charges_enabled: user.connect_charges_enabled,
+    connect_payouts_enabled: user.connect_payouts_enabled,
+    seller_terms_accepted_at: user.seller_terms_accepted_at,
     display_name: user.display_name,
     role: user.role,
     suspended: user.suspended,

@@ -14,13 +14,14 @@ export default function SellerDashboard() {
   const [onboarding, setOnboarding] = useState(false);
 
   useEffect(() => {
-    // Handle Connect return
     const connectStatus = searchParams.get('connect');
     if (connectStatus === 'return') {
       api
         .refreshOnboarding()
         .then(() => refreshUser())
         .catch(() => {});
+    } else if (connectStatus === 'refresh') {
+      toast.error('Your Stripe link expired. Click below to try again.');
     }
   }, []);
 

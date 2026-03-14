@@ -70,11 +70,14 @@ router.post('/listings', authenticate, checkTrialExpiry, requirePlan('pro'), asy
       return res.status(429).json({ error: `Maximum ${MAX_ACTIVE_LISTINGS} active listings allowed` });
     }
 
-    // Check seller has Stripe Connect charges enabled
+    // Check seller has accepted terms and has Stripe Connect charges enabled
     const { rows: userRows } = await pool.query(
-      'SELECT connect_charges_enabled FROM users WHERE id = $1',
+      'SELECT connect_charges_enabled, seller_terms_accepted_at FROM users WHERE id = $1',
       [req.userId]
     );
+    if (!userRows[0].seller_terms_accepted_at) {
+      return res.status(403).json({ error: 'terms_required', message: 'You must accept seller terms first.' });
+    }
     if (!userRows[0].connect_charges_enabled) {
       return res.status(403).json({ error: 'Complete Stripe Connect onboarding before listing decks' });
     }
@@ -196,7 +199,7 @@ router.patch('/listings/:id', authenticate, checkTrialExpiry, requirePlan('pro')
 router.delete('/listings/:id', authenticate, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `UPDATE marketplace_listings SET status = 'delisted', updated_at = NOW()
+      `UPDATE marketplace_listings SET status = 'delisted', delisted_at = NOW(), updated_at = NOW()
        WHERE id = $1 AND seller_id = $2 AND status = 'active'
        RETURNING id`,
       [req.params.id, req.userId]
@@ -215,9 +218,12 @@ router.delete('/listings/:id', authenticate, async (req, res) => {
 router.post('/listings/:id/relist', authenticate, checkTrialExpiry, requirePlan('pro'), async (req, res) => {
   try {
     const { rows: userRows } = await pool.query(
-      'SELECT connect_charges_enabled FROM users WHERE id = $1',
+      'SELECT connect_charges_enabled, seller_terms_accepted_at FROM users WHERE id = $1',
       [req.userId]
     );
+    if (!userRows[0].seller_terms_accepted_at) {
+      return res.status(403).json({ error: 'terms_required', message: 'You must accept seller terms first.' });
+    }
     if (!userRows[0].connect_charges_enabled) {
       return res.status(403).json({ error: 'Stripe Connect required' });
     }
@@ -288,9 +294,46 @@ router.get('/dashboard', authenticate, async (req, res) => {
   }
 });
 
+// Accept seller terms
+router.post('/accept-terms', authenticate, checkTrialExpiry, requirePlan('pro'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT seller_terms_accepted_at, seller_terms_version FROM users WHERE id = $1',
+      [req.userId]
+    );
+    const user = rows[0];
+
+    // Idempotent: if already accepted, return existing
+    if (user.seller_terms_accepted_at) {
+      return res.json({
+        seller_terms_accepted_at: user.seller_terms_accepted_at,
+        seller_terms_version: user.seller_terms_version,
+      });
+    }
+
+    const { rows: updated } = await pool.query(
+      'UPDATE users SET seller_terms_accepted_at = NOW(), seller_terms_version = 1 WHERE id = $1 RETURNING seller_terms_accepted_at, seller_terms_version',
+      [req.userId]
+    );
+    res.json(updated[0]);
+  } catch (err) {
+    console.error('Accept terms error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Stripe Connect onboarding — create Express account + account link
 router.post('/onboard', authenticate, checkTrialExpiry, requirePlan('pro'), async (req, res) => {
   try {
+    // Gate on terms acceptance
+    const { rows: termsRows } = await pool.query(
+      'SELECT seller_terms_accepted_at FROM users WHERE id = $1',
+      [req.userId]
+    );
+    if (!termsRows[0].seller_terms_accepted_at) {
+      return res.status(403).json({ error: 'terms_required', message: 'You must accept seller terms before connecting Stripe.' });
+    }
+
     const stripe = getStripe();
     const { rows } = await pool.query(
       'SELECT email, stripe_connect_account_id FROM users WHERE id = $1',

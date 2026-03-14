@@ -100,16 +100,16 @@ app.post('/webhooks/stripe-connect', async (req, res) => {
 
       case 'account.application.deauthorized': {
         const account = event.data.object;
-        // Mark seller as disconnected and delist all active listings
+        // Delist first, then nullify — single CTE to avoid race condition
         await pool.query(
-          `UPDATE users SET connect_charges_enabled = false, connect_payouts_enabled = false,
-           stripe_connect_account_id = NULL WHERE stripe_connect_account_id = $1`,
-          [account.id]
-        );
-        await pool.query(
-          `UPDATE marketplace_listings SET status = 'delisted', updated_at = NOW()
-           WHERE seller_id = (SELECT id FROM users WHERE stripe_connect_account_id = $1)
-           AND status = 'active'`,
+          `WITH delisted AS (
+            UPDATE marketplace_listings SET status = 'delisted', delisted_at = NOW(), updated_at = NOW()
+            WHERE seller_id = (SELECT id FROM users WHERE stripe_connect_account_id = $1)
+              AND status = 'active'
+          )
+          UPDATE users SET stripe_connect_account_id = NULL,
+            connect_charges_enabled = false, connect_payouts_enabled = false
+          WHERE stripe_connect_account_id = $1`,
           [account.id]
         );
         console.log(`Connect account ${account.id} deauthorized — listings delisted`);
