@@ -936,54 +936,54 @@ This ensures: Google photo is captured automatically, but a manually uploaded av
 ## Acceptance Criteria
 
 ### Phase 1: Database & Backend
-- [ ] Migration 008 adds `avatar_url`, `google_avatar_url`, `preferences`, `deleted_at`, `token_revoked_at` columns to users
-- [ ] Migration 008 adds composite index on `study_sessions (user_id, completed_at DESC, id DESC)`
-- [ ] Extract `requireXHR` from `generate.js` to `middleware/csrf.js` as shared middleware
-- [ ] Create `requireActiveUser` middleware in `middleware/auth.js` (checks `deleted_at`, `token_revoked_at`)
-- [ ] Create `services/storage.js` for Supabase Storage REST calls (`uploadAvatar`, `deleteAvatar`)
-- [ ] `POST /api/account/avatar` accepts image upload (JPEG/PNG, max 2MB), validates magic bytes (status 422 on failure), deletes old file if extension changes, checks Storage response before DB update
-- [ ] `DELETE /api/account/avatar` removes avatar from storage and sets column to NULL
-- [ ] `PATCH /api/account/password` validates current password, hashes with `SALT_ROUNDS` (12), sets `token_revoked_at = NOW() - INTERVAL '1 second'`, re-issues token
-- [ ] `PATCH /api/settings/preferences` validates against allowlist, deep-merges in application code (not `||` operator), writes full object back
-- [ ] `GET /api/study/history` returns cursor-paginated sessions with composite `(completed_at, id)` cursor
-- [ ] `GET /api/study/deck-stats` returns deck_stats with deck titles (LIMIT 100)
-- [ ] `GET /api/settings/export` uses single joined query (not N+1), LIMIT 500 decks, returns JSON
-- [ ] `DELETE /api/account` requires "DELETE" confirmation, soft-deletes in transaction (scrubs ALL PII including `google_user_id`, Stripe IDs), best-effort Stripe cancellation
-- [ ] Google OAuth handler captures `payload.picture` into `google_avatar_url` and sets `avatar_url` for new users
-- [ ] `USER_SELECT` adds `avatar_url`, `google_avatar_url`, `preferences`, `(password_hash IS NOT NULL) AS has_password`
-- [ ] `sanitizeUser` resolves avatar URL with `STORAGE_BASE` constant and cache-busting `?v=` param
-- [ ] Add `AND deleted_at IS NULL` to login, signup, and Google OAuth user queries
-- [ ] All new endpoints use `requireXHR` (from shared middleware) and `requireActiveUser` where appropriate
-- [ ] All handlers wrapped in try/catch with `console.error` and status 500
-- [ ] Success responses without data use `{ ok: true }` (not `{ message }`)
+- [x] Migration 008 adds `avatar_url`, `google_avatar_url`, `preferences`, `deleted_at`, `token_revoked_at` columns to users
+- [x] Migration 008 adds composite index on `study_sessions (user_id, completed_at DESC, id DESC)`
+- [x] Extract `requireXHR` from `generate.js` to `middleware/csrf.js` as shared middleware
+- [x] Create `requireActiveUser` middleware in `middleware/auth.js` (checks `deleted_at`, `token_revoked_at`)
+- [x] Create `services/storage.js` for Supabase Storage REST calls (`uploadAvatar`, `deleteAvatar`)
+- [x] `POST /api/account/avatar` accepts image upload (JPEG/PNG, max 2MB), validates magic bytes (status 422 on failure), deletes old file if extension changes, checks Storage response before DB update
+- [x] `DELETE /api/account/avatar` removes avatar from storage and sets column to NULL
+- [x] `PATCH /api/account/password` validates current password, hashes with `SALT_ROUNDS` (12), sets `token_revoked_at = NOW() - INTERVAL '1 second'`, re-issues token
+- [x] `PATCH /api/settings/preferences` validates against allowlist, deep-merges in application code (not `||` operator), writes full object back
+- [x] `GET /api/study/history` returns cursor-paginated sessions with composite `(completed_at, id)` cursor
+- [x] `GET /api/study/deck-stats` returns deck_stats with deck titles (LIMIT 100)
+- [x] `GET /api/settings/export` uses single joined query (not N+1), LIMIT 500 decks, returns JSON
+- [x] `DELETE /api/account` requires "DELETE" confirmation, soft-deletes in transaction (scrubs ALL PII including `google_user_id`, Stripe IDs), best-effort Stripe cancellation
+- [x] Google OAuth handler captures `payload.picture` into `google_avatar_url` and sets `avatar_url` for new users
+- [x] `USER_SELECT` adds `avatar_url`, `google_avatar_url`, `preferences`, `(password_hash IS NOT NULL) AS has_password`
+- [x] `sanitizeUser` resolves avatar URL with `STORAGE_BASE` constant and cache-busting `?v=` param
+- [x] Add `AND deleted_at IS NULL` to login, signup, and Google OAuth user queries
+- [x] All new endpoints use `requireXHR` (from shared middleware) and `requireActiveUser` where appropriate
+- [x] All handlers wrapped in try/catch with `console.error` and status 500
+- [x] Success responses without data use `{ ok: true }` (not `{ message }`)
 
 ### Phase 2: Navbar Avatar Dropdown
-- [ ] Avatar circle (32px) in top-right of Navbar replaces flat links when logged in
-- [ ] Shows user's avatar image, or Google avatar fallback, or initials on colored background
-- [ ] Click opens dropdown with: Profile, Settings, Seller Dashboard (conditional), divider, Log out
-- [ ] Plan badge shown in dropdown next to user info
-- [ ] Click outside (via `mousedown`) or Escape closes dropdown
-- [ ] Dropdown uses ARIA menu pattern (role="menu", aria-haspopup, aria-expanded)
+- [x] Avatar circle (32px) in top-right of Navbar replaces flat links when logged in
+- [x] Shows user's avatar image, or Google avatar fallback, or initials on colored background
+- [x] Click opens dropdown with: Profile, Settings, Seller Dashboard (conditional), divider, Log out
+- [x] Plan badge shown in dropdown next to user info
+- [x] Click outside (via `mousedown`) or Escape closes dropdown
+- [x] Dropdown uses ARIA menu pattern (role="menu", aria-haspopup, aria-expanded)
 
 ### Phase 3: Profile Page
-- [ ] Accessible at `/profile` (authenticated only)
-- [ ] Shows avatar (clickable to change), display name (editable inline), email (read-only), plan badge
-- [ ] Study stats grid: study score, total sessions, cards studied, overall accuracy
-- [ ] Session history table with date, deck title, score (correct/total), accuracy — cursor-paginated
-- [ ] Per-deck stats: deck title, times completed, best accuracy
-- [ ] Member since date
-- [ ] Uses `Promise.allSettled` for resilient data loading
-- [ ] AbortController cleanup on unmount
+- [x] Accessible at `/profile` (authenticated only)
+- [x] Shows avatar (clickable to change), display name (editable inline), email (read-only), plan badge
+- [x] Study stats grid: study score, total sessions, cards studied, overall accuracy
+- [x] Session history table with date, deck title, score (correct/total), accuracy — cursor-paginated
+- [x] Per-deck stats: deck title, times completed, best accuracy
+- [x] Member since date
+- [x] Uses `Promise.allSettled` for resilient data loading
+- [x] AbortController cleanup on unmount
 
 ### Phase 4: Settings Restructure
-- [ ] Profile section removed (display name editing moved to Profile page)
-- [ ] Security section: change password form (hidden for Google-only users), Google connected status
-- [ ] Study Preferences section: card order toggle, auto-flip select — auto-saves with debounce
-- [ ] Notifications section: study reminders and marketplace activity toggles — auto-saves
-- [ ] Subscription section: unchanged from current
-- [ ] Seller section: unchanged from current
-- [ ] Data & Privacy section: export decks button (blob download), delete account with "DELETE" confirmation modal
-- [ ] Export and delete use mutual exclusion (can't run both simultaneously)
+- [x] Profile section removed (display name editing moved to Profile page)
+- [x] Security section: change password form (hidden for Google-only users), Google connected status
+- [x] Study Preferences section: card order toggle, auto-flip select — auto-saves with debounce
+- [x] Notifications section: study reminders and marketplace activity toggles — auto-saves
+- [x] Subscription section: unchanged from current
+- [x] Seller section: unchanged from current
+- [x] Data & Privacy section: export decks button (blob download), delete account with "DELETE" confirmation modal
+- [x] Export and delete use mutual exclusion (can't run both simultaneously)
 
 ---
 

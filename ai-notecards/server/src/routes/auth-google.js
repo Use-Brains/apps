@@ -43,9 +43,11 @@ router.post('/', googleLimiter, async (req, res) => {
 
     const normalizedEmail = email.toLowerCase();
 
+    const googleAvatarUrl = payload.picture || null;
+
     // 1. Lookup by google_user_id
     const googleResult = await pool.query(
-      `SELECT ${USER_SELECT} FROM users WHERE google_user_id = $1`,
+      `SELECT ${USER_SELECT} FROM users WHERE google_user_id = $1 AND deleted_at IS NULL`,
       [sub]
     );
 
@@ -54,13 +56,18 @@ router.post('/', googleLimiter, async (req, res) => {
       if (user.suspended) {
         return res.status(403).json({ error: 'Account suspended. Contact support.', code: 'AUTH_ACCOUNT_SUSPENDED' });
       }
+      // Refresh Google avatar on each login
+      if (googleAvatarUrl) {
+        await pool.query('UPDATE users SET google_avatar_url = $1 WHERE id = $2', [googleAvatarUrl, user.id]);
+        user.google_avatar_url = googleAvatarUrl;
+      }
       setTokenCookie(res, user.id);
       return res.json({ user: sanitizeUser(user), isNewUser: false });
     }
 
     // 2. Check email match for auto-link
     const emailResult = await pool.query(
-      `SELECT ${USER_SELECT} FROM users WHERE email = $1`,
+      `SELECT ${USER_SELECT} FROM users WHERE email = $1 AND deleted_at IS NULL`,
       [normalizedEmail]
     );
 
@@ -75,12 +82,18 @@ router.post('/', googleLimiter, async (req, res) => {
         return res.status(409).json({ error: 'An account with this email already exists. Try signing in with a different method.' });
       }
 
-      // Auto-link: set google_user_id, update email_verified and display_name if needed
+      // Auto-link: set google_user_id, update email_verified, display_name, and google avatar
       const updates = ['google_user_id = $2'];
       const params = [user.id, sub];
       let paramIdx = 3;
 
       updates.push(`email_verified = true`);
+
+      if (googleAvatarUrl) {
+        updates.push(`google_avatar_url = $${paramIdx}`);
+        params.push(googleAvatarUrl);
+        paramIdx++;
+      }
 
       if (!user.display_name && name) {
         updates.push(`display_name = $${paramIdx}`);
@@ -101,10 +114,10 @@ router.post('/', googleLimiter, async (req, res) => {
 
     // 3. Create new user
     const newUser = await pool.query(
-      `INSERT INTO users (email, display_name, google_user_id, email_verified, plan, trial_ends_at)
-       VALUES ($1, $2, $3, true, 'trial', NOW() + INTERVAL '7 days')
+      `INSERT INTO users (email, display_name, google_user_id, google_avatar_url, email_verified, plan, trial_ends_at)
+       VALUES ($1, $2, $3, $4, true, 'trial', NOW() + INTERVAL '7 days')
        RETURNING ${USER_SELECT}`,
-      [normalizedEmail, name || null, sub]
+      [normalizedEmail, name || null, sub, googleAvatarUrl]
     );
 
     const user = newUser.rows[0];

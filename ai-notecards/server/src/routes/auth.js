@@ -5,13 +5,15 @@ import rateLimit from 'express-rate-limit';
 import pool from '../db/pool.js';
 
 const router = Router();
-const SALT_ROUNDS = 12;
+export const SALT_ROUNDS = 12;
 const TOKEN_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 export const USER_SELECT = `id, email, plan, trial_ends_at, daily_generation_count, last_generation_date,
   study_score, stripe_customer_id, stripe_connect_account_id, connect_charges_enabled,
   connect_payouts_enabled, seller_terms_accepted_at,
-  display_name, role, suspended, google_user_id, created_at`;
+  display_name, role, suspended, google_user_id, created_at,
+  avatar_url, google_avatar_url, preferences,
+  (password_hash IS NOT NULL) AS has_password`;
 
 export function setTokenCookie(res, userId) {
   const token = jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -23,7 +25,20 @@ export function setTokenCookie(res, userId) {
   });
 }
 
+const STORAGE_BASE = process.env.SUPABASE_URL
+  ? `${process.env.SUPABASE_URL}/storage/v1/object/public`
+  : '';
+
 export function sanitizeUser(user) {
+  // Resolve avatar: uploaded avatar (with cache-bust) > Google avatar > null
+  let resolvedAvatar = null;
+  if (user.avatar_url && STORAGE_BASE) {
+    const cacheBust = user.updated_at ? `?v=${new Date(user.updated_at).getTime()}` : '';
+    resolvedAvatar = `${STORAGE_BASE}/${user.avatar_url}${cacheBust}`;
+  } else if (user.google_avatar_url) {
+    resolvedAvatar = user.google_avatar_url;
+  }
+
   return {
     id: user.id,
     email: user.email,
@@ -41,6 +56,10 @@ export function sanitizeUser(user) {
     role: user.role,
     suspended: user.suspended,
     created_at: user.created_at,
+    avatar_url: resolvedAvatar,
+    has_password: user.has_password,
+    google_connected: !!user.google_user_id,
+    preferences: user.preferences || {},
   };
 }
 
@@ -57,7 +76,7 @@ router.post('/signup', signupLimiter, async (req, res) => {
   }
 
   try {
-    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
+    const existing = await pool.query('SELECT id FROM users WHERE email = $1 AND deleted_at IS NULL', [email.toLowerCase()]);
     if (existing.rows.length > 0) {
       return res.status(409).json({ error: 'Email already registered' });
     }
@@ -87,7 +106,7 @@ router.post('/login', loginLimiter, async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT ${USER_SELECT}, password_hash FROM users WHERE email = $1`,
+      `SELECT ${USER_SELECT}, password_hash FROM users WHERE email = $1 AND deleted_at IS NULL`,
       [email.toLowerCase()]
     );
     if (result.rows.length === 0) {
@@ -125,7 +144,7 @@ router.get('/me', async (req, res) => {
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
     const result = await pool.query(
-      `SELECT ${USER_SELECT} FROM users WHERE id = $1`,
+      `SELECT ${USER_SELECT} FROM users WHERE id = $1 AND deleted_at IS NULL`,
       [payload.userId]
     );
     if (result.rows.length === 0) {
@@ -134,6 +153,13 @@ router.get('/me', async (req, res) => {
     }
 
     const user = result.rows[0];
+
+    // Check token revocation (password change invalidates old sessions)
+    if (user.token_revoked_at && new Date(user.token_revoked_at) > new Date(payload.iat * 1000)) {
+      res.clearCookie('token');
+      return res.json({ user: null });
+    }
+
     // Auto-downgrade expired trial
     if (user.plan === 'trial' && user.trial_ends_at && new Date(user.trial_ends_at) < new Date()) {
       await pool.query("UPDATE users SET plan = 'free' WHERE id = $1 AND plan = 'trial'", [user.id]);
