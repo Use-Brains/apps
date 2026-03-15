@@ -57,7 +57,6 @@ export function sanitizeUser(user) {
     seller_terms_accepted_at: user.seller_terms_accepted_at,
     display_name: user.display_name,
     role: user.role,
-    suspended: user.suspended,
     created_at: user.created_at,
     avatar_url: resolvedAvatar,
     has_password: user.has_password,
@@ -144,7 +143,7 @@ router.post('/logout', (req, res) => {
 });
 
 router.get('/me', async (req, res) => {
-  const token = req.cookies?.token;
+  const token = req.cookies?.token || req.headers.authorization?.replace('Bearer ', '');
   if (!token) {
     return res.json({ user: null });
   }

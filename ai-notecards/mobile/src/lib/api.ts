@@ -1,5 +1,6 @@
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
+import type { StudyMode } from '@/types/api';
 
 const TOKEN_KEY = 'auth-token';
 
@@ -29,7 +30,9 @@ async function getToken(): Promise<string | null> {
 }
 
 export async function setToken(token: string): Promise<void> {
-  await SecureStore.setItemAsync(TOKEN_KEY, token);
+  await SecureStore.setItemAsync(TOKEN_KEY, token, {
+    keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+  });
 }
 
 export async function clearToken(): Promise<void> {
@@ -81,13 +84,13 @@ export const api = {
 
   // Auth — Google
   authGoogle: (idToken: string) =>
-    request('/auth-google', { method: 'POST', body: JSON.stringify({ idToken }) }),
+    request('/auth/google', { method: 'POST', body: JSON.stringify({ idToken }) }),
 
   // Auth — Magic Link
   magicLinkRequest: (email: string) =>
-    request('/auth-magic/request', { method: 'POST', body: JSON.stringify({ email }) }),
+    request('/auth/magic-link/request', { method: 'POST', body: JSON.stringify({ email }) }),
   magicLinkVerify: (email: string, code: string) =>
-    request('/auth-magic/verify', { method: 'POST', body: JSON.stringify({ email, code }) }),
+    request('/auth/magic-link/verify', { method: 'POST', body: JSON.stringify({ email, code }) }),
 
   // Generate
   generate: (input: string, title?: string) =>
@@ -110,8 +113,8 @@ export const api = {
     request(`/decks/${deckId}/cards/${cardId}`, { method: 'DELETE' }),
 
   // Study
-  startSession: (deckId: string, mode: string) =>
-    request('/study/start', { method: 'POST', body: JSON.stringify({ deckId, mode }) }),
+  startSession: (deckId: string, mode: StudyMode) =>
+    request('/study', { method: 'POST', body: JSON.stringify({ deckId, mode }) }),
   completeSession: (sessionId: string, correct: number, totalCards: number) =>
     request(`/study/${sessionId}`, { method: 'PATCH', body: JSON.stringify({ correct, totalCards }) }),
   getStats: () => request('/study/stats'),

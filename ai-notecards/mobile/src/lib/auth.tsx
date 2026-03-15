@@ -1,15 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import type { User } from '@/types/api';
 import { api, setToken, clearToken } from './api';
+import { storage } from './mmkv';
 
-type User = {
-  id: string;
-  email: string;
-  displayName: string | null;
-  plan: string;
-  avatarUrl: string | null;
-  studyScore: number;
-  currentStreak: number;
-};
+const USER_CACHE_KEY = 'cached-user';
 
 type AuthState = {
   user: User | null;
@@ -27,11 +21,18 @@ type AuthContextValue = AuthState & {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<AuthState>({ user: null, loading: true });
+  const cachedUserJson = storage.getString(USER_CACHE_KEY);
+  const cachedUser = cachedUserJson ? JSON.parse(cachedUserJson) as User : null;
+
+  const [state, setState] = useState<AuthState>({
+    user: cachedUser,
+    loading: cachedUser === null, // spinner only on first install or after logout
+  });
 
   const refreshUser = useCallback(async () => {
     try {
       const data = await api.me() as { user: User };
+      storage.set(USER_CACHE_KEY, JSON.stringify(data.user));
       setState({ user: data.user, loading: false });
     } catch {
       setState({ user: null, loading: false });
@@ -45,12 +46,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     const data = await api.login(email, password) as { token: string; user: User };
     await setToken(data.token);
+    storage.set(USER_CACHE_KEY, JSON.stringify(data.user));
     setState({ user: data.user, loading: false });
   }, []);
 
   const signup = useCallback(async (email: string, password: string) => {
     const data = await api.signup(email, password) as { token: string; user: User };
     await setToken(data.token);
+    storage.set(USER_CACHE_KEY, JSON.stringify(data.user));
     setState({ user: data.user, loading: false });
   }, []);
 
@@ -59,6 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await api.logout();
     } finally {
       await clearToken();
+      storage.remove(USER_CACHE_KEY);
       setState({ user: null, loading: false });
     }
   }, []);

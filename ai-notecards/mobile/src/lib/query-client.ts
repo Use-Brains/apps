@@ -1,4 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
+import type { Query } from '@tanstack/react-query';
 import type { Persister } from '@tanstack/react-query-persist-client';
 import { storage } from './mmkv';
 
@@ -25,4 +26,14 @@ export const queryPersister: Persister = {
   removeClient: async () => {
     storage.remove(PERSIST_KEY);
   },
+};
+
+// Allowlist of query roots to persist offline.
+// Default-deny: only explicitly listed roots are cached to disk.
+// Add new roots here when implementing features that need offline support.
+const PERSISTABLE_ROOTS = new Set(['decks', 'marketplace', 'study']);
+
+export const dehydrateOptions = {
+  shouldDehydrateQuery: (query: Query) =>
+    PERSISTABLE_ROOTS.has(query.queryKey[0] as string),
 };

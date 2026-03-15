@@ -1,3 +1,4 @@
+import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 
 const ENCRYPTION_KEY_ID = 'mmkv-encryption-key';
@@ -16,10 +17,8 @@ type MmkvFactory = {
 const memoryFallback = new Map<string, string>();
 
 function generateEncryptionKey(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  return Array.from({ length: 16 }, () =>
-    chars.charAt(Math.floor(Math.random() * chars.length))
-  ).join('');
+  // Synchronous CSPRNG — randomUUID() is backed by the native secure RNG (122 bits entropy)
+  return Crypto.randomUUID().replace(/-/g, '');
 }
 
 function getOrCreateEncryptionKey(): string {
@@ -31,7 +30,12 @@ function getOrCreateEncryptionKey(): string {
     }
     return key;
   } catch {
-    return generateEncryptionKey();
+    // First write failed — generate a new key and attempt to persist it so the
+    // same key is used on next launch. Without persisting, a different key is
+    // generated next launch and all MMKV data becomes permanently unreadable.
+    const newKey = generateEncryptionKey();
+    try { SecureStore.setItem(ENCRYPTION_KEY_ID, newKey); } catch { /* best-effort */ }
+    return newKey;
   }
 }
 
@@ -52,11 +56,10 @@ function createSecureStoreFallbackStorage(): KeyValueStorage {
       }
     },
     remove: (key: string): void => {
-      try {
-        void SecureStore.deleteItemAsync(key);
-      } finally {
-        memoryFallback.delete(key);
-      }
+      // deleteItemAsync is the only available delete API; fire-and-forget is acceptable
+      // since this is the fallback path and memoryFallback is cleared synchronously.
+      void SecureStore.deleteItemAsync(key);
+      memoryFallback.delete(key);
     },
   };
 }

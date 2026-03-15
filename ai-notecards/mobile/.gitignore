@@ -1,0 +1,40 @@
+# Expo
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native build output (root-anchored)
+/ios
+/android
+.kotlin/
+
+# EAS
+eas-build-local-nodejs/
+credentials.json
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Metro
+.metro-health-check*
+
+# TypeScript
+*.tsbuildinfo
+
+# Debug logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# OS / signing artifacts
+.DS_Store
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*

@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
-import { queryClient, queryPersister } from '@/lib/query-client';
+import { queryClient, queryPersister, dehydrateOptions } from '@/lib/query-client';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ThemeProvider, useTheme, useThemedStyles } from '@/lib/theme';
@@ -42,7 +42,7 @@ export default function RootLayout() {
   return (
     <ThemeProvider>
       <ErrorBoundary>
-        <PersistQueryClientProvider client={queryClient} persistOptions={{ persister: queryPersister }}>
+        <PersistQueryClientProvider client={queryClient} persistOptions={{ persister: queryPersister, dehydrateOptions }}>
           <AuthProvider>
             <AuthGate>
               <Slot />
