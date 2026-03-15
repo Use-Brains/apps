@@ -16,6 +16,26 @@ export function authenticate(req, res, next) {
   }
 }
 
+// Require email verification — stub for future auth methods (all current users auto-verified)
+export async function requireEmailVerified(req, res, next) {
+  try {
+    const { rows } = await pool.query(
+      'SELECT email_verified FROM users WHERE id = $1 AND deleted_at IS NULL',
+      [req.userId]
+    );
+    if (!rows[0]?.email_verified) {
+      return res.status(403).json({
+        error: 'email_verification_required',
+        message: 'Please verify your email to use this feature.',
+      });
+    }
+    next();
+  } catch (err) {
+    console.error('requireEmailVerified error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
 // DB check for sensitive operations — verifies user isn't deleted and token isn't revoked
 export async function requireActiveUser(req, res, next) {
   try {

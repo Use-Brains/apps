@@ -12,7 +12,7 @@ export const USER_SELECT = `id, email, plan, trial_ends_at, daily_generation_cou
   study_score, stripe_customer_id, stripe_connect_account_id, connect_charges_enabled,
   connect_payouts_enabled, seller_terms_accepted_at,
   display_name, role, suspended, google_user_id, created_at,
-  avatar_url, google_avatar_url, preferences,
+  avatar_url, google_avatar_url, preferences, email_verified, token_revoked_at,
   (password_hash IS NOT NULL) AS has_password`;
 
 export function setTokenCookie(res, userId) {
@@ -59,6 +59,7 @@ export function sanitizeUser(user) {
     avatar_url: resolvedAvatar,
     has_password: user.has_password,
     google_connected: !!user.google_user_id,
+    email_verified: !!user.email_verified,
     preferences: user.preferences || {},
   };
 }

@@ -845,12 +845,12 @@ const handleSetPassword = async (e) => {
 - [x] No Replay integration, no performance tracing (deferred)
 
 ### Phase 5: Email Verification
-- [ ] `email_verified` added to existing `USER_SELECT` string (one field, not a rewrite)
-- [ ] `email_verified: !!user.email_verified` added to existing `sanitizeUser` return (one line, snake_case)
-- [ ] `email_verified` is included in API responses (`GET /api/auth/me`, login, signup)
-- [ ] `requireEmailVerified` middleware exists and returns 403 with `email_verification_required` error code
-- [ ] Middleware is NOT yet chained onto any endpoints (deferred until unverified auth method exists)
-- [ ] No Dashboard banner (deferred)
+- [x] `email_verified` added to existing `USER_SELECT` string (one field, not a rewrite)
+- [x] `email_verified: !!user.email_verified` added to existing `sanitizeUser` return (one line, snake_case)
+- [x] `email_verified` is included in API responses (`GET /api/auth/me`, login, signup)
+- [x] `requireEmailVerified` middleware exists and returns 403 with `email_verification_required` error code
+- [x] Middleware is NOT yet chained onto any endpoints (deferred until unverified auth method exists)
+- [x] No Dashboard banner (deferred)
 
 ### Phase 6: Password Recovery
 - [ ] Login page shows "You can always sign in with a code" help text (not "Forgot your password?")
