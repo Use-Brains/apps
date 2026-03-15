@@ -118,7 +118,7 @@ export async function fulfillPurchase(paymentIntentId, metadata) {
   );
   if (sourceDeck.length === 0) {
     console.error(`Purchase fulfillment: source deck ${deck_id} not found`);
-    return;
+    return { isNew: false };
   }
 
   const { rows: sourceCards } = await pool.query(
@@ -151,7 +151,7 @@ export async function fulfillPurchase(paymentIntentId, metadata) {
     if (purchaseRows.length === 0) {
       // Already processed
       await client.query('ROLLBACK');
-      return;
+      return { isNew: false };
     }
 
     // Create buyer's deck copy
@@ -187,6 +187,7 @@ export async function fulfillPurchase(paymentIntentId, metadata) {
 
     await client.query('COMMIT');
     console.log(`Purchase fulfilled: buyer=${buyer_id}, listing=${listing_id}, deck_copy=${newDeckId}`);
+    return { isNew: true, purchaseId: purchaseRows[0].id };
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Purchase fulfillment error:', err);

@@ -3,8 +3,11 @@ import rateLimit from 'express-rate-limit';
 import { authenticate, requireActiveUser } from '../middleware/auth.js';
 import { requireXHR } from '../middleware/csrf.js';
 import { fulfillPurchase } from '../services/purchase.js';
+import { sendTransactionalEmail } from '../services/email.js';
 import { getStripe } from '../services/stripe.js';
 import pool from '../db/pool.js';
+
+const PLATFORM_FEE_RATE = 0.5;
 
 const router = Router();
 
@@ -130,13 +133,18 @@ router.post('/webhook', async (req, res) => {
         const session = event.data.object;
         const userId = session.metadata?.userId;
         if (userId && session.mode === 'subscription') {
-          await pool.query(
+          const { rows: [updatedUser] } = await pool.query(
             `UPDATE users SET plan = 'pro', stripe_subscription_id = $1, trial_ends_at = NULL,
              cancel_at_period_end = false, cancel_at = NULL
-             WHERE id = $2`,
+             WHERE id = $2 RETURNING email`,
             [session.subscription, userId]
           );
           console.log(`User ${userId} upgraded to pro`);
+          res.json({ received: true });
+          if (updatedUser?.email) {
+            sendTransactionalEmail('subscription_confirmed', updatedUser.email, {}).catch(() => {});
+          }
+          return;
         }
         break;
       }
@@ -145,11 +153,19 @@ router.post('/webhook', async (req, res) => {
         const subscription = event.data.object;
         const customerId = subscription.customer;
         if (subscription.cancel_at_period_end) {
-          await pool.query(
+          const cancelAt = new Date(subscription.cancel_at * 1000);
+          const { rows: [cancelledUser] } = await pool.query(
             `UPDATE users SET cancel_at_period_end = true, cancel_at = $1
-             WHERE stripe_customer_id = $2`,
-            [new Date(subscription.cancel_at * 1000).toISOString(), customerId]
+             WHERE stripe_customer_id = $2 RETURNING email`,
+            [cancelAt.toISOString(), customerId]
           );
+          res.json({ received: true });
+          if (cancelledUser?.email) {
+            sendTransactionalEmail('subscription_cancelling', cancelledUser.email, {
+              cancelAt: cancelAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+            }).catch(() => {});
+          }
+          return;
         } else if (subscription.status === 'active') {
           await pool.query(
             `UPDATE users SET plan = 'pro', stripe_subscription_id = $1,
@@ -197,12 +213,45 @@ router.post('/webhook', async (req, res) => {
         const meta = paymentIntent.metadata;
         // Marketplace purchase fulfillment
         if (meta?.listing_id && meta?.buyer_id) {
+          let result;
           try {
-            await fulfillPurchase(paymentIntent.id, meta);
+            result = await fulfillPurchase(paymentIntent.id, meta);
           } catch (err) {
             console.error('Purchase fulfillment failed:', err);
             // Still return 200 — log for manual resolution
           }
+          res.json({ received: true });
+          // Send emails only for new purchases (not replays)
+          if (result?.isNew) {
+            const { rows: [emailData] } = await pool.query(`
+              SELECT buyer.email AS buyer_email, seller.email AS seller_email,
+                     ml.title, ml.price_cents
+              FROM purchases p
+              JOIN users buyer ON buyer.id = p.buyer_id
+              JOIN users seller ON seller.id = p.seller_id
+              JOIN marketplace_listings ml ON ml.id = p.listing_id
+              WHERE p.id = $1
+            `, [result.purchaseId]);
+
+            if (emailData) {
+              const earnings = Math.round(emailData.price_cents * (1 - PLATFORM_FEE_RATE));
+              Promise.allSettled([
+                sendTransactionalEmail('sale_notification', emailData.seller_email, {
+                  title: emailData.title,
+                  earnings,
+                }),
+                sendTransactionalEmail('purchase_confirmation', emailData.buyer_email, {
+                  title: emailData.title,
+                  price: emailData.price_cents,
+                }),
+              ]).then(results => {
+                results.filter(r => r.status === 'rejected').forEach(r =>
+                  console.error('Email send failed:', r.reason)
+                );
+              });
+            }
+          }
+          return;
         }
         break;
       }
