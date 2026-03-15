@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { api } from '../lib/api.js';
@@ -131,6 +131,10 @@ export default function Dashboard() {
   const [searchParams] = useSearchParams();
   const [showSellerPrompt, setShowSellerPrompt] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [sortOption, setSortOption] = useState('newest');
+  const debounceRef = useRef(null);
 
   useEffect(() => {
     if (searchParams.get('upgraded') === 'true') {
@@ -196,6 +200,46 @@ export default function Dashboard() {
       toast.error(err.message);
     }
   };
+
+  // Debounced search
+  const handleSearchChange = (e) => {
+    const val = e.target.value;
+    setSearchQuery(val);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setDebouncedSearch(val), 150);
+  };
+  useEffect(() => () => clearTimeout(debounceRef.current), []);
+
+  const filteredDecks = useMemo(() => {
+    let filtered = decks;
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.trim().toLowerCase();
+      filtered = filtered.filter((d) => d.title.toLowerCase().includes(q));
+    }
+    const sorted = [...filtered];
+    switch (sortOption) {
+      case 'oldest':
+        sorted.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        break;
+      case 'a-z':
+        sorted.sort((a, b) => a.title.localeCompare(b.title));
+        break;
+      case 'most-cards':
+        sorted.sort((a, b) => b.card_count - a.card_count);
+        break;
+      case 'last-studied':
+        sorted.sort((a, b) => {
+          if (!a.last_studied_at && !b.last_studied_at) return 0;
+          if (!a.last_studied_at) return 1;
+          if (!b.last_studied_at) return -1;
+          return new Date(b.last_studied_at) - new Date(a.last_studied_at);
+        });
+        break;
+      default: // newest
+        sorted.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    }
+    return sorted;
+  }, [decks, debouncedSearch, sortOption]);
 
   const isTrialActive = user?.plan === 'trial' && user?.trial_ends_at && new Date(user.trial_ends_at) > new Date();
   const trialDaysLeft = isTrialActive
@@ -306,6 +350,35 @@ export default function Dashboard() {
           </Link>
         </div>
 
+        {/* Search + Sort */}
+        {decks.length > 0 && (
+          <div className="flex flex-col sm:flex-row gap-3 mb-6">
+            <div className="relative flex-1">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B635A]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={handleSearchChange}
+                placeholder="Search decks..."
+                className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-[#1A1614] text-sm focus:outline-none focus:ring-2 focus:ring-[#1B6B5A]/30 focus:border-[#1B6B5A]"
+              />
+            </div>
+            <select
+              value={sortOption}
+              onChange={(e) => setSortOption(e.target.value)}
+              className="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-[#1A1614] text-sm focus:outline-none focus:ring-2 focus:ring-[#1B6B5A]/30 focus:border-[#1B6B5A]"
+            >
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="a-z">A-Z</option>
+              <option value="most-cards">Most Cards</option>
+              <option value="last-studied">Last Studied</option>
+            </select>
+          </div>
+        )}
+
         {/* Deck Grid */}
         {decks.length === 0 ? (
           <div className="text-center py-20">
@@ -331,9 +404,13 @@ export default function Dashboard() {
               </Link>
             </div>
           </div>
+        ) : filteredDecks.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-[#6B635A]">No decks match your search</p>
+          </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {decks.map((deck) => {
+            {filteredDecks.map((deck) => {
               const sellState = getDeckSellState(deck, user);
               return (
                 <div

@@ -11,14 +11,21 @@ router.get('/', authenticate, async (req, res) => {
       `SELECT d.id, d.user_id, d.title, d.source_text, d.origin, d.purchased_from_listing_id,
               d.created_at, d.updated_at, COUNT(c.id)::int AS card_count,
               ml.id AS listing_id, ml.status AS listing_status,
-              (rt.id IS NOT NULL) AS has_rated
+              (rt.id IS NOT NULL) AS has_rated,
+              ls.last_studied_at
        FROM decks d
        LEFT JOIN cards c ON c.deck_id = d.id
        LEFT JOIN marketplace_listings ml ON ml.deck_id = d.id
        LEFT JOIN ratings rt ON rt.user_id = d.user_id
          AND rt.listing_id = d.purchased_from_listing_id
+       LEFT JOIN (
+         SELECT deck_id, MAX(completed_at) AS last_studied_at
+         FROM study_sessions
+         WHERE user_id = $1 AND completed_at IS NOT NULL
+         GROUP BY deck_id
+       ) ls ON ls.deck_id = d.id
        WHERE d.user_id = $1
-       GROUP BY d.id, ml.id, ml.status, rt.id
+       GROUP BY d.id, ml.id, ml.status, rt.id, ls.last_studied_at
        ORDER BY d.created_at DESC`,
       [req.userId]
     );
