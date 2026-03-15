@@ -1,26 +1,50 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth.js';
+import { requireXHR } from '../middleware/csrf.js';
 import pool from '../db/pool.js';
 
 const router = Router();
 
+const ALLOWED_MODES = ['flip', 'multiple_choice', 'type_answer', 'match'];
+const MIN_CARDS = { flip: 1, multiple_choice: 4, type_answer: 1, match: 6 };
+
 // Start a study session
-router.post('/', authenticate, async (req, res) => {
+router.post('/', requireXHR, authenticate, async (req, res) => {
   const { deckId } = req.body;
+  const mode = req.body.mode || 'flip';
+
   if (!deckId) {
     return res.status(400).json({ error: 'deckId is required' });
   }
+  if (!ALLOWED_MODES.includes(mode)) {
+    return res.status(400).json({ error: 'Invalid study mode' });
+  }
+
   try {
-    const deck = await pool.query('SELECT id FROM decks WHERE id = $1 AND user_id = $2', [deckId, req.userId]);
-    if (deck.rows.length === 0) {
+    // Combined deck ownership + card count (one round-trip)
+    const { rows } = await pool.query(
+      `SELECT COUNT(c.id)::int AS card_count
+       FROM decks d LEFT JOIN cards c ON c.deck_id = d.id
+       WHERE d.id = $1 AND d.user_id = $2
+       GROUP BY d.id`,
+      [deckId, req.userId]
+    );
+    if (rows.length === 0) {
       return res.status(404).json({ error: 'Deck not found' });
     }
 
-    const cardCount = await pool.query('SELECT COUNT(*)::int AS count FROM cards WHERE deck_id = $1', [deckId]);
+    const cardCount = rows[0].card_count;
+    const minRequired = MIN_CARDS[mode];
+    if (cardCount < minRequired) {
+      return res.status(400).json({ error: `This mode requires at least ${minRequired} cards` });
+    }
+
+    // Match mode: total_cards is always 6 (server-authoritative)
+    const totalCards = mode === 'match' ? 6 : cardCount;
 
     const result = await pool.query(
-      'INSERT INTO study_sessions (user_id, deck_id, total_cards) VALUES ($1, $2, $3) RETURNING *',
-      [req.userId, deckId, cardCount.rows[0].count]
+      'INSERT INTO study_sessions (user_id, deck_id, total_cards, mode) VALUES ($1, $2, $3, $4) RETURNING *',
+      [req.userId, deckId, totalCards, mode]
     );
     res.status(201).json({ session: result.rows[0] });
   } catch (err) {
@@ -29,9 +53,15 @@ router.post('/', authenticate, async (req, res) => {
   }
 });
 
-// Complete a study session — also increments study_score and upserts deck_stats
-router.patch('/:id', authenticate, async (req, res) => {
+// Complete a study session — also increments study_score + streak and upserts deck_stats
+router.patch('/:id', requireXHR, authenticate, async (req, res) => {
   const { correct, totalCards } = req.body;
+
+  // Type validation (pre-existing gap: string "5" passes "5" < 0 due to JS coercion)
+  if (!Number.isInteger(correct) || !Number.isInteger(totalCards)) {
+    return res.status(400).json({ error: 'correct and totalCards must be integers' });
+  }
+
   try {
     const client = await pool.connect();
     try {
@@ -66,9 +96,23 @@ router.patch('/:id', authenticate, async (req, res) => {
         [correct, totalCards, req.params.id, req.userId]
       );
 
-      // Increment study_score (counts completed study sessions)
-      await client.query(
-        'UPDATE users SET study_score = study_score + 1 WHERE id = $1',
+      // Atomic streak + study_score update (CTE computes streak value once)
+      const streakResult = await client.query(
+        `WITH new_streak AS (
+          SELECT CASE
+            WHEN last_study_date = (NOW() AT TIME ZONE 'UTC')::date THEN current_streak
+            WHEN last_study_date = (NOW() AT TIME ZONE 'UTC')::date - 1 THEN current_streak + 1
+            ELSE 1
+          END AS val
+          FROM users WHERE id = $1
+        )
+        UPDATE users SET
+          study_score = study_score + 1,
+          current_streak = (SELECT val FROM new_streak),
+          longest_streak = GREATEST(longest_streak, (SELECT val FROM new_streak)),
+          last_study_date = GREATEST(last_study_date, (NOW() AT TIME ZONE 'UTC')::date)
+        WHERE id = $1
+        RETURNING current_streak, longest_streak, study_score`,
         [req.userId]
       );
 
@@ -105,6 +149,7 @@ router.patch('/:id', authenticate, async (req, res) => {
         listing_id: deckInfo.rows[0]?.listing_id,
         has_rated: deckInfo.rows[0]?.has_rated || false,
         deck_stats: statsResult.rows[0],
+        streak: streakResult.rows[0],
       });
     } catch (err) {
       await client.query('ROLLBACK');
@@ -134,7 +179,31 @@ router.get('/stats', authenticate, async (req, res) => {
        WHERE user_id = $1 AND completed_at IS NOT NULL`,
       [req.userId]
     );
-    res.json({ stats: result.rows[0] });
+
+    // Streak + daily goal data
+    const { rows: [userData] } = await pool.query(
+      `SELECT current_streak, longest_streak, preferences->'daily_goal' AS daily_goal
+       FROM users WHERE id = $1`,
+      [req.userId]
+    );
+
+    // Sessions completed today (UTC)
+    const { rows: [todayData] } = await pool.query(
+      `SELECT COUNT(*)::int AS sessions_today
+       FROM study_sessions
+       WHERE user_id = $1 AND completed_at >= (NOW() AT TIME ZONE 'UTC')::date`,
+      [req.userId]
+    );
+
+    res.json({
+      stats: {
+        ...result.rows[0],
+        current_streak: userData?.current_streak || 0,
+        longest_streak: userData?.longest_streak || 0,
+        daily_goal: userData?.daily_goal || null,
+        sessions_today: todayData?.sessions_today || 0,
+      },
+    });
   } catch (err) {
     console.error('Stats error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -148,7 +217,7 @@ router.get('/history', authenticate, async (req, res) => {
     const limit = 20;
 
     const { rows } = await pool.query(`
-      SELECT ss.id, ss.total_cards, ss.correct, ss.completed_at, d.title AS deck_title
+      SELECT ss.id, ss.total_cards, ss.correct, ss.completed_at, ss.mode, d.title AS deck_title
       FROM study_sessions ss
       JOIN decks d ON d.id = ss.deck_id
       WHERE ss.user_id = $1

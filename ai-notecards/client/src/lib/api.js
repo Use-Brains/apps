@@ -2,12 +2,13 @@ const BASE = '/api';
 
 async function request(path, options = {}) {
   const isFormData = options.body instanceof FormData;
-  const { headers: optHeaders, ...restOptions } = options;
+  const { headers: optHeaders, signal, ...restOptions } = options;
   const res = await fetch(`${BASE}${path}`, {
     headers: isFormData
       ? { 'X-Requested-With': 'XMLHttpRequest', ...optHeaders }
       : { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', ...optHeaders },
     credentials: 'include',
+    signal,
     ...restOptions,
   });
 
@@ -45,6 +46,15 @@ export const api = {
     files.forEach(f => form.append('photos', f));
     return request('/generate', { method: 'POST', body: form });
   },
+  generatePreview: (input, title, options = {}) => request('/generate/preview', { method: 'POST', body: JSON.stringify({ input, title }), ...options }),
+  generatePreviewWithPhotos: (input, title, files, options = {}) => {
+    const form = new FormData();
+    if (input) form.append('input', input);
+    if (title) form.append('title', title);
+    files.forEach(f => form.append('photos', f));
+    return request('/generate/preview', { method: 'POST', body: form, ...options });
+  },
+  saveDeck: (title, sourceText, cards) => request('/decks/save', { method: 'POST', body: JSON.stringify({ title, source_text: sourceText, cards }) }),
 
   // Decks
   getDecks: () => request('/decks'),
@@ -58,7 +68,7 @@ export const api = {
   deleteCard: (deckId, cardId) => request(`/decks/${deckId}/cards/${cardId}`, { method: 'DELETE' }),
 
   // Study
-  startSession: (deckId) => request('/study', { method: 'POST', body: JSON.stringify({ deckId }) }),
+  startSession: (deckId, mode) => request('/study', { method: 'POST', body: JSON.stringify({ deckId, mode }) }),
   completeSession: (sessionId, correct, totalCards) => request(`/study/${sessionId}`, { method: 'PATCH', body: JSON.stringify({ correct, totalCards }) }),
   getStats: () => request('/study/stats'),
 

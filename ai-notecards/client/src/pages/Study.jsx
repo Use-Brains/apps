@@ -1,7 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { api } from '../lib/api.js';
+import shuffle from '../lib/shuffle.js';
+import MultipleChoiceMode from '../components/study/MultipleChoiceMode.jsx';
+import TypeAnswerMode from '../components/study/TypeAnswerMode.jsx';
+import MatchMode from '../components/study/MatchMode.jsx';
 
 export default function Study() {
   const { deckId } = useParams();
@@ -12,8 +16,9 @@ export default function Study() {
   const [flipped, setFlipped] = useState(false);
   const [results, setResults] = useState([]);
   const [sessionId, setSessionId] = useState(null);
-  const [phase, setPhase] = useState('loading');
+  const [phase, setPhase] = useState('loading'); // 'loading' | 'mode-select' | 'studying' | 'results' | 'rating'
   const [loading, setLoading] = useState(true);
+  const [mode, setMode] = useState('flip');
 
   // Results screen state
   const [deckStats, setDeckStats] = useState(null);
@@ -32,15 +37,15 @@ export default function Study() {
   const submittingRef = useRef(false);
   const advancingRef = useRef(false);
   const advanceTimeoutRef = useRef(null);
+  const resultsRef = useRef([]);
 
+  // Fetch deck data on mount (but don't start session yet — wait for mode selection)
   useEffect(() => {
-    Promise.all([api.getDeck(deckId), api.startSession(deckId)])
-      .then(([deckData, sessionData]) => {
+    api.getDeck(deckId)
+      .then((deckData) => {
         setDeck(deckData.deck);
-        const shuffled = [...deckData.cards].sort(() => Math.random() - 0.5);
-        setCards(shuffled);
-        setSessionId(sessionData.session.id);
-        setPhase('studying');
+        setCards(deckData.cards);
+        setPhase('mode-select');
       })
       .catch((err) => {
         toast.error(err.message);
@@ -56,62 +61,93 @@ export default function Study() {
     };
   }, []);
 
-  const handleRate = useCallback(
-    async (rating) => {
-      if (advancingRef.current) return;
+  // Stable allCards ref for MC distractors
+  const allCardsRef = useRef([]);
+  const stableAllCards = useMemo(() => {
+    allCardsRef.current = cards;
+    return cards;
+  }, [cards]);
 
-      const newResults = [...results, rating];
-      setResults(newResults);
+  const totalCards = mode === 'match' ? 6 : cards.length;
 
-      if (newResults.length < cards.length) {
-        // Not the last card — advance with input lock
-        advancingRef.current = true;
-        setFlipped(false);
-        advanceTimeoutRef.current = setTimeout(() => {
-          setCurrentIndex((i) => i + 1);
-          advancingRef.current = false;
-        }, 200);
-        return;
-      }
+  // Ref-based results accumulation — avoids stale closures
+  const handleRate = useCallback((rating) => {
+    if (!['correct', 'missed'].includes(rating)) return;
+    resultsRef.current = [...resultsRef.current, rating];
+    setResults(resultsRef.current);
 
-      // Last card — complete session
-      if (completingRef.current) return;
+    if (resultsRef.current.length === totalCards && !completingRef.current) {
       completingRef.current = true;
+      const correct = resultsRef.current.filter((r) => r === 'correct').length;
+      api.completeSession(sessionId, correct, totalCards)
+        .then((res) => {
+          setDeckStats(res.deck_stats);
+          setHasRated(res.has_rated);
+          setListingId(res.listing_id);
+          setPhase('results');
+        })
+        .catch(() => {
+          toast.error('Failed to save results. Please try again.');
+          completingRef.current = false;
+        });
+    }
+  }, [totalCards, sessionId]);
 
-      const correct = newResults.filter((r) => r === 'correct').length;
-      const totalCards = cards.length;
+  // Advance to next card (for flip mode and called by mode components)
+  const handleAdvance = useCallback(() => {
+    setCurrentIndex((i) => i + 1);
+    setFlipped(false);
+  }, []);
 
-      try {
-        const res = await api.completeSession(sessionId, correct, totalCards);
-        setDeckStats(res.deck_stats);
-        setHasRated(res.has_rated);
-        setListingId(res.listing_id);
-        setPhase('results');
-      } catch (err) {
-        toast.error('Failed to save results. Please try again.');
-        completingRef.current = false;
-      }
-    },
-    [results, cards, sessionId]
-  );
-
+  // Flip mode keyboard handling
   useEffect(() => {
-    if (phase !== 'studying') return;
+    if (phase !== 'studying' || mode !== 'flip') return;
 
     const handleKey = (e) => {
+      if (advancingRef.current) return;
       if (e.key === ' ' || e.key === 'Enter') {
         e.preventDefault();
         if (!flipped) setFlipped(true);
       } else if (flipped && (e.key === 'ArrowRight' || e.key === '1')) {
+        advancingRef.current = true;
         handleRate('correct');
+        setFlipped(false);
+        advanceTimeoutRef.current = setTimeout(() => {
+          handleAdvance();
+          advancingRef.current = false;
+        }, 200);
       } else if (flipped && (e.key === 'ArrowLeft' || e.key === '2')) {
+        advancingRef.current = true;
         handleRate('missed');
+        setFlipped(false);
+        advanceTimeoutRef.current = setTimeout(() => {
+          handleAdvance();
+          advancingRef.current = false;
+        }, 200);
       }
     };
 
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [phase, flipped, handleRate]);
+  }, [phase, mode, flipped, handleRate, handleAdvance]);
+
+  const handleModeSelect = async (selectedMode) => {
+    setMode(selectedMode);
+    try {
+      const res = await api.startSession(deckId, selectedMode);
+      setSessionId(res.session.id);
+      setCurrentIndex(0);
+      setResults([]);
+      resultsRef.current = [];
+      setFlipped(false);
+      completingRef.current = false;
+      advancingRef.current = false;
+      setCards(shuffle(cards));
+      setPhase('studying');
+    } catch (err) {
+      toast.error(err.message || 'Failed to start session');
+    }
+  };
 
   const handleStudyAgain = async () => {
     if (isRestarting) return;
@@ -121,12 +157,13 @@ export default function Study() {
       advanceTimeoutRef.current = null;
     }
     try {
-      const res = await api.startSession(deckId);
+      const res = await api.startSession(deckId, mode);
       setSessionId(res.session.id);
       setCurrentIndex(0);
       setResults([]);
+      resultsRef.current = [];
       setFlipped(false);
-      setCards((prev) => [...prev].sort(() => Math.random() - 0.5));
+      setCards((prev) => shuffle(prev));
       setPhase('studying');
       completingRef.current = false;
       advancingRef.current = false;
@@ -161,10 +198,75 @@ export default function Study() {
     }
   };
 
+  const handleFlipRate = (rating) => {
+    if (advancingRef.current) return;
+    advancingRef.current = true;
+    handleRate(rating);
+    setFlipped(false);
+    advanceTimeoutRef.current = setTimeout(() => {
+      handleAdvance();
+      advancingRef.current = false;
+    }, 200);
+  };
+
   if (loading || phase === 'loading') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#1A1614] via-[#0d4a3d] to-[#1A1614] flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-[#1B6B5A] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Mode Selection Screen
+  if (phase === 'mode-select') {
+    const modes = [
+      { id: 'flip', name: 'Flip Cards', desc: 'Classic flashcard flipping', icon: '🔄', min: 1 },
+      { id: 'multiple_choice', name: 'Multiple Choice', desc: 'Pick the right answer from 4 options', icon: '📝', min: 4 },
+      { id: 'type_answer', name: 'Type the Answer', desc: 'Type what you remember', icon: '⌨️', min: 1 },
+      { id: 'match', name: 'Match', desc: 'Match questions to answers', icon: '🔗', min: 6 },
+    ];
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#1A1614] via-[#0d4a3d] to-[#1A1614] flex items-center justify-center p-4">
+        <div className="max-w-lg w-full">
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold text-white mb-2">Choose Study Mode</h1>
+            <p className="text-white/60">{deck.title} · {cards.length} cards</p>
+          </div>
+          <div className="space-y-3">
+            {modes.map((m) => {
+              const disabled = cards.length < m.min;
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => !disabled && handleModeSelect(m.id)}
+                  disabled={disabled}
+                  className={`w-full text-left p-5 rounded-2xl border transition-all ${
+                    disabled
+                      ? 'bg-white/5 border-white/5 opacity-40 cursor-not-allowed'
+                      : 'bg-white/10 border-white/10 hover:bg-white/20 hover:border-white/20'
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <span className="text-2xl">{m.icon}</span>
+                    <div>
+                      <p className="text-white font-semibold">{m.name}</p>
+                      <p className="text-white/50 text-sm">{m.desc}</p>
+                      {disabled && (
+                        <p className="text-[#C8A84E] text-xs mt-1">Requires {m.min}+ cards</p>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <div className="text-center mt-6">
+            <Link to="/dashboard" className="text-white/50 hover:text-white text-sm transition-colors">
+              &larr; Back to Dashboard
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
@@ -182,6 +284,8 @@ export default function Study() {
 
     const continueLabel =
       deck?.origin === 'purchased' && listingId && !hasRated ? 'Rate this deck' : 'Continue';
+
+    const missedCards = cards.filter((_, i) => results[i] === 'missed');
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#1A1614] via-[#0d4a3d] to-[#1A1614] flex items-center justify-center p-4">
@@ -230,6 +334,30 @@ export default function Study() {
               style={{ width: `${currentAccuracy}%` }}
             />
           </div>
+
+          {/* Missed Cards Recap */}
+          {missedCards.length === 0 ? (
+            <div className="bg-[#2D8A5E]/10 rounded-xl p-4 mb-8 border border-[#2D8A5E]/20">
+              <p className="text-[#2D8A5E] font-semibold">Perfect score!</p>
+              <p className="text-white/50 text-sm mt-1">You got every card right</p>
+            </div>
+          ) : (
+            <div className="mb-8 text-left">
+              <h2 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-3">
+                Missed Cards ({missedCards.length})
+              </h2>
+              <div className="space-y-3 max-h-64 overflow-y-auto">
+                {missedCards.map((card, i) => (
+                  <div key={i} className="bg-white/5 rounded-xl p-4 border border-white/5">
+                    <p className="text-white/60 text-xs uppercase tracking-wider mb-1">Question</p>
+                    <p className="text-white text-sm mb-2">{card.front}</p>
+                    <p className="text-[#2D8A5E]/60 text-xs uppercase tracking-wider mb-1">Answer</p>
+                    <p className="text-[#2D8A5E] text-sm">{card.back}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-col sm:flex-row gap-3">
             <button
@@ -320,7 +448,7 @@ export default function Study() {
 
   // Studying phase
   const card = cards[currentIndex];
-  const progress = ((currentIndex) / cards.length) * 100;
+  const progress = (currentIndex / totalCards) * 100;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#1A1614] via-[#0d4a3d] to-[#1A1614] flex flex-col">
@@ -329,10 +457,13 @@ export default function Study() {
           &larr; Exit
         </Link>
         <div className="text-white/60 text-sm font-medium">
-          {currentIndex + 1} / {cards.length}
+          {mode === 'match' ? `${results.length}/6 pairs` : `${currentIndex + 1} / ${cards.length}`}
         </div>
         <div className="text-white/40 text-xs">
-          Space to flip · Arrow keys to rate
+          {mode === 'flip' && 'Space to flip · Arrow keys to rate'}
+          {mode === 'multiple_choice' && '1-4 to select'}
+          {mode === 'type_answer' && 'Enter to submit'}
+          {mode === 'match' && 'Tap to match'}
         </div>
       </div>
 
@@ -346,46 +477,76 @@ export default function Study() {
       </div>
 
       <div className="flex-1 flex items-center justify-center p-4 sm:p-8">
-        <div className="w-full max-w-2xl">
-          <div
-            className="perspective cursor-pointer"
-            style={{ minHeight: '320px' }}
-            onClick={() => !flipped && setFlipped(true)}
-          >
-            <div className={`flip-card-inner ${flipped ? 'flipped' : ''}`} style={{ minHeight: '320px' }}>
-              <div className="flip-card-front bg-white rounded-3xl p-8 sm:p-12 flex flex-col items-center justify-center shadow-2xl shadow-black/20 border border-white/20">
-                <p className="text-xs uppercase tracking-wider text-[#6B635A] font-medium mb-6">Question</p>
-                <p className="text-xl sm:text-2xl text-[#1A1614] font-medium text-center leading-relaxed">
-                  {card.front}
-                </p>
-                <p className="text-sm text-[#6B635A] mt-8">Tap to reveal answer</p>
-              </div>
-              <div className="flip-card-back bg-gradient-to-br from-[#1B6B5A] to-[#0d4a3d] rounded-3xl p-8 sm:p-12 flex flex-col items-center justify-center shadow-2xl shadow-black/20">
-                <p className="text-xs uppercase tracking-wider text-white/50 font-medium mb-6">Answer</p>
-                <p className="text-xl sm:text-2xl text-white font-medium text-center leading-relaxed">
-                  {card.back}
-                </p>
+        {mode === 'flip' && card && (
+          <div className="w-full max-w-2xl">
+            <div
+              className="perspective cursor-pointer"
+              style={{ minHeight: '320px' }}
+              onClick={() => !flipped && setFlipped(true)}
+            >
+              <div className={`flip-card-inner ${flipped ? 'flipped' : ''}`} style={{ minHeight: '320px' }}>
+                <div className="flip-card-front bg-white rounded-3xl p-8 sm:p-12 flex flex-col items-center justify-center shadow-2xl shadow-black/20 border border-white/20">
+                  <p className="text-xs uppercase tracking-wider text-[#6B635A] font-medium mb-6">Question</p>
+                  <p className="text-xl sm:text-2xl text-[#1A1614] font-medium text-center leading-relaxed">
+                    {card.front}
+                  </p>
+                  <p className="text-sm text-[#6B635A] mt-8">Tap to reveal answer</p>
+                </div>
+                <div className="flip-card-back bg-gradient-to-br from-[#1B6B5A] to-[#0d4a3d] rounded-3xl p-8 sm:p-12 flex flex-col items-center justify-center shadow-2xl shadow-black/20">
+                  <p className="text-xs uppercase tracking-wider text-white/50 font-medium mb-6">Answer</p>
+                  <p className="text-xl sm:text-2xl text-white font-medium text-center leading-relaxed">
+                    {card.back}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
 
-          {flipped && (
-            <div className="flex gap-4 mt-8 justify-center">
-              <button
-                onClick={() => handleRate('missed')}
-                className="flex-1 max-w-[200px] py-4 bg-[#C0392B]/20 text-[#C0392B] rounded-2xl font-semibold hover:bg-[#C0392B]/30 transition-colors border border-[#C0392B]/20"
-              >
-                Missed it
-              </button>
-              <button
-                onClick={() => handleRate('correct')}
-                className="flex-1 max-w-[200px] py-4 bg-[#2D8A5E]/20 text-[#2D8A5E] rounded-2xl font-semibold hover:bg-[#2D8A5E]/30 transition-colors border border-[#2D8A5E]/20"
-              >
-                Got it!
-              </button>
-            </div>
-          )}
-        </div>
+            {flipped && (
+              <div className="flex gap-4 mt-8 justify-center">
+                <button
+                  onClick={() => handleFlipRate('missed')}
+                  className="flex-1 max-w-[200px] py-4 bg-[#C0392B]/20 text-[#C0392B] rounded-2xl font-semibold hover:bg-[#C0392B]/30 transition-colors border border-[#C0392B]/20"
+                >
+                  Missed it
+                </button>
+                <button
+                  onClick={() => handleFlipRate('correct')}
+                  className="flex-1 max-w-[200px] py-4 bg-[#2D8A5E]/20 text-[#2D8A5E] rounded-2xl font-semibold hover:bg-[#2D8A5E]/30 transition-colors border border-[#2D8A5E]/20"
+                >
+                  Got it!
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {mode === 'multiple_choice' && card && (
+          <MultipleChoiceMode
+            card={card}
+            allCards={stableAllCards}
+            onRate={handleRate}
+            onAdvance={handleAdvance}
+          />
+        )}
+
+        {mode === 'type_answer' && card && (
+          <TypeAnswerMode
+            card={card}
+            onRate={handleRate}
+            onAdvance={handleAdvance}
+          />
+        )}
+
+        {mode === 'match' && (
+          <MatchMode
+            allCards={stableAllCards}
+            onRate={handleRate}
+            onAdvance={() => {
+              // Match mode completes when all 6 pairs matched
+              // Session completion is handled by handleRate when results.length === totalCards
+            }}
+          />
+        )}
       </div>
     </div>
   );

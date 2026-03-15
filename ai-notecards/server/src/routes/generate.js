@@ -74,8 +74,9 @@ async function validateImageContent(req, res, next) {
 let activeVisionRequests = 0;
 const MAX_CONCURRENT_VISION = parseInt(process.env.MAX_CONCURRENT_VISION, 10) || 3;
 
+// POST /preview — AI generation only, returns unsaved cards. Consumes generation count.
 router.post(
-  '/',
+  '/preview',
   generateLimiter,
   requireXHR,
   authenticate,
@@ -120,55 +121,21 @@ router.post(
           activeVisionRequests--;
         }
       } else {
-        // Text-only path (existing behavior)
+        // Text-only path
         cards = await generateCards(input);
       }
 
-      // Deck title with fallback for photo-only generations
-      const deckTitle =
-        title || (input ? input.slice(0, 60).trim() + (input.length > 60 ? '...' : '') : 'Photo flashcards');
+      // Increment generation count (consumed at preview time)
+      const today = new Date().toISOString().split('T')[0];
+      await pool.query(
+        'UPDATE users SET daily_generation_count = $1, last_generation_date = $2 WHERE id = $3',
+        [req.generationCount + 1, today, req.userId]
+      );
 
-      // Acquire DB connection only after AI call completes
-      const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
-
-        const deckResult = await client.query(
-          'INSERT INTO decks (user_id, title, source_text) VALUES ($1, $2, $3) RETURNING *',
-          [req.userId, deckTitle, input || null]
-        );
-        const deck = deckResult.rows[0];
-
-        for (let i = 0; i < cards.length; i++) {
-          await client.query(
-            'INSERT INTO cards (deck_id, front, back, position) VALUES ($1, $2, $3, $4)',
-            [deck.id, cards[i].front, cards[i].back, i]
-          );
-        }
-
-        const today = new Date().toISOString().split('T')[0];
-        await client.query(
-          'UPDATE users SET daily_generation_count = $1, last_generation_date = $2 WHERE id = $3',
-          [req.generationCount + 1, today, req.userId]
-        );
-
-        await client.query('COMMIT');
-
-        const savedCards = await pool.query(
-          'SELECT id, front, back, position FROM cards WHERE deck_id = $1 ORDER BY position',
-          [deck.id]
-        );
-
-        res.status(201).json({
-          deck: { ...deck, cards: savedCards.rows },
-          generationsRemaining: req.generationLimit - (req.generationCount + 1),
-        });
-      } catch (err) {
-        await client.query('ROLLBACK');
-        throw err;
-      } finally {
-        client.release();
-      }
+      res.json({
+        cards,
+        generationsRemaining: req.generationLimit - (req.generationCount + 1),
+      });
     } catch (err) {
       console.error('Generation error:', err);
       if (err.message === 'Failed to parse AI-generated cards') {

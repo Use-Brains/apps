@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { api } from '../lib/api.js';
@@ -131,6 +131,11 @@ export default function Dashboard() {
   const [searchParams] = useSearchParams();
   const [showSellerPrompt, setShowSellerPrompt] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
+  const [streakDismissed, setStreakDismissed] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [sortOption, setSortOption] = useState('newest');
+  const debounceRef = useRef(null);
 
   useEffect(() => {
     if (searchParams.get('upgraded') === 'true') {
@@ -150,6 +155,17 @@ export default function Dashboard() {
       })
       .catch((err) => toast.error(err.message))
       .finally(() => setLoading(false));
+  }, []);
+
+  // bfcache: refetch stats when navigating back
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.persisted) {
+        api.getStats().then((data) => setStats(data.stats)).catch(() => {});
+      }
+    };
+    window.addEventListener('pageshow', handler);
+    return () => window.removeEventListener('pageshow', handler);
   }, []);
 
   const refreshDecks = async () => {
@@ -196,6 +212,46 @@ export default function Dashboard() {
       toast.error(err.message);
     }
   };
+
+  // Debounced search
+  const handleSearchChange = (e) => {
+    const val = e.target.value;
+    setSearchQuery(val);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setDebouncedSearch(val), 150);
+  };
+  useEffect(() => () => clearTimeout(debounceRef.current), []);
+
+  const filteredDecks = useMemo(() => {
+    let filtered = decks;
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.trim().toLowerCase();
+      filtered = filtered.filter((d) => d.title.toLowerCase().includes(q));
+    }
+    const sorted = [...filtered];
+    switch (sortOption) {
+      case 'oldest':
+        sorted.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        break;
+      case 'a-z':
+        sorted.sort((a, b) => a.title.localeCompare(b.title));
+        break;
+      case 'most-cards':
+        sorted.sort((a, b) => b.card_count - a.card_count);
+        break;
+      case 'last-studied':
+        sorted.sort((a, b) => {
+          if (!a.last_studied_at && !b.last_studied_at) return 0;
+          if (!a.last_studied_at) return 1;
+          if (!b.last_studied_at) return -1;
+          return new Date(b.last_studied_at) - new Date(a.last_studied_at);
+        });
+        break;
+      default: // newest
+        sorted.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    }
+    return sorted;
+  }, [decks, debouncedSearch, sortOption]);
 
   const isTrialActive = user?.plan === 'trial' && user?.trial_ends_at && new Date(user.trial_ends_at) > new Date();
   const trialDaysLeft = isTrialActive
@@ -272,7 +328,7 @@ export default function Dashboard() {
         )}
 
         {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-8">
           {[
             { label: 'Study Score', value: user?.study_score ?? 0 },
             { label: 'Sessions', value: stats?.total_sessions ?? 0 },
@@ -284,7 +340,46 @@ export default function Dashboard() {
               <p className="text-2xl font-bold text-[#1A1614] mt-1">{s.value}</p>
             </div>
           ))}
+          {/* Streak Widget */}
+          <div className={`bg-white rounded-xl p-4 border border-gray-100 ${(stats?.current_streak ?? 0) >= 7 ? 'ring-2 ring-[#C8A84E]/30' : ''}`}>
+            <p className="text-sm text-[#6B635A]">Streak</p>
+            <div className="flex items-baseline gap-1.5 mt-1">
+              <span className={`text-2xl font-bold ${(stats?.current_streak ?? 0) >= 7 ? 'text-[#C8A84E]' : 'text-[#1A1614]'}`}>
+                {stats?.current_streak ?? 0}
+              </span>
+              <span className="text-sm text-[#6B635A]">day{(stats?.current_streak ?? 0) !== 1 ? 's' : ''}</span>
+            </div>
+            {(stats?.longest_streak ?? 0) > 0 && (
+              <p className="text-xs text-[#6B635A] mt-1">Best: {stats.longest_streak}</p>
+            )}
+            {stats?.daily_goal && (
+              <div className="mt-2">
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-[#1B6B5A] rounded-full transition-all"
+                    style={{ width: `${Math.min(100, ((stats.sessions_today || 0) / stats.daily_goal) * 100)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-[#6B635A] mt-1">{stats.sessions_today || 0}/{stats.daily_goal} today</p>
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Streak at risk banner */}
+        {!streakDismissed && (stats?.current_streak ?? 0) > 0 && (stats?.sessions_today ?? 0) === 0 && (
+          <div className="bg-[#C8A84E]/10 border border-[#C8A84E]/20 rounded-xl p-4 mb-6 flex items-center justify-between">
+            <p className="text-[#1A1614] text-sm">
+              Keep your streak alive! Study now to maintain your <span className="font-semibold">{stats.current_streak}-day streak</span>.
+            </p>
+            <button
+              onClick={() => setStreakDismissed(true)}
+              className="text-[#6B635A] hover:text-[#1A1614] text-sm shrink-0 ml-4"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -305,6 +400,35 @@ export default function Dashboard() {
             Generate Cards
           </Link>
         </div>
+
+        {/* Search + Sort */}
+        {decks.length > 0 && (
+          <div className="flex flex-col sm:flex-row gap-3 mb-6">
+            <div className="relative flex-1">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B635A]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={handleSearchChange}
+                placeholder="Search decks..."
+                className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-[#1A1614] text-sm focus:outline-none focus:ring-2 focus:ring-[#1B6B5A]/30 focus:border-[#1B6B5A]"
+              />
+            </div>
+            <select
+              value={sortOption}
+              onChange={(e) => setSortOption(e.target.value)}
+              className="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-[#1A1614] text-sm focus:outline-none focus:ring-2 focus:ring-[#1B6B5A]/30 focus:border-[#1B6B5A]"
+            >
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="a-z">A-Z</option>
+              <option value="most-cards">Most Cards</option>
+              <option value="last-studied">Last Studied</option>
+            </select>
+          </div>
+        )}
 
         {/* Deck Grid */}
         {decks.length === 0 ? (
@@ -331,9 +455,13 @@ export default function Dashboard() {
               </Link>
             </div>
           </div>
+        ) : filteredDecks.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-[#6B635A]">No decks match your search</p>
+          </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {decks.map((deck) => {
+            {filteredDecks.map((deck) => {
               const sellState = getDeckSellState(deck, user);
               return (
                 <div

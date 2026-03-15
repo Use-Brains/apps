@@ -22,5 +22,12 @@ CREATE INDEX IF NOT EXISTS idx_study_sessions_user_completed
   WHERE completed_at IS NOT NULL;
 
 -- Prevent JSONB bloat
-ALTER TABLE users ADD CONSTRAINT preferences_size
-  CHECK (pg_column_size(preferences) < 1024);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'preferences_size'
+  ) THEN
+    ALTER TABLE users ADD CONSTRAINT preferences_size
+      CHECK (pg_column_size(preferences) < 1024);
+  END IF;
+END $$;

@@ -15,17 +15,28 @@ export default function Generate() {
   const [title, setTitle] = useState('');
   const [loading, setLoading] = useState(false);
   const [photos, setPhotos] = useState([]);
-  const submitting = useRef(false);
+  const [previewCards, setPreviewCards] = useState(null);
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
   const previewUrls = useRef([]);
+  const controllerRef = useRef(null);
+  const savingRef = useRef(false);
 
-  // Revoke all preview URLs on unmount
+  // Revoke all preview URLs on unmount + abort in-flight generation
   useEffect(() => {
     return () => {
       previewUrls.current.forEach(url => URL.revokeObjectURL(url));
+      controllerRef.current?.abort();
     };
   }, []);
+
+  // Navigate-away confirmation while preview is active
+  useEffect(() => {
+    if (!previewCards || previewCards.length === 0) return;
+    const handler = (e) => { e.preventDefault(); };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [previewCards]);
 
   const addPhotos = (files) => {
     const newFiles = Array.from(files);
@@ -39,7 +50,6 @@ export default function Generate() {
       if (newFiles.length > remaining) {
         toast.error(`Only added ${remaining} photo${remaining === 1 ? '' : 's'} (limit: ${MAX_PHOTOS}).`);
       }
-      // Create preview URLs for new files
       toAdd.forEach(f => {
         const url = URL.createObjectURL(f);
         previewUrls.current.push(url);
@@ -49,19 +59,20 @@ export default function Generate() {
   };
 
   const removePhoto = (index) => {
-    // Revoke the URL for the removed photo
     URL.revokeObjectURL(previewUrls.current[index]);
     previewUrls.current.splice(index, 1);
     setPhotos(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleGenerate = async (e) => {
-    e.preventDefault();
-    if (submitting.current) return;
+    if (e) e.preventDefault();
     if (!input.trim() && photos.length === 0) return;
 
-    submitting.current = true;
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
     setLoading(true);
+
     try {
       let data;
       if (photos.length > 0) {
@@ -72,26 +83,136 @@ export default function Generate() {
           toast.error('Could not process one of your photos. Try removing it.');
           return;
         }
-        data = await api.generateWithPhotos(input, title || undefined, resizedFiles);
+        data = await api.generatePreviewWithPhotos(input, title || undefined, resizedFiles, { signal: controller.signal });
       } else {
-        data = await api.generate(input, title || undefined);
+        data = await api.generatePreview(input, title || undefined, { signal: controller.signal });
       }
-      toast.success(`Created ${data.deck.cards.length} flashcards!`);
-      navigate(`/decks/${data.deck.id}`);
+      if (controller.signal.aborted) return;
+      setPreviewCards(data.cards);
     } catch (err) {
+      if (err.name === 'AbortError') return;
       if (err.data?.limit) {
         toast.error(err.message);
       } else {
         toast.error(err.message || 'Generation failed. Please try again.');
       }
     } finally {
-      setLoading(false);
-      submitting.current = false;
+      if (controllerRef.current === controller) setLoading(false);
     }
+  };
+
+  const handleSave = async () => {
+    if (savingRef.current) return;
+    if (!previewCards || previewCards.length === 0) return;
+    savingRef.current = true;
+    try {
+      const deckTitle = title.trim() || (input ? input.slice(0, 60).trim() + (input.length > 60 ? '...' : '') : 'Photo flashcards');
+      const data = await api.saveDeck(deckTitle, input || null, previewCards);
+      toast.success(`Saved ${previewCards.length} flashcards!`);
+      setPreviewCards(null);
+      navigate(`/decks/${data.deck.id}`);
+    } catch (err) {
+      toast.error(err.message || 'Failed to save deck');
+    } finally {
+      savingRef.current = false;
+    }
+  };
+
+  const handleEditCard = (index, field, value) => {
+    setPreviewCards(prev => prev.map((card, i) => i === index ? { ...card, [field]: value } : card));
+  };
+
+  const handleDeleteCard = (index) => {
+    setPreviewCards(prev => prev.filter((_, i) => i !== index));
   };
 
   const canSubmit = (input.trim() || photos.length > 0) && !loading;
 
+  // Preview mode
+  if (previewCards) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Preview Cards</h1>
+              <p className="text-gray-500 text-sm mt-1">{previewCards.length} card{previewCards.length !== 1 ? 's' : ''} — edit or remove before saving</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleGenerate}
+                disabled={loading}
+                className="px-4 py-2 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                {loading ? 'Regenerating...' : 'Regenerate'}
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={previewCards.length === 0 || savingRef.current}
+                className="px-5 py-2 bg-brand-600 text-white rounded-xl font-medium hover:bg-brand-700 transition-colors disabled:opacity-50"
+              >
+                Save Deck
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {previewCards.map((card, i) => (
+              <div key={i} className="bg-white rounded-xl border border-gray-200 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 space-y-3">
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Front</label>
+                      <textarea
+                        value={card.front}
+                        onChange={(e) => handleEditCard(i, 'front', e.target.value)}
+                        rows={2}
+                        className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg text-gray-900 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Back</label>
+                      <textarea
+                        value={card.back}
+                        onChange={(e) => handleEditCard(i, 'back', e.target.value)}
+                        rows={2}
+                        className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg text-gray-900 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteCard(i)}
+                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                    aria-label={`Delete card ${i + 1}`}
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {previewCards.length === 0 && (
+            <div className="text-center py-12">
+              <p className="text-gray-500 mb-4">All cards removed. Regenerate or go back.</p>
+              <button
+                onClick={handleGenerate}
+                disabled={loading}
+                className="px-5 py-2.5 bg-brand-600 text-white rounded-xl font-medium hover:bg-brand-700 transition-colors disabled:opacity-50"
+              >
+                Regenerate
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Input mode
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />

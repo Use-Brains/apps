@@ -112,13 +112,14 @@ function validatePreferences(input) {
   if (typeof input !== 'object' || input === null) return null;
   const clean = {};
 
-  if ('card_order' in input) {
-    if (!['shuffle', 'sequential'].includes(input.card_order)) return null;
-    clean.card_order = input.card_order;
-  }
   if ('auto_flip_seconds' in input) {
     if (![0, 3, 5, 10].includes(input.auto_flip_seconds)) return null;
     clean.auto_flip_seconds = input.auto_flip_seconds;
+  }
+  if ('daily_goal' in input) {
+    const goal = input.daily_goal;
+    if (!Number.isInteger(goal) || goal < 5 || goal > 100) return null;
+    clean.daily_goal = goal;
   }
   if ('notifications' in input && typeof input.notifications === 'object') {
     clean.notifications = {};

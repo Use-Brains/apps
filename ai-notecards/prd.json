@@ -1,0 +1,873 @@
+{
+  "meta": {
+    "app_name": "AI Notecards",
+    "tagline": "AI-powered flashcard app with marketplace",
+    "description": "Paste notes or type a topic, AI generates study flashcards. Buy and sell decks on the marketplace.",
+    "version": "1.0.0",
+    "last_updated": "2026-03-14",
+    "tech_stack": {
+      "frontend": {
+        "framework": "React 19",
+        "bundler": "Vite 6",
+        "styling": "Tailwind CSS 3",
+        "routing": "react-router-dom v7",
+        "notifications": "react-hot-toast",
+        "auth_provider": "@react-oauth/google"
+      },
+      "backend": {
+        "runtime": "Node.js (ES modules)",
+        "framework": "Express 4",
+        "auth": "bcrypt + JWT (httpOnly cookies)",
+        "file_uploads": "multer (memory storage)",
+        "rate_limiting": "express-rate-limit",
+        "file_validation": "file-type (magic-byte detection)"
+      },
+      "database": {
+        "engine": "PostgreSQL",
+        "hosting": "Supabase (production)",
+        "migrations": "Custom versioned runner (server/src/db/migrator.js)",
+        "connection": "Lazy-init PG pool, SSL + max 12 for Supabase Supavisor"
+      },
+      "ai": {
+        "primary": "Groq (llama-3.3-70b-versatile) via OpenAI-compatible SDK",
+        "fallback": "Google Gemini (gemini-2.5-flash-lite) via @google/genai",
+        "vision": "Gemini for photo-to-flashcard generation"
+      },
+      "payments": {
+        "subscriptions": "Stripe Checkout",
+        "marketplace_payouts": "Stripe Connect Express (destination charges, 70/30 split)",
+        "webhooks": "Platform + Connect (separate signing secrets)"
+      },
+      "storage": {
+        "avatars": "Supabase Storage (REST API, no SDK)",
+        "file_validation": "Magic-byte detection via file-type library"
+      },
+      "email": {
+        "provider": "Resend",
+        "usage": "Magic link codes for passwordless auth"
+      }
+    },
+    "deployment": {
+      "frontend": "Vercel",
+      "backend": "Railway",
+      "database": "Supabase PostgreSQL",
+      "storage": "Supabase Storage"
+    }
+  },
+
+  "tiers": {
+    "free": {
+      "price": "$0",
+      "generations_per_day": 1,
+      "max_decks": 10,
+      "deck_limit_note": "Generated decks only; purchased decks don't count",
+      "marketplace": "buy_only",
+      "selling": false
+    },
+    "trial": {
+      "price": "$0 (7 days)",
+      "generations_per_day": 10,
+      "max_decks": "unlimited",
+      "marketplace": "buy_only",
+      "selling": false,
+      "expiry": "Exact timestamp (not midnight), checked at request time via middleware"
+    },
+    "pro": {
+      "price": "$9/month",
+      "generations_per_day": 10,
+      "max_decks": "unlimited",
+      "marketplace": "buy_and_sell",
+      "selling": true,
+      "selling_requires": "Stripe Connect Express onboarding + seller terms acceptance",
+      "downgrade_behavior": "Cancelled/failed payment delists all active marketplace listings"
+    }
+  },
+
+  "features": {
+    "v1": {
+      "core": [
+        {
+          "name": "AI Flashcard Generation (Text)",
+          "description": "Paste notes or type a topic, AI generates front/back flashcard pairs",
+          "details": "Groq primary with Gemini fallback, 25 cards suggested / 30 max enforced, rate limited (30 per 15 min)"
+        },
+        {
+          "name": "AI Flashcard Generation (Photo)",
+          "description": "Upload up to 5 photos of handwritten/printed notes, AI generates flashcards via vision",
+          "details": "Gemini vision API, magic-byte file validation (JPEG/PNG/WebP), 5MB per photo limit, concurrency semaphore (MAX_CONCURRENT_VISION=3)"
+        },
+        {
+          "name": "Deck Management",
+          "description": "View, browse, and delete flashcard decks",
+          "details": "Decks listed on dashboard with card count, origin badge (generated/purchased), creation date"
+        },
+        {
+          "name": "Study Sessions",
+          "description": "Flip-card study mode with correct/incorrect tracking",
+          "details": "CSS card flip (perspective + rotateY), session persisted to DB, increments study_score on completion, upserts deck_stats (times_completed, best_accuracy)"
+        },
+        {
+          "name": "Study Statistics",
+          "description": "Aggregate stats: total sessions, cards studied, total correct, accuracy percentage",
+          "endpoint": "GET /api/study/stats"
+        },
+        {
+          "name": "Study History",
+          "description": "Cursor-paginated completed session history with deck titles",
+          "details": "Composite (completed_at, id) cursor, 20 per page, fetches limit+1 for hasMore detection",
+          "endpoint": "GET /api/study/history"
+        },
+        {
+          "name": "Per-Deck Stats",
+          "description": "Times completed and best accuracy per deck",
+          "endpoint": "GET /api/study/deck-stats"
+        },
+        {
+          "name": "Dashboard",
+          "description": "User's deck grid with trial banner, study score display, generation CTA",
+          "details": "Shows deck count limits for free tier, purchased deck badges"
+        }
+      ],
+
+      "auth": [
+        {
+          "name": "Email/Password Signup",
+          "description": "Register with email and password, starts 7-day trial",
+          "details": "bcrypt hashing, JWT in httpOnly cookie, display_name optional"
+        },
+        {
+          "name": "Email/Password Login",
+          "description": "Login with email and password",
+          "details": "Checks suspension status, checks deleted_at IS NULL"
+        },
+        {
+          "name": "Google Sign-In",
+          "description": "One-tap Google OAuth signup/login",
+          "details": "Captures google_user_id and google_avatar_url, auto-links to existing email accounts, creates trial on first login"
+        },
+        {
+          "name": "Magic Link Auth",
+          "description": "Passwordless email login via 6-digit code",
+          "details": "Resend API for email delivery, code_hash stored (not plaintext), 10-min expiry, max 3 attempts, rate limited"
+        },
+        {
+          "name": "Token Revocation",
+          "description": "Invalidate all sessions on password change",
+          "details": "token_revoked_at = NOW() - 1 second, re-issue fresh JWT for current session, requireActiveUser middleware compares iat vs revocation timestamp"
+        },
+        {
+          "name": "Soft-Delete Guard",
+          "description": "Deleted accounts cannot authenticate",
+          "details": "deleted_at IS NULL filter on all auth queries, requireActiveUser middleware checks deleted_at"
+        },
+        {
+          "name": "Trial Auto-Expiry",
+          "description": "Trial expiry checked at request time, no cron needed",
+          "details": "checkTrialExpiry middleware downgrades to free when trial_ends_at has passed"
+        },
+        {
+          "name": "CSRF Protection",
+          "description": "Custom X-Requested-With header on state-changing endpoints",
+          "details": "requireXHR middleware forces CORS preflight, shared across generate/account/settings routes"
+        }
+      ],
+
+      "marketplace": [
+        {
+          "name": "Browse Listings",
+          "description": "Public browsing with search, category filter, and sort",
+          "details": "PostgreSQL tsvector full-text search with GIN index, cursor pagination (20/page), sort by popular/newest/rating/price"
+        },
+        {
+          "name": "Categories",
+          "description": "13 seeded categories with listing counts",
+          "details": "Science, Mathematics, History, Languages, Literature, Computer Science, Business, Medical & Health, Psychology, Arts & Music, Law, Engineering, Test Prep. Cached 1 hour."
+        },
+        {
+          "name": "Listing Detail",
+          "description": "Full listing view with preview cards, seller info, ratings",
+          "details": "Shows 3 preview cards, price, purchase count, average rating, seller display name"
+        },
+        {
+          "name": "Purchase Flow",
+          "description": "Buy decks via Stripe Checkout with idempotent fulfillment",
+          "details": "Destination charges with 70/30 split (seller/platform), webhook-driven fulfillment, deck+cards copied in transaction, ON CONFLICT DO NOTHING for idempotency"
+        },
+        {
+          "name": "Listing Tags",
+          "description": "Up to 5 tags per listing for discovery",
+          "details": "Stored in separate listing_tags table with unique constraint"
+        }
+      ],
+
+      "seller": [
+        {
+          "name": "Stripe Connect Onboarding",
+          "description": "Pro users onboard to Stripe Connect Express for payouts",
+          "details": "Start onboard, refresh link, return verification. connect_charges_enabled and connect_payouts_enabled tracked via account.updated webhook."
+        },
+        {
+          "name": "Seller Terms",
+          "description": "Sellers must accept terms before first listing",
+          "details": "seller_terms_accepted_at and seller_terms_version tracked on users table"
+        },
+        {
+          "name": "Create/Edit/Delist/Relist Listings",
+          "description": "Full listing lifecycle management",
+          "details": "$1-$5 price range, min 10 cards, max 50 active listings per seller, 13 categories, up to 5 tags"
+        },
+        {
+          "name": "Seller Dashboard",
+          "description": "Earnings overview, listing management, Connect status",
+          "details": "Total earnings, listing stats (active/delisted counts), per-listing sales and revenue"
+        },
+        {
+          "name": "Connect Deauthorization Handling",
+          "description": "If seller disconnects Stripe, all active listings are delisted atomically",
+          "details": "account.application.deauthorized webhook, single CTE to delist + nullify"
+        }
+      ],
+
+      "ratings_reviews": [
+        {
+          "name": "Star Ratings",
+          "description": "1-5 star ratings with one per user per listing",
+          "details": "Requires purchase + completed study session, atomic SQL update for listing average (no read-modify-write)"
+        },
+        {
+          "name": "Review Text",
+          "description": "Optional 200-character review text with star rating",
+          "details": "Added in migration 007, length constraint enforced at DB level"
+        },
+        {
+          "name": "Rating Modal",
+          "description": "Post-study rating prompt for purchased marketplace decks",
+          "details": "Shows after completing study session on purchased deck, only if user hasn't rated yet"
+        }
+      ],
+
+      "moderation": [
+        {
+          "name": "Content Flagging",
+          "description": "Users can report listings and reviews",
+          "details": "Reasons: Inappropriate, Misleading, Spam, Low Quality, Other. Supports both listing and review flag types."
+        },
+        {
+          "name": "Admin Moderation Queue",
+          "description": "Admin page to review and resolve content flags",
+          "details": "Actions: dismiss, uphold (delist listing), uphold + suspend user. Admin role required."
+        },
+        {
+          "name": "User Suspension",
+          "description": "Admins can suspend/unsuspend users",
+          "details": "Suspended users cannot log in, existing sessions blocked at login check"
+        }
+      ],
+
+      "account_settings": [
+        {
+          "name": "Avatar Upload",
+          "description": "Upload profile photo (JPEG/PNG) stored in Supabase Storage",
+          "details": "Magic-byte validation via fileTypeFromBuffer, 2MB limit, old avatar cleaned up on replace, relative path stored in DB, resolved to full URL with cache-busting in sanitizeUser"
+        },
+        {
+          "name": "Avatar Delete",
+          "description": "Remove profile photo, falls back to Google avatar or initials",
+          "details": "Best-effort storage cleanup, nulls avatar_url in DB"
+        },
+        {
+          "name": "Profile Page",
+          "description": "Avatar display/upload, inline name edit, stats grid, session history, deck stats",
+          "details": "Promise.allSettled data loading, AbortController cleanup, cursor pagination for history"
+        },
+        {
+          "name": "Display Name Edit",
+          "description": "Inline editable display name on profile and settings",
+          "endpoint": "PATCH /api/settings"
+        },
+        {
+          "name": "Password Change",
+          "description": "Change password with current password verification",
+          "details": "bcrypt verify + rehash (SALT_ROUNDS=12), token revocation with 1-second buffer, fresh JWT re-issued"
+        },
+        {
+          "name": "Study Preferences",
+          "description": "Card order (shuffle/sequential) and auto-flip timer (0/3/5/10 seconds)",
+          "details": "JSONB column with allowlist validation, application-level deep merge, debounced auto-save (300ms) with serialization queue"
+        },
+        {
+          "name": "Notification Preferences",
+          "description": "Toggle study reminders and marketplace activity notifications",
+          "details": "Stored in preferences JSONB nested under notifications key"
+        },
+        {
+          "name": "Data Export",
+          "description": "Download all decks and cards as JSON file",
+          "details": "Rate limited (3 per hour), 500-deck cap, joined query (no N+1), requireActiveUser middleware"
+        },
+        {
+          "name": "Account Deletion",
+          "description": "Soft-delete with full PII scrubbing",
+          "details": "Required because purchases FK uses RESTRICT. Scrubs email (→ 'deleted-' || id), display_name, avatar_url, google_avatar_url, password_hash, preferences, google_user_id, stripe IDs, seller terms. Best-effort Stripe subscription cancellation. Typed confirmation modal on frontend."
+        },
+        {
+          "name": "Navbar Avatar Dropdown",
+          "description": "User avatar with accessible dropdown menu",
+          "details": "32px avatar circle (image/initials/Google fallback), ARIA menu semantics, Escape key close, mousedown click-outside, plan badge, links to Profile/Settings/Seller Dashboard"
+        },
+        {
+          "name": "Settings Page Sections",
+          "description": "Security, Study Preferences, Notifications, Subscription, Seller, Data & Privacy",
+          "details": "Mutual exclusion via busyAction state, connected accounts display (Google status, password status)"
+        }
+      ],
+
+      "subscription": [
+        {
+          "name": "Stripe Checkout for Pro",
+          "description": "Create Pro subscription via Stripe Checkout session",
+          "endpoint": "POST /api/stripe/checkout"
+        },
+        {
+          "name": "Subscription Cancellation",
+          "description": "Cancel at period end, delists all active marketplace listings on downgrade",
+          "endpoint": "POST /api/stripe/cancel"
+        },
+        {
+          "name": "Webhook-Driven Status Sync",
+          "description": "Platform webhook handles subscription lifecycle events",
+          "details": "payment_intent.succeeded, customer.subscription.updated, customer.subscription.deleted"
+        }
+      ],
+
+      "infrastructure": [
+        {
+          "name": "Health Check",
+          "description": "Health endpoint with DB connection test",
+          "endpoint": "GET /api/health"
+        },
+        {
+          "name": "Rate Limiting",
+          "description": "Per-endpoint rate limits with JSON error messages",
+          "details": "Generation (30/15min), export (3/hr), magic link (3/hr per email + 20/hr global)"
+        },
+        {
+          "name": "Versioned Migrations",
+          "description": "8 sequential SQL migrations tracked in schema_migrations table",
+          "details": "Each runs in transaction, uses DATABASE_URL_DIRECT to bypass connection pooler"
+        },
+        {
+          "name": "Two-Tier Auth Middleware",
+          "description": "Stateless authenticate (JWT only) + requireActiveUser (DB check for sensitive ops)",
+          "details": "authenticate exposes req.userId and req.tokenIat; requireActiveUser checks deleted_at and token_revoked_at"
+        },
+        {
+          "name": "AI Auto-Fallback",
+          "description": "If primary AI provider fails, automatically falls back to secondary",
+          "details": "Groq → Gemini fallback chain, 25-card prompt limit, 30-card hard cap in parseCards()"
+        },
+        {
+          "name": "Lazy DB Pool Initialization",
+          "description": "Database pool initialized on first use, not at import time",
+          "details": "Avoids ES module import hoisting issue with dotenv"
+        },
+        {
+          "name": "Stripe Webhook Signature Verification",
+          "description": "Raw body parsing before express.json() for Stripe signature verification",
+          "details": "Two separate webhook endpoints with separate signing secrets (platform + Connect)"
+        },
+        {
+          "name": "Trust Proxy",
+          "description": "Enabled in production for correct IP detection behind Railway/Vercel",
+          "details": "Required for rate limiting accuracy"
+        }
+      ],
+
+      "ui_ux": [
+        {
+          "name": "Landing Page",
+          "description": "Hero section, how it works, marketplace showcase, pricing comparison",
+          "route": "/"
+        },
+        {
+          "name": "Pricing Page",
+          "description": "Free vs Pro comparison table with CTA buttons",
+          "route": "/pricing"
+        },
+        {
+          "name": "Card Flip Animation",
+          "description": "CSS perspective + rotateY(180deg), no animation library",
+          "details": "Smooth 3D flip effect during study sessions"
+        },
+        {
+          "name": "Warm Parchment Design System",
+          "description": "Consistent palette: #FAF7F2 background, #1A1614 text, #1B6B5A accent green, #C8A84E accent gold",
+          "details": "Toast notifications: dark style, top-right position, 12px border radius"
+        },
+        {
+          "name": "Responsive Layout",
+          "description": "Mobile-friendly responsive design across all pages",
+          "details": "Tailwind CSS responsive utilities"
+        },
+        {
+          "name": "Welcome Page",
+          "description": "Post-signup onboarding welcome screen",
+          "route": "/welcome"
+        },
+        {
+          "name": "Verify Code Page",
+          "description": "6-digit code input for magic link verification",
+          "route": "/verify-code"
+        }
+      ]
+    },
+
+    "v2": [
+      {
+        "name": "BYOK Tier (Bring Your Own Key)",
+        "description": "Users provide their own AI API key for unlimited generations",
+        "source": "brainstorm/marketplace-and-production",
+        "priority": "medium",
+        "notes": "Would add a new tier between Free and Pro, or as a Pro add-on"
+      },
+      {
+        "name": "Automated Content Moderation",
+        "description": "AI-powered automated screening of listings before they go live",
+        "source": "brainstorm/marketplace-and-production",
+        "priority": "medium",
+        "notes": "Run content through AI classifier for policy violations, auto-flag or auto-reject"
+      },
+      {
+        "name": "Transactional Emails",
+        "description": "Email notifications for purchases, sales, account events",
+        "source": "brainstorm/seller-flow",
+        "priority": "high",
+        "notes": "Resend already integrated for magic links; extend to purchase confirmations, sale notifications, subscription changes"
+      },
+      {
+        "name": "Seller Badges & Trust Indicators",
+        "description": "Visual badges for top sellers, verified sellers, etc.",
+        "source": "brainstorm/seller-flow",
+        "priority": "low",
+        "notes": "Based on sales volume, rating average, account age"
+      },
+      {
+        "name": "Flag Abuse Prevention",
+        "description": "Rate limiting and penalties for serial flaggers",
+        "source": "brainstorm/deck-rating-and-results-screen",
+        "priority": "medium",
+        "notes": "Track flag accuracy per user, reduce flag weight for habitual false reporters"
+      },
+      {
+        "name": "Photo Display on Cards",
+        "description": "Show uploaded photos alongside generated flashcard text",
+        "source": "brainstorm/photo-upload-ai-vision",
+        "priority": "medium",
+        "notes": "Currently photos are used for generation only and discarded; store and display them on card faces"
+      },
+      {
+        "name": "Dark Mode",
+        "description": "Dark color scheme option across the entire app",
+        "source": "brainstorm/account-settings-experience",
+        "priority": "low",
+        "notes": "Preferences infrastructure already supports it (JSONB column); needs Tailwind dark: variants"
+      },
+      {
+        "name": "Seller UX Enhancements",
+        "description": "Inline listing editing, bulk actions, analytics graphs",
+        "source": "brainstorm/seller-flow",
+        "priority": "medium",
+        "notes": "Current seller dashboard is functional but minimal; add charts, filters, search"
+      },
+      {
+        "name": "Study Score Economy",
+        "description": "Gamification — leaderboards, streaks, achievements, study score rewards",
+        "source": "brainstorm/deck-rating-and-results-screen",
+        "priority": "low",
+        "notes": "study_score column exists and increments; needs UI surfaces and game mechanics"
+      },
+      {
+        "name": "Notification Email Delivery",
+        "description": "Actually send notification emails based on user preferences",
+        "source": "account-settings implementation",
+        "priority": "high",
+        "notes": "Preference toggles exist (study_reminders, marketplace_activity) but no email delivery pipeline yet"
+      },
+      {
+        "name": "Apple Sign-In",
+        "description": "Sign in with Apple for iOS parity",
+        "source": "brainstorm/auth-revamp",
+        "priority": "low",
+        "notes": "Mentioned in auth revamp brainstorm; Google is done, Apple is deferred"
+      },
+      {
+        "name": "Testing Suite",
+        "description": "Comprehensive automated test coverage",
+        "source": "general",
+        "priority": "high",
+        "notes": "No tests exist currently. Need unit tests for route handlers, integration tests for auth flows, E2E tests for critical paths"
+      },
+      {
+        "name": "Card Editing",
+        "description": "Edit individual card front/back text after generation",
+        "source": "general",
+        "priority": "medium",
+        "notes": "DeckView page shows cards but has no edit capability"
+      },
+      {
+        "name": "Spaced Repetition",
+        "description": "SM-2 or similar algorithm for optimal review scheduling",
+        "source": "general",
+        "priority": "medium",
+        "notes": "Current study mode is simple flip-through; spaced repetition would significantly improve learning outcomes"
+      },
+      {
+        "name": "Deck Sharing (Non-Marketplace)",
+        "description": "Share decks via link without marketplace listing",
+        "source": "general",
+        "priority": "low",
+        "notes": "Free sharing for collaboration, separate from paid marketplace"
+      },
+      {
+        "name": "Collaborative Decks",
+        "description": "Multiple users contribute cards to a shared deck",
+        "source": "general",
+        "priority": "low",
+        "notes": "Would require new permissions model and real-time sync"
+      }
+    ]
+  },
+
+  "pages": [
+    { "path": "/", "component": "Landing", "auth": "public_only", "description": "Hero, how it works, marketplace section, pricing" },
+    { "path": "/login", "component": "Login", "auth": "public_only", "description": "Email/password + Google Sign-In + Magic Link" },
+    { "path": "/signup", "component": "Redirect", "auth": "public_only", "description": "Redirects to /login" },
+    { "path": "/verify-code", "component": "VerifyCode", "auth": "public_only", "description": "6-digit magic link code verification" },
+    { "path": "/welcome", "component": "Welcome", "auth": "required", "description": "Post-signup onboarding" },
+    { "path": "/pricing", "component": "Pricing", "auth": "none", "description": "Free vs Pro comparison" },
+    { "path": "/marketplace", "component": "Marketplace", "auth": "none", "description": "Browse/search/filter listings" },
+    { "path": "/marketplace/:id", "component": "MarketplaceDeck", "auth": "none", "description": "Listing detail, preview cards, buy, report" },
+    { "path": "/dashboard", "component": "Dashboard", "auth": "required", "description": "User's deck grid, trial banner, study score" },
+    { "path": "/decks/:id", "component": "DeckView", "auth": "required", "description": "View deck cards" },
+    { "path": "/generate", "component": "Generate", "auth": "required", "description": "AI text/photo flashcard generation" },
+    { "path": "/study/:deckId", "component": "Study", "auth": "required", "description": "Card flip study session with rating modal" },
+    { "path": "/profile", "component": "Profile", "auth": "required", "description": "Avatar, name, stats, history, deck stats" },
+    { "path": "/settings", "component": "Settings", "auth": "required", "description": "Security, preferences, notifications, subscription, seller, data & privacy" },
+    { "path": "/sell/:deckId", "component": "ListDeck", "auth": "required", "description": "Create marketplace listing form" },
+    { "path": "/seller", "component": "SellerDashboard", "auth": "required", "description": "Earnings, listings, Connect onboarding" },
+    { "path": "/admin/flags", "component": "Admin", "auth": "required_admin", "description": "Content moderation queue" }
+  ],
+
+  "database": {
+    "tables": {
+      "users": {
+        "description": "User accounts with auth, subscription, seller, and preferences data",
+        "columns": [
+          "id UUID PK",
+          "email TEXT UNIQUE NOT NULL",
+          "password_hash TEXT (nullable for Google/magic-link users)",
+          "display_name TEXT",
+          "plan TEXT (free/trial/pro)",
+          "trial_ends_at TIMESTAMPTZ",
+          "stripe_customer_id TEXT",
+          "stripe_subscription_id TEXT",
+          "stripe_connect_account_id TEXT",
+          "connect_charges_enabled BOOLEAN",
+          "connect_payouts_enabled BOOLEAN",
+          "study_score INT",
+          "daily_generation_count INT",
+          "last_generation_date DATE",
+          "email_verified BOOLEAN",
+          "suspended BOOLEAN",
+          "suspended_reason TEXT",
+          "role TEXT (user/admin)",
+          "google_user_id TEXT (partial unique index)",
+          "avatar_url TEXT (relative Supabase Storage path)",
+          "google_avatar_url TEXT",
+          "preferences JSONB (1KB max, allowlist validated)",
+          "deleted_at TIMESTAMPTZ (soft-delete)",
+          "token_revoked_at TIMESTAMPTZ",
+          "seller_terms_accepted_at TIMESTAMPTZ",
+          "seller_terms_version INT",
+          "created_at TIMESTAMPTZ"
+        ]
+      },
+      "decks": {
+        "description": "Flashcard decks (generated or purchased)",
+        "columns": [
+          "id UUID PK",
+          "user_id UUID FK→users (CASCADE)",
+          "title TEXT NOT NULL",
+          "source_text TEXT",
+          "origin TEXT (generated/purchased)",
+          "purchased_from_listing_id UUID",
+          "created_at TIMESTAMPTZ",
+          "updated_at TIMESTAMPTZ"
+        ]
+      },
+      "cards": {
+        "description": "Individual flashcards within decks",
+        "columns": [
+          "id UUID PK",
+          "deck_id UUID FK→decks (CASCADE)",
+          "front TEXT NOT NULL",
+          "back TEXT NOT NULL",
+          "position INT",
+          "created_at TIMESTAMPTZ"
+        ]
+      },
+      "study_sessions": {
+        "description": "Study session tracking with scores",
+        "columns": [
+          "id UUID PK",
+          "user_id UUID FK→users (CASCADE)",
+          "deck_id UUID FK→decks (CASCADE)",
+          "total_cards INT",
+          "correct INT",
+          "started_at TIMESTAMPTZ",
+          "completed_at TIMESTAMPTZ"
+        ],
+        "indexes": [
+          "idx_study_sessions_user_id (user_id)",
+          "idx_study_sessions_user_completed (user_id, completed_at DESC, id DESC) WHERE completed_at IS NOT NULL",
+          "idx_study_sessions_user_deck (user_id, deck_id)"
+        ]
+      },
+      "deck_stats": {
+        "description": "Per-user per-deck aggregate study stats",
+        "columns": [
+          "id UUID PK",
+          "user_id UUID FK→users (CASCADE)",
+          "deck_id UUID FK→decks (CASCADE)",
+          "times_completed INT (CHECK >= 0)",
+          "best_accuracy NUMERIC(5,2) (CHECK 0-100)",
+          "created_at TIMESTAMPTZ",
+          "updated_at TIMESTAMPTZ"
+        ],
+        "constraints": ["UNIQUE(user_id, deck_id)"]
+      },
+      "marketplace_categories": {
+        "description": "13 seeded listing categories",
+        "columns": [
+          "id UUID PK",
+          "name TEXT UNIQUE NOT NULL",
+          "slug TEXT UNIQUE NOT NULL",
+          "sort_order INT"
+        ]
+      },
+      "marketplace_listings": {
+        "description": "Deck listings for sale on the marketplace",
+        "columns": [
+          "id UUID PK",
+          "deck_id UUID UNIQUE FK→decks (CASCADE)",
+          "seller_id UUID FK→users (CASCADE)",
+          "category_id UUID FK→marketplace_categories",
+          "title TEXT NOT NULL",
+          "description TEXT NOT NULL",
+          "price_cents INT (CHECK 100-500)",
+          "status TEXT (active/delisted/removed)",
+          "purchase_count INT",
+          "average_rating NUMERIC(3,2)",
+          "rating_count INT",
+          "search_vector tsvector GENERATED (title A + description B)",
+          "delisted_at TIMESTAMPTZ",
+          "created_at TIMESTAMPTZ",
+          "updated_at TIMESTAMPTZ"
+        ],
+        "indexes": [
+          "idx_listings_search GIN (search_vector)",
+          "idx_listings_cat_popular (category_id, purchase_count DESC) WHERE active",
+          "idx_listings_cat_newest (category_id, created_at DESC) WHERE active",
+          "idx_listings_popular (purchase_count DESC) WHERE active"
+        ]
+      },
+      "listing_tags": {
+        "description": "Up to 5 tags per listing",
+        "columns": [
+          "id UUID PK",
+          "listing_id UUID FK→marketplace_listings (CASCADE)",
+          "tag TEXT NOT NULL"
+        ],
+        "constraints": ["UNIQUE(listing_id, tag)"]
+      },
+      "purchases": {
+        "description": "Purchase records with Stripe payment deduplication",
+        "columns": [
+          "id UUID PK",
+          "buyer_id UUID FK→users (CASCADE)",
+          "seller_id UUID FK→users (RESTRICT)",
+          "listing_id UUID FK→marketplace_listings",
+          "deck_id UUID FK→decks",
+          "price_cents INT",
+          "platform_fee_cents INT",
+          "stripe_payment_intent_id TEXT UNIQUE",
+          "created_at TIMESTAMPTZ"
+        ],
+        "constraints": ["UNIQUE(buyer_id, listing_id)"],
+        "notes": "seller_id uses RESTRICT (not CASCADE) — this is why account deletion must be soft-delete"
+      },
+      "ratings": {
+        "description": "Star ratings with optional review text",
+        "columns": [
+          "id UUID PK",
+          "user_id UUID FK→users (CASCADE)",
+          "listing_id UUID FK→marketplace_listings (CASCADE)",
+          "stars INT (CHECK 1-5)",
+          "review_text TEXT (CHECK length <= 200)",
+          "created_at TIMESTAMPTZ",
+          "updated_at TIMESTAMPTZ"
+        ],
+        "constraints": ["UNIQUE(user_id, listing_id)"]
+      },
+      "content_flags": {
+        "description": "User-submitted reports for listings and reviews",
+        "columns": [
+          "id UUID PK",
+          "listing_id UUID FK→marketplace_listings (CASCADE)",
+          "reporter_id UUID FK→users (CASCADE)",
+          "reason TEXT NOT NULL",
+          "flag_type TEXT (listing/review)",
+          "rating_id UUID FK→ratings (SET NULL)",
+          "status TEXT (pending/upheld/dismissed)",
+          "admin_notes TEXT",
+          "created_at TIMESTAMPTZ",
+          "resolved_at TIMESTAMPTZ"
+        ],
+        "constraints": ["UNIQUE(listing_id, reporter_id, flag_type)"]
+      },
+      "magic_link_codes": {
+        "description": "Passwordless auth verification codes",
+        "columns": [
+          "id UUID PK",
+          "email TEXT NOT NULL",
+          "code_hash TEXT NOT NULL",
+          "expires_at TIMESTAMPTZ NOT NULL",
+          "attempts SMALLINT (CHECK >= 0)",
+          "used_at TIMESTAMPTZ",
+          "created_at TIMESTAMPTZ"
+        ]
+      },
+      "schema_migrations": {
+        "description": "Migration version tracking",
+        "columns": ["version INT"]
+      }
+    },
+    "migrations": [
+      "001_initial.sql — users, decks, cards, study_sessions",
+      "002_tiers_and_marketplace_prep.sql — trial, Connect, study_score, deck origin",
+      "003_marketplace.sql — categories, listings, tags, purchases",
+      "004_ratings_and_flags.sql — ratings, content_flags",
+      "005_auth_revamp.sql — Google Sign-In, magic_link_codes, nullable password_hash",
+      "006_seller_terms.sql — seller_terms_accepted_at, delisted_at",
+      "007_deck_stats_and_reviews.sql — deck_stats, review_text, flag_type",
+      "008_account_settings.sql — avatar, preferences JSONB, soft-delete, token revocation, cursor pagination index"
+    ]
+  },
+
+  "api_routes": {
+    "auth": [
+      "POST   /api/auth/signup",
+      "POST   /api/auth/login",
+      "GET    /api/auth/me",
+      "POST   /api/auth/logout",
+      "POST   /api/auth/magic-link/send",
+      "POST   /api/auth/magic-link/verify",
+      "POST   /api/auth/google/callback"
+    ],
+    "generation": [
+      "POST   /api/generate"
+    ],
+    "decks": [
+      "GET    /api/decks",
+      "GET    /api/decks/:id",
+      "DELETE /api/decks/:id"
+    ],
+    "study": [
+      "POST   /api/study",
+      "PATCH  /api/study/:id",
+      "GET    /api/study/stats",
+      "GET    /api/study/history",
+      "GET    /api/study/deck-stats"
+    ],
+    "account": [
+      "POST   /api/account/avatar",
+      "DELETE /api/account/avatar",
+      "PATCH  /api/account/password",
+      "DELETE /api/account"
+    ],
+    "settings": [
+      "GET    /api/settings",
+      "PATCH  /api/settings",
+      "PATCH  /api/settings/preferences",
+      "GET    /api/settings/export"
+    ],
+    "marketplace": [
+      "GET    /api/marketplace",
+      "GET    /api/marketplace/categories",
+      "GET    /api/marketplace/:id",
+      "POST   /api/marketplace/:id/purchase",
+      "POST   /api/marketplace/:id/flag"
+    ],
+    "seller": [
+      "POST   /api/seller/listings",
+      "PATCH  /api/seller/listings/:id",
+      "DELETE /api/seller/listings/:id",
+      "POST   /api/seller/listings/:id/relist",
+      "GET    /api/seller/listings",
+      "GET    /api/seller/dashboard",
+      "POST   /api/seller/onboard",
+      "GET    /api/seller/onboard/refresh",
+      "GET    /api/seller/onboard/return"
+    ],
+    "ratings": [
+      "POST   /api/ratings",
+      "GET    /api/ratings/listing/:id"
+    ],
+    "stripe": [
+      "POST   /api/stripe/checkout",
+      "POST   /api/stripe/cancel",
+      "POST   /api/stripe/webhook"
+    ],
+    "admin": [
+      "GET    /api/admin/flags",
+      "PATCH  /api/admin/flags/:id",
+      "PATCH  /api/admin/users/:id/suspend"
+    ],
+    "webhooks": [
+      "POST   /webhooks/stripe-connect"
+    ],
+    "health": [
+      "GET    /api/health"
+    ]
+  },
+
+  "design_system": {
+    "palette": {
+      "background": { "value": "#FAF7F2", "usage": "Page backgrounds" },
+      "text_primary": { "value": "#1A1614", "usage": "Headings, body text" },
+      "text_secondary": { "value": "#6B635A", "usage": "Captions, labels" },
+      "accent_green": { "value": "#1B6B5A", "usage": "Buttons, links, CTAs" },
+      "accent_green_light": { "value": "#2D8A5E", "usage": "Success states, gradients" },
+      "accent_gold": { "value": "#C8A84E", "usage": "Ratings, badges, highlights" },
+      "light_accent": { "value": "#E8F5F0", "usage": "Tag backgrounds, soft emphasis" },
+      "study_dark": { "value": "#1A1614 via #0d4a3d", "usage": "Study mode gradient background" }
+    },
+    "conventions": {
+      "toasts": "Dark style (#1A1614 bg, white text), top-right, 12px border-radius, 3s duration",
+      "cards": "CSS perspective + rotateY(180deg) for flip animation, no library",
+      "avatars": "32px circle, image → Google fallback → initials",
+      "fonts": "System font stack via Tailwind defaults",
+      "responsive": "Mobile-first with Tailwind responsive utilities"
+    }
+  },
+
+  "summary": {
+    "v1_feature_count": 43,
+    "v2_feature_count": 16,
+    "pages": 17,
+    "api_endpoints": 38,
+    "database_tables": 13,
+    "migrations": 8,
+    "status": "v1 complete and deployed"
+  }
+}
