@@ -1,29 +1,30 @@
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Link, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/lib/auth';
 import { fontSize, spacing, useThemedStyles } from '@/lib/theme';
 import type { AppTheme } from '@/lib/theme';
 
-export default function RegisterScreen() {
+export default function VerifyCodeScreen() {
   const styles = useThemedStyles(createStyles);
   const router = useRouter();
-  const { signup } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const params = useLocalSearchParams<{ email?: string }>();
+  const email = typeof params.email === 'string' ? params.email : '';
+  const { verifyMagicLink } = useAuth();
+  const [code, setCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const handleRegister = async () => {
+  const handleVerify = async () => {
     setSubmitting(true);
     try {
-      const session = await signup(email, password);
+      const session = await verifyMagicLink(email, code);
       if (session.isNewUser && !session.user.displayName) {
         router.replace('/welcome');
       } else {
         router.replace('/(tabs)/home');
       }
     } catch (error) {
-      Alert.alert('Signup failed', error instanceof Error ? error.message : 'Unable to create account');
+      Alert.alert('Verification failed', error instanceof Error ? error.message : 'Unable to verify code');
     } finally {
       setSubmitting(false);
     }
@@ -31,32 +32,24 @@ export default function RegisterScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Create Account</Text>
-      <Text style={styles.subtitle}>Password signup for legacy accounts</Text>
-
+      <Text style={styles.title}>Check your email</Text>
+      <Text style={styles.subtitle}>Enter the 6-digit code sent to {email || 'your email address'}.</Text>
       <TextInput
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        keyboardType="email-address"
-        placeholder="Email"
+        value={code}
+        onChangeText={(value) => setCode(value.replace(/\D/g, '').slice(0, 6))}
+        keyboardType="number-pad"
+        textContentType="oneTimeCode"
+        placeholder="123456"
         placeholderTextColor={styles.placeholder.color}
         style={styles.input}
+        maxLength={6}
       />
-      <TextInput
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        placeholder="Password"
-        placeholderTextColor={styles.placeholder.color}
-        style={styles.input}
-      />
-
-      <Pressable style={[styles.button, (submitting || password.length < 8 || !email) && styles.disabledButton]} onPress={handleRegister} disabled={submitting || password.length < 8 || !email}>
-        <Text style={styles.buttonText}>Create Account</Text>
+      <Pressable style={[styles.button, (submitting || code.length !== 6) && styles.disabledButton]} onPress={handleVerify} disabled={submitting || code.length !== 6}>
+        <Text style={styles.buttonText}>Verify Code</Text>
       </Pressable>
-
-      <Link href="/(auth)/login" style={styles.linkText}>Back to sign in</Link>
+      <Pressable onPress={() => router.back()}>
+        <Text style={styles.linkText}>Back</Text>
+      </Pressable>
     </View>
   );
 }
@@ -91,6 +84,10 @@ const createStyles = ({ colors }: AppTheme) => {
       paddingVertical: spacing.md,
       color: colors.text,
       backgroundColor: colors.surface,
+      textAlign: 'center',
+      letterSpacing: 8,
+      fontSize: fontSize['2xl'],
+      fontWeight: '600',
     },
     button: {
       backgroundColor: colors.primary,

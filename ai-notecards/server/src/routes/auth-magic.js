@@ -2,7 +2,7 @@ import { Router } from 'express';
 import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
 import pool from '../db/pool.js';
-import { USER_SELECT, setTokenCookie, sanitizeUser } from './auth.js';
+import { USER_SELECT, respondWithSession } from './auth.js';
 import { trackServerEvent } from '../services/analytics.js';
 import { sendMagicLinkCode } from '../services/email.js';
 
@@ -15,9 +15,8 @@ function hmacHash(code) {
   return crypto.createHmac('sha256', process.env.JWT_SECRET).update(String(code)).digest('hex');
 }
 
-// POST /request — generate code, send email
 router.post('/request', requestLimiter, async (req, res) => {
-  const { email: rawEmail } = req.body;
+  const { email: rawEmail } = req.body ?? {};
   if (!rawEmail || typeof rawEmail !== 'string') {
     return res.status(400).json({ error: 'Email is required' });
   }
@@ -28,18 +27,13 @@ router.post('/request', requestLimiter, async (req, res) => {
   }
 
   try {
-    // Invalidate existing codes for this email
     await pool.query(
       `UPDATE magic_link_codes SET used_at = NOW() WHERE email = $1 AND used_at IS NULL`,
       [email]
     );
 
-    // Opportunistic cleanup: delete codes expired > 1 hour ago (global, not per-email)
-    await pool.query(
-      `DELETE FROM magic_link_codes WHERE expires_at < NOW() - INTERVAL '1 hour'`
-    );
+    await pool.query(`DELETE FROM magic_link_codes WHERE expires_at < NOW() - INTERVAL '1 hour'`);
 
-    // Generate code and store HMAC hash
     const code = crypto.randomInt(100000, 999999);
     const codeHash = hmacHash(code);
 
@@ -49,10 +43,7 @@ router.post('/request', requestLimiter, async (req, res) => {
       [email, codeHash]
     );
 
-    // Return immediately, send email asynchronously
     res.json({ ok: true });
-
-    // Fire-and-forget email send — intentionally not awaited
     sendMagicLinkCode(email, code).catch(err => {
       console.error('Failed to send magic link email:', err);
     });
@@ -62,18 +53,16 @@ router.post('/request', requestLimiter, async (req, res) => {
   }
 });
 
-// POST /verify — verify code, login/create user
 router.post('/verify', verifyLimiter, async (req, res) => {
-  const { email: rawEmail, code: rawCode } = req.body;
+  const { email: rawEmail, code: rawCode } = req.body ?? {};
   if (!rawEmail || !rawCode) {
     return res.status(400).json({ error: 'Email and code are required' });
   }
 
-  const email = rawEmail.toLowerCase().trim();
+  const email = String(rawEmail).toLowerCase().trim();
   const code = String(rawCode).trim();
 
   try {
-    // Lookup most recent unexpired, unused code for this email
     const codeResult = await pool.query(
       `SELECT id, code_hash, attempts FROM magic_link_codes
        WHERE email = $1 AND used_at IS NULL AND expires_at > NOW()
@@ -87,22 +76,18 @@ router.post('/verify', verifyLimiter, async (req, res) => {
 
     const codeRow = codeResult.rows[0];
 
-    // Check attempts before hash comparison
     if (codeRow.attempts >= 5) {
       await pool.query(`UPDATE magic_link_codes SET used_at = NOW() WHERE id = $1`, [codeRow.id]);
       return res.status(400).json({ error: 'Too many attempts. Request a new code.', code: 'AUTH_MAGIC_CODE_EXPIRED' });
     }
 
-    // Increment attempts unconditionally
     await pool.query(`UPDATE magic_link_codes SET attempts = attempts + 1 WHERE id = $1`, [codeRow.id]);
 
-    // Compare HMAC hash
     const inputHash = hmacHash(code);
     if (inputHash !== codeRow.code_hash) {
       return res.status(400).json({ error: 'Invalid code', code: 'AUTH_MAGIC_CODE_INVALID' });
     }
 
-    // Atomic consume — prevents race condition
     const consumeResult = await pool.query(
       `UPDATE magic_link_codes SET used_at = NOW() WHERE id = $1 AND used_at IS NULL RETURNING id`,
       [codeRow.id]
@@ -111,9 +96,8 @@ router.post('/verify', verifyLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Code already used', code: 'AUTH_MAGIC_CODE_EXPIRED' });
     }
 
-    // Lookup or create user
     const userResult = await pool.query(
-      `SELECT ${USER_SELECT}, password_hash FROM users WHERE email = $1`,
+      `SELECT ${USER_SELECT}, password_hash FROM users WHERE email = $1 AND deleted_at IS NULL`,
       [email]
     );
 
@@ -123,17 +107,16 @@ router.post('/verify', verifyLimiter, async (req, res) => {
     if (userResult.rows.length > 0) {
       user = userResult.rows[0];
 
-      // Check suspended
       if (user.suspended) {
         return res.status(403).json({ error: 'Account suspended. Contact support.', code: 'AUTH_ACCOUNT_SUSPENDED' });
       }
 
-      // Mark email as verified
       if (!user.email_verified) {
         await pool.query(`UPDATE users SET email_verified = true WHERE id = $1`, [user.id]);
+        const updated = await pool.query(`SELECT ${USER_SELECT} FROM users WHERE id = $1`, [user.id]);
+        user = updated.rows[0];
       }
     } else {
-      // Create new user
       const newUserResult = await pool.query(
         `INSERT INTO users (email, plan, trial_ends_at, email_verified)
          VALUES ($1, 'trial', NOW() + INTERVAL '7 days', true)
@@ -145,8 +128,7 @@ router.post('/verify', verifyLimiter, async (req, res) => {
       trackServerEvent(user.id, 'signup_completed', { method: 'magic_link' });
     }
 
-    setTokenCookie(res, user.id);
-    res.json({ user: sanitizeUser(user), isNewUser });
+    await respondWithSession(req, res, { user, isNewUser });
   } catch (err) {
     console.error('Magic link verify error:', err);
     res.status(500).json({ error: 'Internal server error' });

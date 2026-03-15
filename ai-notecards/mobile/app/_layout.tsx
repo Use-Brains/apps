@@ -9,7 +9,7 @@ import { ThemeProvider, useTheme, useThemedStyles } from '@/lib/theme';
 import type { AppTheme } from '@/lib/theme';
 
 function AuthGate({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
   const { theme } = useTheme();
   const styles = useThemedStyles(createStyles);
   const segments = useSegments();
@@ -19,13 +19,23 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     if (loading) return;
 
     const inAuth = segments[0] === '(auth)';
+    const inWelcome = segments[0] === 'welcome';
+    const needsWelcome = isAuthenticated && !user?.displayName;
 
     if (!isAuthenticated && !inAuth) {
       router.replace('/(auth)/login');
-    } else if (isAuthenticated && inAuth) {
+      return;
+    }
+
+    if (needsWelcome && !inWelcome) {
+      router.replace('/welcome');
+      return;
+    }
+
+    if (isAuthenticated && !needsWelcome && (inAuth || inWelcome)) {
       router.replace('/(tabs)/home');
     }
-  }, [isAuthenticated, loading, segments]);
+  }, [isAuthenticated, loading, segments, router, user?.displayName]);
 
   if (loading) {
     return (

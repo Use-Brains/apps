@@ -35,6 +35,7 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 
 import authRoutes from './routes/auth.js';
+import authAppleRoutes from './routes/auth-apple.js';
 import authMagicRoutes from './routes/auth-magic.js';
 import authGoogleRoutes from './routes/auth-google.js';
 import generateRoutes from './routes/generate.js';
@@ -84,6 +85,7 @@ for (const key of requiredEnvVars) {
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/auth/apple', authAppleRoutes);
 app.use('/api/auth/magic-link', authMagicRoutes);
 app.use('/api/auth/google', authGoogleRoutes);
 app.use('/api/generate', generateRoutes);

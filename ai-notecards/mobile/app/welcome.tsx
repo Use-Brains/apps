@@ -1,62 +1,46 @@
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Link, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useAuth } from '@/lib/auth';
+import { api } from '@/lib/api';
 import { fontSize, spacing, useThemedStyles } from '@/lib/theme';
 import type { AppTheme } from '@/lib/theme';
 
-export default function RegisterScreen() {
+export default function WelcomeScreen() {
   const styles = useThemedStyles(createStyles);
   const router = useRouter();
-  const { signup } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const { user, refreshUser } = useAuth();
+  const [displayName, setDisplayName] = useState(user?.displayName ?? '');
+  const [saving, setSaving] = useState(false);
 
-  const handleRegister = async () => {
-    setSubmitting(true);
+  const handleContinue = async () => {
+    setSaving(true);
     try {
-      const session = await signup(email, password);
-      if (session.isNewUser && !session.user.displayName) {
-        router.replace('/welcome');
-      } else {
-        router.replace('/(tabs)/home');
-      }
+      await api.updateProfile({ display_name: displayName.trim() });
+      await refreshUser();
+      router.replace('/(tabs)/home');
     } catch (error) {
-      Alert.alert('Signup failed', error instanceof Error ? error.message : 'Unable to create account');
+      Alert.alert('Unable to save name', error instanceof Error ? error.message : 'Please try again');
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Create Account</Text>
-      <Text style={styles.subtitle}>Password signup for legacy accounts</Text>
-
+      <Text style={styles.title}>Welcome to AI Notecards</Text>
+      <Text style={styles.subtitle}>What should we call you?</Text>
       <TextInput
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        keyboardType="email-address"
-        placeholder="Email"
+        value={displayName}
+        onChangeText={setDisplayName}
+        placeholder="Display name"
         placeholderTextColor={styles.placeholder.color}
         style={styles.input}
+        maxLength={50}
       />
-      <TextInput
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        placeholder="Password"
-        placeholderTextColor={styles.placeholder.color}
-        style={styles.input}
-      />
-
-      <Pressable style={[styles.button, (submitting || password.length < 8 || !email) && styles.disabledButton]} onPress={handleRegister} disabled={submitting || password.length < 8 || !email}>
-        <Text style={styles.buttonText}>Create Account</Text>
+      <Pressable style={[styles.button, (saving || !displayName.trim()) && styles.disabledButton]} onPress={handleContinue} disabled={saving || !displayName.trim()}>
+        <Text style={styles.buttonText}>Continue</Text>
       </Pressable>
-
-      <Link href="/(auth)/login" style={styles.linkText}>Back to sign in</Link>
     </View>
   );
 }
@@ -105,12 +89,6 @@ const createStyles = ({ colors }: AppTheme) => {
     },
     disabledButton: {
       opacity: 0.6,
-    },
-    linkText: {
-      color: colors.primary,
-      textAlign: 'center',
-      fontSize: fontSize.sm,
-      fontWeight: '500',
     },
     placeholder,
   });
