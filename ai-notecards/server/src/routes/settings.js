@@ -116,6 +116,11 @@ function validatePreferences(input) {
     if (![0, 3, 5, 10].includes(input.auto_flip_seconds)) return null;
     clean.auto_flip_seconds = input.auto_flip_seconds;
   }
+  if ('daily_goal' in input) {
+    const goal = input.daily_goal;
+    if (!Number.isInteger(goal) || goal < 5 || goal > 100) return null;
+    clean.daily_goal = goal;
+  }
   if ('notifications' in input && typeof input.notifications === 'object') {
     clean.notifications = {};
     if ('study_reminders' in input.notifications) {

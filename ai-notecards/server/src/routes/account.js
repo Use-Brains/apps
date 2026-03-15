@@ -173,9 +173,18 @@ router.delete('/', authenticate, requireXHR, deleteLimiter, async (req, res) => 
           stripe_connect_account_id = NULL,
           connect_charges_enabled = false,
           connect_payouts_enabled = false,
-          seller_terms_accepted_at = NULL
+          seller_terms_accepted_at = NULL,
+          current_streak = 0,
+          longest_streak = 0,
+          last_study_date = NULL,
+          study_score = 0,
+          daily_generation_count = 0,
+          last_generation_date = NULL
         WHERE id = $1
       `, [req.userId]);
+      // Delete behavioral data (soft-delete doesn't trigger CASCADE)
+      await client.query('DELETE FROM deck_stats WHERE user_id = $1', [req.userId]);
+      await client.query('DELETE FROM study_sessions WHERE user_id = $1', [req.userId]);
       await client.query('COMMIT');
     } catch (txErr) {
       await client.query('ROLLBACK');

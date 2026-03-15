@@ -399,6 +399,18 @@ export default function Settings() {
                 <option value={10}>10 seconds</option>
               </select>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-[#1A1614] mb-2">Daily Study Goal</label>
+              <select
+                value={prefs.daily_goal || 20}
+                onChange={(e) => updatePref('daily_goal', Number(e.target.value))}
+                className="px-4 py-2.5 bg-[#FAF7F2] border border-gray-200 rounded-xl text-[#1A1614] focus:outline-none focus:ring-2 focus:ring-[#1B6B5A]/30 focus:border-[#1B6B5A]"
+              >
+                {[5, 10, 15, 20, 25, 50, 100].map((n) => (
+                  <option key={n} value={n}>{n} sessions</option>
+                ))}
+              </select>
+            </div>
           </div>
         </section>
 
