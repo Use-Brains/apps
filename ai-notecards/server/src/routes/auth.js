@@ -13,6 +13,7 @@ export const USER_SELECT = `id, email, plan, trial_ends_at, daily_generation_cou
   connect_payouts_enabled, seller_terms_accepted_at,
   display_name, role, suspended, google_user_id, created_at,
   avatar_url, google_avatar_url, preferences, email_verified, token_revoked_at,
+  cancel_at_period_end, cancel_at,
   (password_hash IS NOT NULL) AS has_password`;
 
 export function setTokenCookie(res, userId) {
@@ -58,6 +59,8 @@ export function sanitizeUser(user) {
     created_at: user.created_at,
     avatar_url: resolvedAvatar,
     has_password: user.has_password,
+    cancel_at_period_end: user.cancel_at_period_end || false,
+    cancel_at: user.cancel_at,
     google_connected: !!user.google_user_id,
     email_verified: !!user.email_verified,
     preferences: user.preferences || {},

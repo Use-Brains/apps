@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { authenticate, requireActiveUser } from '../middleware/auth.js';
 import { requireXHR } from '../middleware/csrf.js';
 import { fulfillPurchase } from '../services/purchase.js';
@@ -6,6 +7,13 @@ import { getStripe } from '../services/stripe.js';
 import pool from '../db/pool.js';
 
 const router = Router();
+
+const portalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyGenerator: (req) => req.userId,
+  standardHeaders: true,
+});
 
 // Create a Pro subscription checkout session
 router.post('/checkout', requireXHR, authenticate, requireActiveUser, async (req, res) => {
@@ -81,6 +89,28 @@ router.post('/cancel', requireXHR, authenticate, requireActiveUser, async (req, 
   }
 });
 
+// Billing portal — redirect Pro user to Stripe portal
+router.post('/portal', requireXHR, authenticate, requireActiveUser, portalLimiter, async (req, res) => {
+  try {
+    const stripe = getStripe();
+    const { rows } = await pool.query(
+      'SELECT stripe_customer_id FROM users WHERE id = $1',
+      [req.userId]
+    );
+    if (!rows[0]?.stripe_customer_id) {
+      return res.status(400).json({ error: 'No billing account found' });
+    }
+    const session = await stripe.billingPortal.sessions.create({
+      customer: rows[0].stripe_customer_id,
+      return_url: `${process.env.CLIENT_URL}/settings?portal_return=true`,
+    });
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error('Billing portal error:', err);
+    res.status(500).json({ error: 'Failed to create billing portal session' });
+  }
+});
+
 // Platform webhook — raw body parsed in index.js
 router.post('/webhook', async (req, res) => {
   const stripe = getStripe();
@@ -101,7 +131,8 @@ router.post('/webhook', async (req, res) => {
         const userId = session.metadata?.userId;
         if (userId && session.mode === 'subscription') {
           await pool.query(
-            `UPDATE users SET plan = 'pro', stripe_subscription_id = $1, trial_ends_at = NULL
+            `UPDATE users SET plan = 'pro', stripe_subscription_id = $1, trial_ends_at = NULL,
+             cancel_at_period_end = false, cancel_at = NULL
              WHERE id = $2`,
             [session.subscription, userId]
           );
@@ -113,11 +144,17 @@ router.post('/webhook', async (req, res) => {
       case 'customer.subscription.updated': {
         const subscription = event.data.object;
         const customerId = subscription.customer;
-        // Sync subscription status
-        if (subscription.status === 'active') {
+        if (subscription.cancel_at_period_end) {
           await pool.query(
-            `UPDATE users SET plan = 'pro', stripe_subscription_id = $1
-             WHERE stripe_customer_id = $2 AND plan != 'pro'`,
+            `UPDATE users SET cancel_at_period_end = true, cancel_at = $1
+             WHERE stripe_customer_id = $2`,
+            [new Date(subscription.cancel_at * 1000).toISOString(), customerId]
+          );
+        } else if (subscription.status === 'active') {
+          await pool.query(
+            `UPDATE users SET plan = 'pro', stripe_subscription_id = $1,
+             cancel_at_period_end = false, cancel_at = NULL
+             WHERE stripe_customer_id = $2`,
             [subscription.id, customerId]
           );
         }
@@ -127,19 +164,30 @@ router.post('/webhook', async (req, res) => {
       case 'customer.subscription.deleted': {
         const subscription = event.data.object;
         const customerId = subscription.customer;
-        // Downgrade to free, delist marketplace listings
-        await pool.query(
-          `UPDATE users SET plan = 'free', stripe_subscription_id = NULL
-           WHERE stripe_customer_id = $1 AND plan != 'free'`,
-          [customerId]
-        );
-        // Delist any active marketplace listings
-        await pool.query(
-          `UPDATE marketplace_listings SET status = 'delisted', updated_at = NOW()
-           WHERE seller_id = (SELECT id FROM users WHERE stripe_customer_id = $1)
-           AND status = 'active'`,
-          [customerId]
-        ).catch(() => {}); // Table may not exist yet during Phase 1
+        // Atomic: downgrade user + delist listings in transaction
+        const client = await pool.connect();
+        try {
+          await client.query('BEGIN');
+          const { rows } = await client.query(
+            `UPDATE users SET plan = 'free', stripe_subscription_id = NULL,
+             cancel_at_period_end = false, cancel_at = NULL
+             WHERE stripe_customer_id = $1 RETURNING id`,
+            [customerId]
+          );
+          if (rows[0]) {
+            await client.query(
+              `UPDATE marketplace_listings SET status = 'delisted', updated_at = NOW()
+               WHERE seller_id = $1 AND status IN ('active', 'pending_review')`,
+              [rows[0].id]
+            );
+          }
+          await client.query('COMMIT');
+        } catch (err) {
+          await client.query('ROLLBACK');
+          throw err;
+        } finally {
+          client.release();
+        }
         console.log(`Customer ${customerId} downgraded to free`);
         break;
       }
@@ -162,7 +210,6 @@ router.post('/webhook', async (req, res) => {
       case 'invoice.payment_failed': {
         const invoice = event.data.object;
         console.log(`Payment failed for customer ${invoice.customer}`);
-        // v2: trigger dunning email sequence
         break;
       }
 
@@ -172,14 +219,12 @@ router.post('/webhook', async (req, res) => {
       }
 
       case 'customer.subscription.trial_will_end': {
-        // v2: send trial ending reminder email
         const subscription = event.data.object;
         console.log(`Trial ending soon for customer ${subscription.customer}`);
         break;
       }
 
       default:
-        // Unhandled event type
         break;
     }
   } catch (err) {

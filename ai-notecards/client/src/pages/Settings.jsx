@@ -139,10 +139,11 @@ function Toggle({ checked, onChange, disabled }) {
 }
 
 export default function Settings() {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [onboarding, setOnboarding] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -159,6 +160,18 @@ export default function Settings() {
   // Data & Privacy state
   const [busyAction, setBusyAction] = useState(null); // null | 'exporting' | 'deleting'
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  // Portal return flow — refresh user after returning from Stripe
+  useEffect(() => {
+    if (authLoading) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('portal_return') === 'true') {
+      window.history.replaceState({}, '', '/settings');
+      refreshUser().catch(() => {
+        toast.error('Could not refresh your account. Please reload.');
+      });
+    }
+  }, [authLoading]);
 
   useEffect(() => {
     if (user?.preferences) {
@@ -504,13 +517,41 @@ export default function Settings() {
               </span>
             )}
           </div>
+          {user?.cancel_at_period_end && user?.cancel_at && (
+            <p className="text-sm text-[#6B635A] mb-4">
+              Your subscription will cancel on {new Date(user.cancel_at).toLocaleDateString()}.
+              You'll retain Pro access until then.
+            </p>
+          )}
           {user?.plan === 'pro' && (
-            <button
-              onClick={handleCancel}
-              className="px-4 py-2 text-sm text-red-600 border border-red-200 rounded-xl hover:bg-red-50 transition-colors"
-            >
-              Cancel subscription
-            </button>
+            <div className="flex gap-3">
+              {user?.stripe_customer_id && (
+                <button
+                  onClick={async () => {
+                    setPortalLoading(true);
+                    try {
+                      const data = await api.createBillingPortal();
+                      window.location.href = data.url;
+                    } catch (err) {
+                      toast.error(err.message);
+                      setPortalLoading(false);
+                    }
+                  }}
+                  disabled={portalLoading}
+                  className="px-4 py-2 text-sm text-[#1B6B5A] border border-[#1B6B5A]/30 rounded-xl hover:bg-[#E8F5F0] transition-colors disabled:opacity-50"
+                >
+                  {portalLoading ? 'Redirecting to Stripe...' : 'Manage Billing'}
+                </button>
+              )}
+              {!user?.cancel_at_period_end && (
+                <button
+                  onClick={handleCancel}
+                  className="px-4 py-2 text-sm text-red-600 border border-red-200 rounded-xl hover:bg-red-50 transition-colors"
+                >
+                  Cancel subscription
+                </button>
+              )}
+            </div>
           )}
           {(user?.plan === 'free' || user?.plan === 'trial') && (
             <a

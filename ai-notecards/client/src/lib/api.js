@@ -75,6 +75,7 @@ export const api = {
   // Stripe
   createCheckout: () => request('/stripe/checkout', { method: 'POST' }),
   cancelSubscription: () => request('/stripe/cancel', { method: 'POST' }),
+  createBillingPortal: () => request('/stripe/portal', { method: 'POST' }),
 
   // Settings
   getProfile: () => request('/settings'),
