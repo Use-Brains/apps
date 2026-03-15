@@ -1,6 +1,6 @@
 import pool from '../db/pool.js';
 
-const PLAN_LIMITS = {
+export const PLAN_LIMITS = {
   free: { generationsPerDay: 1, maxDecks: 10 },
   trial: { generationsPerDay: 10, maxDecks: Infinity },
   pro: { generationsPerDay: 10, maxDecks: Infinity },
