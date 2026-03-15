@@ -184,6 +184,8 @@ export default function Study() {
     const continueLabel =
       deck?.origin === 'purchased' && listingId && !hasRated ? 'Rate this deck' : 'Continue';
 
+    const missedCards = cards.filter((_, i) => results[i] === 'missed');
+
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#1A1614] via-[#0d4a3d] to-[#1A1614] flex items-center justify-center p-4">
         <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 sm:p-12 max-w-lg w-full text-center border border-white/10">
@@ -231,6 +233,30 @@ export default function Study() {
               style={{ width: `${currentAccuracy}%` }}
             />
           </div>
+
+          {/* Missed Cards Recap */}
+          {missedCards.length === 0 ? (
+            <div className="bg-[#2D8A5E]/10 rounded-xl p-4 mb-8 border border-[#2D8A5E]/20">
+              <p className="text-[#2D8A5E] font-semibold">Perfect score!</p>
+              <p className="text-white/50 text-sm mt-1">You got every card right</p>
+            </div>
+          ) : (
+            <div className="mb-8 text-left">
+              <h2 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-3">
+                Missed Cards ({missedCards.length})
+              </h2>
+              <div className="space-y-3 max-h-64 overflow-y-auto">
+                {missedCards.map((card, i) => (
+                  <div key={i} className="bg-white/5 rounded-xl p-4 border border-white/5">
+                    <p className="text-white/60 text-xs uppercase tracking-wider mb-1">Question</p>
+                    <p className="text-white text-sm mb-2">{card.front}</p>
+                    <p className="text-[#2D8A5E]/60 text-xs uppercase tracking-wider mb-1">Answer</p>
+                    <p className="text-[#2D8A5E] text-sm">{card.back}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-col sm:flex-row gap-3">
             <button
