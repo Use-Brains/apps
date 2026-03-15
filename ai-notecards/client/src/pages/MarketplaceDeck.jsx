@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/AuthContext.jsx';
 import Navbar from '../components/Navbar.jsx';
+import SharePopover from '../components/SharePopover.jsx';
 
 function FlipCard({ card }) {
   const [flipped, setFlipped] = useState(false);
@@ -222,17 +223,25 @@ export default function MarketplaceDeck() {
                   )}
                 </p>
               )}
-              {user && (
-                <button
-                  onClick={() => {
-                    setReportTarget({ flagType: 'listing', ratingId: null });
-                    setShowReport(true);
-                  }}
-                  className="mt-3 text-xs text-[#6B635A]/60 hover:text-red-500 transition-colors"
-                >
-                  Report this listing
-                </button>
-              )}
+              <div className="flex items-center gap-3 mt-3">
+                <SharePopover
+                  url={`${window.location.origin}/marketplace/${listing.id}`}
+                  title={listing.title}
+                  cardCount={totalCards}
+                  price={listing.price_cents}
+                />
+                {user && (
+                  <button
+                    onClick={() => {
+                      setReportTarget({ flagType: 'listing', ratingId: null });
+                      setShowReport(true);
+                    }}
+                    className="text-xs text-[#6B635A]/60 hover:text-red-500 transition-colors"
+                  >
+                    Report this listing
+                  </button>
+                )}
+              </div>
             </div>
             <div className="sm:text-right shrink-0">
               <p className="font-mono text-3xl font-bold text-[#1A1614] mb-3">

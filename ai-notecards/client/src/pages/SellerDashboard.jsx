@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/AuthContext.jsx';
 import Navbar from '../components/Navbar.jsx';
+import SharePopover from '../components/SharePopover.jsx';
 
 export default function SellerDashboard() {
   const { user, refreshUser, loading: authLoading } = useAuth();
@@ -183,9 +184,17 @@ export default function SellerDashboard() {
                       {listing.status}
                     </span>
                     {listing.status === 'active' && (
-                      <button onClick={() => handleDelist(listing.id)} className="px-3 py-1 text-xs text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors">
-                        Delist
-                      </button>
+                      <>
+                        <SharePopover
+                          url={`${window.location.origin}/marketplace/${listing.id}`}
+                          title={listing.title}
+                          cardCount={listing.card_count}
+                          price={listing.price_cents}
+                        />
+                        <button onClick={() => handleDelist(listing.id)} className="px-3 py-1 text-xs text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors">
+                          Delist
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
