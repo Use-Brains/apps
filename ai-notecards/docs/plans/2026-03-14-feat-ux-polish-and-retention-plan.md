@@ -1,8 +1,10 @@
 ---
-title: "feat: UX polish and retention — deck duplication, guided onboarding, analytics"
+title: 'feat: UX polish and retention — deck duplication, guided onboarding, analytics'
 type: feat
 date: 2026-03-14
 ---
+
+<!-- FINISHED -->
 
 # UX Polish & Retention
 
@@ -91,29 +93,29 @@ No new services or major infrastructure. All three features layer onto existing 
 
 ### Key Design Decisions
 
-| Decision | Choice | Reasoning |
-|----------|--------|-----------|
-| Duplicated deck origin | `'duplicated'` (not `'generated'`) | Prevents selling duplicated content; seller.js line 36 already gates on `origin = 'generated'`. Correct over a boolean — the origin column is already the discriminator used throughout the codebase. |
-| `duplicated_from_deck_id` FK | `ON DELETE SET NULL` | Source deck may be deleted or belong to another user (purchased deck scenario); SET NULL preserves the duplicate while accepting provenance loss |
-| Duplicated decks count toward free tier limit | Yes — `origin IN ('generated', 'duplicated')` | Prevents free users from bypassing the 10-deck limit via infinite duplication |
-| Can duplicate a duplicate | Yes | Duplicates are fully owned decks for all operations except selling |
-| Copy `source_text` on duplication | Copy unconditionally | Purchased decks already have `source_text = NULL`, so copying NULL is a no-op. No conditional branch needed. |
-| Purchased deck editing | Blocked (all mutations: title, card add/edit/delete) — **server-side + frontend** | Frontend-only blocking is insufficient — API calls could bypass it. Origin guard on `PATCH /:id` (rename), `POST /:id/cards`, `PATCH /:deckId/cards/:cardId`, `DELETE /:deckId/cards/:cardId` |
-| Duplicate title format | `"[Original Title] (Copy)"` — striptags + trim + Unicode-safe truncation to 193 chars via `Array.from()` | Standard UX convention. Defense-in-depth against HTML in titles. `Array.from` avoids splitting emoji/CJK surrogate pairs. |
-| Duplicate rate limit | Same as deck save (20/hour) via `saveLimiter` | Prevents abuse |
-| Onboarding detection | `!user.preferences?.onboarding_completed && user.deck_count === 0` | Uses `deck_count` from `/auth/me` response (correlated subquery, no extra round-trip). Avoids disrupting existing users. `/welcome` route uses `skipOnboardingCheck` prop on ProtectedRoute to prevent infinite redirect loop. |
-| Onboarding step persistence | Only set `onboarding_completed` at end | Simple — users who leave mid-flow see it again next login |
-| Step 2 generation | Single topic text field, auto-title, no photos | Reduces cognitive load for first-time users |
-| Step 2 counts toward daily limit | Yes | Same endpoints enforce limits naturally |
-| Analytics opt-out | `analytics_opt_out` preference + Settings toggle + consent banner | GDPR/CCPA compliance. Server preference is source of truth; synced to localStorage on login for cross-device consistency. Settings toggle updates localStorage only AFTER successful API call. |
-| Consent default | Missing `analytics_opt_out` in preferences = not consented | GDPR-safe default. New users see consent banner; existing users without the preference are not tracked. |
-| Consent banner | PostHog not initialized until consent granted | GDPR: deferred init via dynamic `import()`. Consent handler replays `identify()` after `opt_in_capturing()` since user may already be logged in. |
-| PostHog single owner | `analytics.js` owns PostHog instance exclusively | No `@posthog/react`, no `PostHogProvider`, no `setPostHogInstance` handoff. `initPostHog()` caches the promise (not result) to prevent double-init on StrictMode/double-click. |
-| PostHog server-side deduplication | Fire events only after idempotency check passes | Prevents webhook replays from inflating metrics |
-| PostHog server-side consent | `trackServerEvent` checks user's `analytics_opt_out` preference | GDPR: server-side events associated with a distinct user ID require the same consent as client-side. |
-| PostHog error handling | All calls wrapped in try/catch with `console.warn` in dev, silent in prod | Analytics must not break core functionality. Dev logging aids debugging. |
-| Server analytics module | `server/src/services/analytics.js` (not `index.js`) | Follows existing service pattern (purchase.js, email.js, stripe.js). Avoids circular imports since index.js imports routes and routes would import from index.js. |
-| Preferences race condition | Read-modify-write wrapped in transaction with `FOR UPDATE` | Prevents concurrent preference updates (consent banner + onboarding completion) from clobbering each other. |
+| Decision                                      | Choice                                                                                                   | Reasoning                                                                                                                                                                                                                      |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Duplicated deck origin                        | `'duplicated'` (not `'generated'`)                                                                       | Prevents selling duplicated content; seller.js line 36 already gates on `origin = 'generated'`. Correct over a boolean — the origin column is already the discriminator used throughout the codebase.                          |
+| `duplicated_from_deck_id` FK                  | `ON DELETE SET NULL`                                                                                     | Source deck may be deleted or belong to another user (purchased deck scenario); SET NULL preserves the duplicate while accepting provenance loss                                                                               |
+| Duplicated decks count toward free tier limit | Yes — `origin IN ('generated', 'duplicated')`                                                            | Prevents free users from bypassing the 10-deck limit via infinite duplication                                                                                                                                                  |
+| Can duplicate a duplicate                     | Yes                                                                                                      | Duplicates are fully owned decks for all operations except selling                                                                                                                                                             |
+| Copy `source_text` on duplication             | Copy unconditionally                                                                                     | Purchased decks already have `source_text = NULL`, so copying NULL is a no-op. No conditional branch needed.                                                                                                                   |
+| Purchased deck editing                        | Blocked (all mutations: title, card add/edit/delete) — **server-side + frontend**                        | Frontend-only blocking is insufficient — API calls could bypass it. Origin guard on `PATCH /:id` (rename), `POST /:id/cards`, `PATCH /:deckId/cards/:cardId`, `DELETE /:deckId/cards/:cardId`                                  |
+| Duplicate title format                        | `"[Original Title] (Copy)"` — striptags + trim + Unicode-safe truncation to 193 chars via `Array.from()` | Standard UX convention. Defense-in-depth against HTML in titles. `Array.from` avoids splitting emoji/CJK surrogate pairs.                                                                                                      |
+| Duplicate rate limit                          | Same as deck save (20/hour) via `saveLimiter`                                                            | Prevents abuse                                                                                                                                                                                                                 |
+| Onboarding detection                          | `!user.preferences?.onboarding_completed && user.deck_count === 0`                                       | Uses `deck_count` from `/auth/me` response (correlated subquery, no extra round-trip). Avoids disrupting existing users. `/welcome` route uses `skipOnboardingCheck` prop on ProtectedRoute to prevent infinite redirect loop. |
+| Onboarding step persistence                   | Only set `onboarding_completed` at end                                                                   | Simple — users who leave mid-flow see it again next login                                                                                                                                                                      |
+| Step 2 generation                             | Single topic text field, auto-title, no photos                                                           | Reduces cognitive load for first-time users                                                                                                                                                                                    |
+| Step 2 counts toward daily limit              | Yes                                                                                                      | Same endpoints enforce limits naturally                                                                                                                                                                                        |
+| Analytics opt-out                             | `analytics_opt_out` preference + Settings toggle + consent banner                                        | GDPR/CCPA compliance. Server preference is source of truth; synced to localStorage on login for cross-device consistency. Settings toggle updates localStorage only AFTER successful API call.                                 |
+| Consent default                               | Missing `analytics_opt_out` in preferences = not consented                                               | GDPR-safe default. New users see consent banner; existing users without the preference are not tracked.                                                                                                                        |
+| Consent banner                                | PostHog not initialized until consent granted                                                            | GDPR: deferred init via dynamic `import()`. Consent handler replays `identify()` after `opt_in_capturing()` since user may already be logged in.                                                                               |
+| PostHog single owner                          | `analytics.js` owns PostHog instance exclusively                                                         | No `@posthog/react`, no `PostHogProvider`, no `setPostHogInstance` handoff. `initPostHog()` caches the promise (not result) to prevent double-init on StrictMode/double-click.                                                 |
+| PostHog server-side deduplication             | Fire events only after idempotency check passes                                                          | Prevents webhook replays from inflating metrics                                                                                                                                                                                |
+| PostHog server-side consent                   | `trackServerEvent` checks user's `analytics_opt_out` preference                                          | GDPR: server-side events associated with a distinct user ID require the same consent as client-side.                                                                                                                           |
+| PostHog error handling                        | All calls wrapped in try/catch with `console.warn` in dev, silent in prod                                | Analytics must not break core functionality. Dev logging aids debugging.                                                                                                                                                       |
+| Server analytics module                       | `server/src/services/analytics.js` (not `index.js`)                                                      | Follows existing service pattern (purchase.js, email.js, stripe.js). Avoids circular imports since index.js imports routes and routes would import from index.js.                                                              |
+| Preferences race condition                    | Read-modify-write wrapped in transaction with `FOR UPDATE`                                               | Prevents concurrent preference updates (consent banner + onboarding completion) from clobbering each other.                                                                                                                    |
 
 ### ERD Changes
 
@@ -268,15 +270,13 @@ WHERE conrelid = 'decks'::regclass AND contype = 'c'
 // server/src/db/queries.js (new)
 // Shared helper — normalized COUNT pattern with ::int cast everywhere
 export async function countUserDecks(pool, userId) {
-  const { rows } = await pool.query(
-    "SELECT COUNT(*)::int AS count FROM decks WHERE user_id = $1 AND origin IN ('generated', 'duplicated')",
-    [userId]
-  );
+  const { rows } = await pool.query("SELECT COUNT(*)::int AS count FROM decks WHERE user_id = $1 AND origin IN ('generated', 'duplicated')", [userId]);
   return rows[0].count;
 }
 ```
 
 Replace inline COUNT queries in all 3 locations:
+
 - `server/src/routes/decks.js:112` — replace inline query with `countUserDecks(pool, req.userId)`
 - `server/src/middleware/plan.js:92` — replace inline query + `parseInt` with `countUserDecks(pool, req.userId)`
 - New duplicate endpoint — uses same helper
@@ -319,16 +319,18 @@ Return as a **sibling field** (like `daily_generation_limit` at line 175), NOT i
 res.json({
   user: sanitizeUser(row),
   daily_generation_limit: limits.generationsPerDay,
-  deck_count: row.deck_count   // sibling field, not in sanitizeUser
+  deck_count: row.deck_count // sibling field, not in sanitizeUser
 });
 ```
 
 In `AuthContext.jsx`, expose `deck_count` on the user context object so ProtectedRoute can access it:
+
 ```js
 setUser({ ...sanitizedUser, deck_count: data.deck_count });
 ```
 
 Also sync server consent preference to localStorage on login (cross-device consistency):
+
 ```js
 if (data.user?.preferences?.analytics_opt_out === false) {
   localStorage.setItem('analytics_consent', 'granted');
@@ -351,39 +353,46 @@ Note: the function is named `request`, not `fetchAPI`. The `options` parameter a
 1. **Duplicate button** — next to Delete, small icon (two overlapping squares). Uses `useAsyncGuard` hook (shared, extracted from the ref-based pattern in Generate.jsx) + AbortController for unmount safety:
 
    **Shared hook `client/src/hooks/useAsyncGuard.js` (new):**
+
    ```js
    import { useRef, useCallback } from 'react';
    export function useAsyncGuard() {
      const busyRef = useRef(false);
-     const run = useCallback(async (fn) => {
+     const run = useCallback(async fn => {
        if (busyRef.current) return;
        busyRef.current = true;
-       try { return await fn(); }
-       finally { busyRef.current = false; }
+       try {
+         return await fn();
+       } finally {
+         busyRef.current = false;
+       }
      }, []);
      return { busy: busyRef, run };
    }
    ```
 
    **Duplicate handler with AbortController:**
+
    ```js
    const { run: guardedRun } = useAsyncGuard();
    const controllerRef = useRef(null);
    useEffect(() => () => controllerRef.current?.abort(), []);
 
-   const handleDuplicate = () => guardedRun(async () => {
-     const controller = new AbortController();
-     controllerRef.current = controller;
-     try {
-       const data = await api.duplicateDeck(id, { signal: controller.signal });
-       if (controller.signal.aborted) return;
-       navigate(`/decks/${data.deck.id}`);
-     } catch (err) {
-       if (err.name === 'AbortError') return;
-       toast.error(err.message);
-     }
-   });
+   const handleDuplicate = () =>
+     guardedRun(async () => {
+       const controller = new AbortController();
+       controllerRef.current = controller;
+       try {
+         const data = await api.duplicateDeck(id, { signal: controller.signal });
+         if (controller.signal.aborted) return;
+         navigate(`/decks/${data.deck.id}`);
+       } catch (err) {
+         if (err.name === 'AbortError') return;
+         toast.error(err.message);
+       }
+     });
    ```
+
    Also disable the button visually while in progress (separate state boolean).
 
 2. **Purchased deck editing block** — when `deck.origin === 'purchased'`:
@@ -397,6 +406,7 @@ Note: the function is named `request`, not `fetchAPI`. The `options` parameter a
 **Dashboard.jsx changes:**
 
 1. **`getDeckSellState` function** (line 76-85) — add case BEFORE the `!isSeller` check (line 81), so sellers see the disabled state:
+
    ```js
    if (deck.origin === 'duplicated') return 'disabled-duplicated';
    ```
@@ -408,6 +418,7 @@ Note: the function is named `request`, not `fetchAPI`. The `options` parameter a
 4. **Origin badge** — add "Duplicated" badge alongside existing "Purchased" badge
 
 **Files modified:**
+
 - `server/src/db/migrations/013_deck_duplication.sql` (new)
 - `server/src/db/migrations/014_validate_deck_constraints.sql` (new)
 - `server/src/db/queries.js` (new) — shared `countUserDecks` helper
@@ -424,11 +435,13 @@ Note: the function is named `request`, not `fetchAPI`. The `options` parameter a
 **Welcome.jsx rewrite** — 3-step flow with local state (`useState` for step tracking):
 
 **Step 1 — Welcome + Name:**
+
 - Display name input, pre-filled from Google auth if available
 - Continue button (calls `api.updateProfile`, then advances to step 2)
 - Same styling as current Welcome page
 
 **Step 2 — Generate Your First Deck:**
+
 - Heading: "Let's create your first flashcards"
 - Single text input: "What are you studying?" with placeholder examples (e.g., "Spanish vocabulary", "Biology cell structure", "JavaScript promises")
 - Quick-start suggestion buttons (3-4 popular topics) to reduce blank-field paralysis
@@ -445,6 +458,7 @@ Note: the function is named `request`, not `fetchAPI`. The `options` parameter a
 - Back arrow to return to step 1 (aborts any in-flight generation)
 
 **Step 3 — Quick Tour:**
+
 - Heading: "Here's what you can do"
 - 3 feature cards (simple divs with icon + heading + one-liner):
   1. Study modes — "Flip, multiple choice, type, and match"
@@ -469,9 +483,14 @@ function ProtectedRoute({ children, skipOnboardingCheck = false }) {
 }
 
 // In routes — /welcome uses skipOnboardingCheck to break the loop:
-<Route path="/welcome" element={
-  <ProtectedRoute skipOnboardingCheck><Welcome /></ProtectedRoute>
-} />
+<Route
+  path="/welcome"
+  element={
+    <ProtectedRoute skipOnboardingCheck>
+      <Welcome />
+    </ProtectedRoute>
+  }
+/>;
 ```
 
 This is a synchronous check on the user object — no extra API call, no loading flash.
@@ -479,6 +498,7 @@ This is a synchronous check on the user object — no extra API call, no loading
 **Settings preferences allowlist update** (`server/src/routes/settings.js`):
 
 Add to `validatePreferences` with explicit boolean validation:
+
 ```js
 if ('onboarding_completed' in input) {
   // One-way latch: silently ignore non-true values (don't reject the entire payload)
@@ -500,14 +520,11 @@ if ('analytics_opt_out' in input) {
 const client = await pool.connect();
 try {
   await client.query('BEGIN');
-  const { rows: [current] } = await client.query(
-    'SELECT preferences FROM users WHERE id = $1 FOR UPDATE', [req.userId]
-  );
+  const {
+    rows: [current]
+  } = await client.query('SELECT preferences FROM users WHERE id = $1 FOR UPDATE', [req.userId]);
   const merged = deepMerge(current.preferences || {}, validated);
-  await client.query(
-    'UPDATE users SET preferences = $1 WHERE id = $2',
-    [JSON.stringify(merged), req.userId]
-  );
+  await client.query('UPDATE users SET preferences = $1 WHERE id = $2', [JSON.stringify(merged), req.userId]);
   await client.query('COMMIT');
   res.json({ preferences: merged });
 } catch (err) {
@@ -519,6 +536,7 @@ try {
 ```
 
 **Files modified:**
+
 - `client/src/pages/Welcome.jsx` — complete rewrite
 - `client/src/App.jsx` — onboarding redirect logic with `skipOnboardingCheck` on ProtectedRoute
 - `server/src/routes/settings.js` — preferences allowlist + `FOR UPDATE` transaction
@@ -526,6 +544,7 @@ try {
 #### Phase 3: Analytics Integration (PostHog)
 
 **Installation:**
+
 ```bash
 cd client && npm install posthog-js
 cd server && npm install posthog-node
@@ -544,8 +563,7 @@ This module owns initialization, instance management, consent checking, and all 
 ```js
 let initPromise = null;
 let posthog = null;
-let consentGranted = typeof localStorage !== 'undefined'
-  && localStorage.getItem('analytics_consent') === 'granted';
+let consentGranted = typeof localStorage !== 'undefined' && localStorage.getItem('analytics_consent') === 'granted';
 
 export function initPostHog() {
   if (initPromise) return initPromise;
@@ -554,7 +572,7 @@ export function initPostHog() {
       api_host: 'https://us.i.posthog.com',
       defaults: '2026-01-30', // enables auto SPA pageview tracking via History API — verify against installed posthog-js version
       opt_out_capturing_by_default: true,
-      person_profiles: 'identified_only',
+      person_profiles: 'identified_only'
     });
     posthog = ph;
     return ph;
@@ -574,25 +592,46 @@ function warn(err) {
 export const analytics = {
   identify: (userId, properties) => {
     if (!consentGranted) return;
-    try { posthog?.identify(userId, properties); } catch (e) { warn(e); }
+    try {
+      posthog?.identify(userId, properties);
+    } catch (e) {
+      warn(e);
+    }
   },
   reset: () => {
-    try { posthog?.reset(); } catch (e) { warn(e); }
+    try {
+      posthog?.reset();
+    } catch (e) {
+      warn(e);
+    }
   },
   track: (event, properties) => {
     if (!consentGranted) return;
-    try { posthog?.capture(event, properties); } catch (e) { warn(e); }
+    try {
+      posthog?.capture(event, properties);
+    } catch (e) {
+      warn(e);
+    }
   },
   optOut: () => {
-    try { posthog?.opt_out_capturing(); } catch (e) { warn(e); }
+    try {
+      posthog?.opt_out_capturing();
+    } catch (e) {
+      warn(e);
+    }
   },
   optIn: () => {
-    try { posthog?.opt_in_capturing(); } catch (e) { warn(e); }
-  },
+    try {
+      posthog?.opt_in_capturing();
+    } catch (e) {
+      warn(e);
+    }
+  }
 };
 ```
 
 **Why this architecture:**
+
 - **Single owner** — no `setPostHogInstance` handoff, no dual module-scoped variables, no fragile wiring
 - **Promise caching** — `initPostHog()` called twice returns the same promise (matches `refreshUser` deduplication pattern in AuthContext.jsx)
 - **Cached consent** — module-scoped `consentGranted` avoids `localStorage.getItem()` on every `track()`/`identify()` call; updated via `updateConsent()`
@@ -619,7 +658,7 @@ const { user } = useAuth();
 
 const handleAccept = () => {
   updateConsent(true); // synchronous: sets module cache + localStorage
-  initPostHog().then((ph) => {
+  initPostHog().then(ph => {
     ph.opt_in_capturing();
     // Replay identity — user was already logged in before consent
     if (user) {
@@ -645,13 +684,16 @@ Add analytics toggle in the Privacy section of Settings.jsx. Update localStorage
 ```js
 import { analytics, updateConsent } from '../lib/analytics';
 
-const handleAnalyticsToggle = async (optOut) => {
+const handleAnalyticsToggle = async optOut => {
   try {
     await api.updatePreferences({ analytics_opt_out: optOut });
     // Only update local state after server confirms
     updateConsent(!optOut);
-    if (optOut) { analytics.optOut(); }
-    else { analytics.optIn(); }
+    if (optOut) {
+      analytics.optOut();
+    } else {
+      analytics.optIn();
+    }
     toast.success(optOut ? 'Analytics disabled' : 'Analytics enabled');
   } catch (err) {
     toast.error('Failed to update preference');
@@ -673,9 +715,9 @@ function getClient() {
   client = new PostHog(process.env.POSTHOG_API_KEY, {
     host: 'https://us.i.posthog.com',
     flushAt: 20,
-    flushInterval: 10000,
+    flushInterval: 10000
   });
-  client.on('error', (err) => console.error('[PostHog]', err));
+  client.on('error', err => console.error('[PostHog]', err));
   return client;
 }
 
@@ -685,10 +727,7 @@ export async function trackServerEvent(userId, event, properties = {}) {
   if (!ph) return;
   try {
     // Check user's analytics consent (GDPR requirement)
-    const { rows } = await pool.query(
-      "SELECT preferences->>'analytics_opt_out' AS opted_out FROM users WHERE id = $1",
-      [userId]
-    );
+    const { rows } = await pool.query("SELECT preferences->>'analytics_opt_out' AS opted_out FROM users WHERE id = $1", [userId]);
     if (rows[0]?.opted_out === 'true') return;
     ph.capture({ distinctId: userId, event, properties });
   } catch (err) {
@@ -706,13 +745,15 @@ Lazy-init pattern follows existing service conventions (not pool.js, which is ea
 ```js
 import { shutdownAnalytics } from './services/analytics.js';
 
-const server = app.listen(PORT, () => { /* ... */ });
+const server = app.listen(PORT, () => {
+  /* ... */
+});
 
 process.on('SIGTERM', async () => {
   const timeout = setTimeout(() => process.exit(1), 5000); // prevent hang if flush stalls
-  server.close();           // stop accepting new connections
+  server.close(); // stop accepting new connections
   await shutdownAnalytics(); // flush batched PostHog events
-  await pool.end();          // drain database connections
+  await pool.end(); // drain database connections
   clearTimeout(timeout);
   process.exit(0);
 });
@@ -720,42 +761,43 @@ process.on('SIGTERM', async () => {
 
 **Server-side event placement** — fire AFTER idempotency checks pass:
 
-| Event | File | Location | Properties |
-|-------|------|----------|------------|
-| `signup_completed` | `auth.js:94` | After INSERT user | `method: 'email'` |
-| `signup_completed` | `auth-google.js:125` | After INSERT user | `method: 'google'` |
-| `signup_completed` | `auth-magic.js:143` | After INSERT user | `method: 'magic_link'` |
-| `seller_terms_accepted` | `seller.js:355` | After UPDATE | — |
-| `seller_onboarding_started` | `seller.js:410` | After account link created | — |
-| `seller_onboarding_completed` | `seller.js:467` | After charges_enabled confirmed | — |
-| `listing_created` | `seller.js:115` | After INSERT listing | `category_id, price_cents` |
-| `purchase_completed` | `stripe.js:225` | After fulfillPurchase succeeds (inside isNew check) | `listing_id, price` |
-| `subscription_started` | `stripe.js:142` | After checkout.session.completed | — |
-| `subscription_cancelled` | `stripe.js:155` | After cancel_at_period_end detected | — |
+| Event                         | File                 | Location                                            | Properties                 |
+| ----------------------------- | -------------------- | --------------------------------------------------- | -------------------------- |
+| `signup_completed`            | `auth.js:94`         | After INSERT user                                   | `method: 'email'`          |
+| `signup_completed`            | `auth-google.js:125` | After INSERT user                                   | `method: 'google'`         |
+| `signup_completed`            | `auth-magic.js:143`  | After INSERT user                                   | `method: 'magic_link'`     |
+| `seller_terms_accepted`       | `seller.js:355`      | After UPDATE                                        | —                          |
+| `seller_onboarding_started`   | `seller.js:410`      | After account link created                          | —                          |
+| `seller_onboarding_completed` | `seller.js:467`      | After charges_enabled confirmed                     | —                          |
+| `listing_created`             | `seller.js:115`      | After INSERT listing                                | `category_id, price_cents` |
+| `purchase_completed`          | `stripe.js:225`      | After fulfillPurchase succeeds (inside isNew check) | `listing_id, price`        |
+| `subscription_started`        | `stripe.js:142`      | After checkout.session.completed                    | —                          |
+| `subscription_cancelled`      | `stripe.js:155`      | After cancel_at_period_end detected                 | —                          |
 
 **Client-side event placement:**
 
-| Event | File | Location | Properties |
-|-------|------|----------|------------|
-| `onboarding_step_completed` | `Welcome.jsx` | After each step transition | `step: 1/2/3` |
-| `first_deck_generated` | `Welcome.jsx` | After step 2 save succeeds | — |
-| `deck_generated` | `Generate.jsx` | After save succeeds | `method: text/photo, card_count` |
-| `deck_duplicated` | `DeckView.jsx` | After duplication succeeds | `source_origin: generated/purchased/duplicated` |
-| `study_session_started` | `Study.jsx` | After mode selected and session created | `mode` |
-| `study_session_completed` | `Study.jsx` | After results shown | `mode, accuracy, duration` |
-| `marketplace_viewed` | `Marketplace.jsx` | On mount | — |
-| `listing_viewed` | `MarketplaceDeck.jsx` | On mount | `listing_id` |
-| `purchase_started` | `MarketplaceDeck.jsx` | On buy button click | `listing_id` |
-| `streak_milestone` | `Dashboard.jsx` | When streak hits 7/30/100 | `days` |
+| Event                       | File                  | Location                                | Properties                                      |
+| --------------------------- | --------------------- | --------------------------------------- | ----------------------------------------------- |
+| `onboarding_step_completed` | `Welcome.jsx`         | After each step transition              | `step: 1/2/3`                                   |
+| `first_deck_generated`      | `Welcome.jsx`         | After step 2 save succeeds              | —                                               |
+| `deck_generated`            | `Generate.jsx`        | After save succeeds                     | `method: text/photo, card_count`                |
+| `deck_duplicated`           | `DeckView.jsx`        | After duplication succeeds              | `source_origin: generated/purchased/duplicated` |
+| `study_session_started`     | `Study.jsx`           | After mode selected and session created | `mode`                                          |
+| `study_session_completed`   | `Study.jsx`           | After results shown                     | `mode, accuracy, duration`                      |
+| `marketplace_viewed`        | `Marketplace.jsx`     | On mount                                | —                                               |
+| `listing_viewed`            | `MarketplaceDeck.jsx` | On mount                                | `listing_id`                                    |
+| `purchase_started`          | `MarketplaceDeck.jsx` | On buy button click                     | `listing_id`                                    |
+| `streak_milestone`          | `Dashboard.jsx`       | When streak hits 7/30/100               | `days`                                          |
 
 **New env vars:**
 
-| Variable | Where | Purpose |
-|----------|-------|---------|
+| Variable               | Where         | Purpose                          |
+| ---------------------- | ------------- | -------------------------------- |
 | `VITE_POSTHOG_API_KEY` | `client/.env` | PostHog project API key (client) |
-| `POSTHOG_API_KEY` | `server/.env` | PostHog project API key (server) |
+| `POSTHOG_API_KEY`      | `server/.env` | PostHog project API key (server) |
 
 **Files modified:**
+
 - `client/src/lib/analytics.js` (new) — single PostHog owner: init, consent, tracking wrapper
 - `client/src/lib/AuthContext.jsx` — identify/reset calls, consent sync from server on login
 - `client/src/components/ConsentBanner.jsx` (new) — with identity replay and useAuth hook
@@ -849,27 +891,27 @@ Note: `main.jsx` is NOT modified for PostHog — all PostHog code lives in `anal
 
 ## Risk Analysis & Mitigation
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| Free users bypass deck limits via duplication | High | Medium | Duplicated decks count toward limits (shared `countUserDecks` helper — single source of truth) |
-| Users sell duplicated content | Medium | High | Server-side gate on `origin = 'generated'` already exists; frontend disabled icon adds UX layer |
-| Onboarding AI generation fails for new user | Low | High | Inline error state with retry + topic change + skip options |
-| Phantom deck from aborted onboarding generation | High | Medium | AbortController pattern from Generate.jsx; guard saveDeck with abort check |
-| PostHog SDK increases bundle size | Low | Low | Dynamic import — only loaded after consent. No `@posthog/react` in bundle. |
-| Webhook replays double-count analytics events | Medium | Medium | Fire events only after idempotency check passes |
-| Existing users forced through onboarding | Medium | High | Detection checks `deck_count === 0` from `/auth/me` — existing users with decks are never redirected |
-| Onboarding redirect loop on /welcome | High | Critical | `skipOnboardingCheck` prop on ProtectedRoute for /welcome route |
-| Migration constraint name mismatch | High | Critical | Catalog-based dynamic drop with tightened LIKE filter (`%origin%` AND `%generated%`) |
-| IDOR on duplicate endpoint | Medium | High | Source deck query MUST include `AND user_id = $2` |
-| Double-click / navigate-away on duplicate | Medium | Medium | `useAsyncGuard` hook + AbortController + signal forwarding |
-| PostHog identify fires before consent | Medium | Medium (GDPR) | Cached consent check + identity replay after late consent |
-| Suspended users mutate content | Medium | High | `requireActiveUser` on ALL 7 deck/card mutation endpoints |
-| Server-side events ignore user consent | Medium | High (GDPR) | `trackServerEvent` checks `analytics_opt_out` preference before sending |
-| Concurrent preference updates clobber each other | Medium | Medium | `FOR UPDATE` transaction on preferences read-modify-write |
-| Consent state diverges across devices | Medium | Low | Server preference synced to localStorage on login; server is source of truth |
-| `initPostHog()` double-init on StrictMode | Medium | Low | Promise caching (matches refreshUser deduplication pattern) |
-| Empty deck duplication SQL error | Low | Medium | Guard with `sourceCards.length > 0` before bulk INSERT |
-| HTML in duplicate title (XSS-adjacent) | Low | Medium | `striptags()` + trim + non-empty check on duplicate title |
+| Risk                                             | Likelihood | Impact        | Mitigation                                                                                           |
+| ------------------------------------------------ | ---------- | ------------- | ---------------------------------------------------------------------------------------------------- |
+| Free users bypass deck limits via duplication    | High       | Medium        | Duplicated decks count toward limits (shared `countUserDecks` helper — single source of truth)       |
+| Users sell duplicated content                    | Medium     | High          | Server-side gate on `origin = 'generated'` already exists; frontend disabled icon adds UX layer      |
+| Onboarding AI generation fails for new user      | Low        | High          | Inline error state with retry + topic change + skip options                                          |
+| Phantom deck from aborted onboarding generation  | High       | Medium        | AbortController pattern from Generate.jsx; guard saveDeck with abort check                           |
+| PostHog SDK increases bundle size                | Low        | Low           | Dynamic import — only loaded after consent. No `@posthog/react` in bundle.                           |
+| Webhook replays double-count analytics events    | Medium     | Medium        | Fire events only after idempotency check passes                                                      |
+| Existing users forced through onboarding         | Medium     | High          | Detection checks `deck_count === 0` from `/auth/me` — existing users with decks are never redirected |
+| Onboarding redirect loop on /welcome             | High       | Critical      | `skipOnboardingCheck` prop on ProtectedRoute for /welcome route                                      |
+| Migration constraint name mismatch               | High       | Critical      | Catalog-based dynamic drop with tightened LIKE filter (`%origin%` AND `%generated%`)                 |
+| IDOR on duplicate endpoint                       | Medium     | High          | Source deck query MUST include `AND user_id = $2`                                                    |
+| Double-click / navigate-away on duplicate        | Medium     | Medium        | `useAsyncGuard` hook + AbortController + signal forwarding                                           |
+| PostHog identify fires before consent            | Medium     | Medium (GDPR) | Cached consent check + identity replay after late consent                                            |
+| Suspended users mutate content                   | Medium     | High          | `requireActiveUser` on ALL 7 deck/card mutation endpoints                                            |
+| Server-side events ignore user consent           | Medium     | High (GDPR)   | `trackServerEvent` checks `analytics_opt_out` preference before sending                              |
+| Concurrent preference updates clobber each other | Medium     | Medium        | `FOR UPDATE` transaction on preferences read-modify-write                                            |
+| Consent state diverges across devices            | Medium     | Low           | Server preference synced to localStorage on login; server is source of truth                         |
+| `initPostHog()` double-init on StrictMode        | Medium     | Low           | Promise caching (matches refreshUser deduplication pattern)                                          |
+| Empty deck duplication SQL error                 | Low        | Medium        | Guard with `sourceCards.length > 0` before bulk INSERT                                               |
+| HTML in duplicate title (XSS-adjacent)           | Low        | Medium        | `striptags()` + trim + non-empty check on duplicate title                                            |
 
 ## References & Research
 

@@ -6,6 +6,8 @@ deepened: 2026-03-15
 reviewed: 2026-03-15
 ---
 
+<!-- FINISHED -->
+
 # iOS Mobile Scaffold — Gap Fixes
 
 ## Enhancement Summary
@@ -15,6 +17,7 @@ reviewed: 2026-03-15
 **Agents run:** TypeScript reviewer, security sentinel, architecture strategist, performance oracle, simplicity reviewer, best practices researcher, framework docs researcher, learnings researcher (8 total); then architecture strategist, security sentinel, TypeScript reviewer, simplicity reviewer, pattern recognition specialist, performance oracle (6 total)
 
 ### Key Improvements Discovered
+
 1. **Server does not accept Bearer tokens** — `authenticate` middleware only reads cookies. `requireXHR` also blocks all mutations. The mobile app cannot communicate with the server as-is. Two-line server fix required before any mobile auth testing.
 2. **API paths confirmed wrong** — all four paths in `api.ts` are wrong. Authoritative source is `server/src/index.js` + web client cross-reference. No "verify first" step needed.
 3. **MMKV encryption key has two bugs** — `Math.random()` is not a CSPRNG (use `Crypto.randomUUID()`), and the catch path never persists the generated key (data-loss vector on next launch). Note: `getRandomBytesAsync` is async and breaks sync module init — use `randomUUID()` instead.
@@ -52,12 +55,12 @@ Five categories of issues were found:
   - Existing web cookie-based auth must remain unchanged
 - [x] **Fix API paths in `mobile/src/lib/api.ts`** — paths are confirmed wrong against `server/src/index.js`. Direct fixes (no verification step needed):
 
-  | Line | Current | Fix |
-  |------|---------|-----|
-  | 84 | `/auth-google` | `/auth/google` |
-  | 88 | `/auth-magic/request` | `/auth/magic-link/request` |
-  | 89 | `/auth-magic/verify` | `/auth/magic-link/verify` |
-  | 114 | `/study/start` | `/study` |
+  | Line | Current               | Fix                        |
+  | ---- | --------------------- | -------------------------- |
+  | 84   | `/auth-google`        | `/auth/google`             |
+  | 88   | `/auth-magic/request` | `/auth/magic-link/request` |
+  | 89   | `/auth-magic/verify`  | `/auth/magic-link/verify`  |
+  | 114  | `/study/start`        | `/study`                   |
 
 - [x] **Unify `User` type** — this is a live bug, not a nice-to-have:
   - Delete the inline 7-field `User` type in `auth.tsx` (lines 4–12)
@@ -82,15 +85,17 @@ Five categories of issues were found:
   - `export const storage = createStorage()` must remain synchronous
 - [x] **Fix `SecureStoreFallback.remove()` async bug** — `void SecureStore.deleteItemAsync(key)` discards the promise. Either `await` it (make `remove` async) or accept the race condition knowingly with a comment.
 - [x] **Fix `dehydrateOptions` allowlist in `query-client.ts`** — the current filter targets `'me'` which is never in the query cache (`api.me()` is called imperatively). Use an allowlist:
+
   ```typescript
   const PERSISTABLE_ROOTS = new Set(['decks', 'marketplace', 'study']);
 
   export const dehydrateOptions = {
-    shouldDehydrateQuery: (query: Query) =>
-      PERSISTABLE_ROOTS.has(query.queryKey[0] as string),
+    shouldDehydrateQuery: (query: Query) => PERSISTABLE_ROOTS.has(query.queryKey[0] as string)
   };
   ```
+
   Pass to `PersistQueryClientProvider`. Document the allowlist in `CLAUDE.md` so brainstorm #2 adds new roots explicitly.
+
 - [x] **Fix `userInterfaceStyle` in `app.json`** — change `"light"` → `"automatic"`. One-character change; prevents the OS dark mode signal from being permanently blocked when dark mode is implemented.
 - [x] **Fix `startSession` mode type** — `api.startSession()` line 113 accepts `mode: string`. `StudyMode` type already exists in `types/api.ts`. One-word fix: `mode: StudyMode`. Add import.
 - [x] **Add auth cold-start MMKV hydration** — `AuthProvider` is a clean shell now; harder to retrofit after brainstorm #2. On mount, read cached user from MMKV synchronously and initialize `loading: false` immediately. Kick off `api.me()` in background to verify freshness. Write user to MMKV on every successful `api.me()`. Clear on logout. Spinner only appears on first install (no cache) or after logout.
@@ -101,7 +106,7 @@ Five categories of issues were found:
 - [x] **Add `keychainAccessible` flag to SecureStore writes** in `api.ts`:
   ```typescript
   await SecureStore.setItemAsync(TOKEN_KEY, token, {
-    keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+    keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY
   });
   ```
   Prevents token from migrating to a new device via iCloud Keychain backup.
@@ -109,17 +114,17 @@ Five categories of issues were found:
 
 ### Deferred to Feature Brainstorms (Do NOT fix now)
 
-| Item | Deferred To | Rationale |
-|------|------------|-----------|
-| Zod validation schemas | Brainstorm #2 (auth) | No API calls happening yet; add per-feature |
-| RevenueCat dependency | Marketplace brainstorm | Requires dev client build, not needed for Expo Go |
-| Typed API responses (`Promise<unknown>`) | Each feature brainstorm | Add type params when implementing each endpoint |
-| Missing API methods (avatar, stripe, generate preview) | Respective brainstorms | Dead code until features exist |
-| Tab bar icons | Brainstorm #2 or #3 | Need icon assets; cosmetic |
-| EAS projectId | Brainstorm #5 (App Store) | Only needed for EAS Build; requires account access |
-| `@shopify/flash-list` | Dashboard brainstorm | Feature optimization concern |
-| RootErrorBoundary outside ThemeProvider | Brainstorm #2 | Low risk; `parseThemeSelection` handles corrupt MMKV gracefully |
-| Type auth methods (`login`, `signup`, `me`) | Brainstorm #2 | Eliminate `as` casts when implementing the actual auth screens |
+| Item                                                   | Deferred To               | Rationale                                                       |
+| ------------------------------------------------------ | ------------------------- | --------------------------------------------------------------- |
+| Zod validation schemas                                 | Brainstorm #2 (auth)      | No API calls happening yet; add per-feature                     |
+| RevenueCat dependency                                  | Marketplace brainstorm    | Requires dev client build, not needed for Expo Go               |
+| Typed API responses (`Promise<unknown>`)               | Each feature brainstorm   | Add type params when implementing each endpoint                 |
+| Missing API methods (avatar, stripe, generate preview) | Respective brainstorms    | Dead code until features exist                                  |
+| Tab bar icons                                          | Brainstorm #2 or #3       | Need icon assets; cosmetic                                      |
+| EAS projectId                                          | Brainstorm #5 (App Store) | Only needed for EAS Build; requires account access              |
+| `@shopify/flash-list`                                  | Dashboard brainstorm      | Feature optimization concern                                    |
+| RootErrorBoundary outside ThemeProvider                | Brainstorm #2             | Low risk; `parseThemeSelection` handles corrupt MMKV gracefully |
+| Type auth methods (`login`, `signup`, `me`)            | Brainstorm #2             | Eliminate `as` casts when implementing the actual auth screens  |
 
 ## Technical Considerations
 
@@ -130,12 +135,13 @@ The mobile app sends `Authorization: Bearer <token>` on every authenticated requ
 **Fix (2 lines, zero architecture change):**
 
 `server/src/middleware/auth.js`:
+
 ```js
-const token = req.cookies?.token
-  || req.headers.authorization?.replace('Bearer ', '');
+const token = req.cookies?.token || req.headers.authorization?.replace('Bearer ', '');
 ```
 
 `server/src/middleware/csrf.js`:
+
 ```js
 // In requireXHR: bypass for Bearer-authenticated requests (native app)
 if (req.headers.authorization?.startsWith('Bearer ')) return next();
@@ -163,17 +169,22 @@ The `updateDeck` and `duplicateDeck` routes ARE confirmed to exist on server (de
 **Problem 2 — Data-loss in catch path:** If `SecureStore.setItem` fails on first write, execution falls to catch. The catch generates a new key but never persists it. On next app launch, another different key is generated and MMKV opens with a mismatched key — all previously written data becomes permanently unreadable.
 
 **Fix:**
+
 ```typescript
 import * as Crypto from 'expo-crypto';
 
 function generateEncryptionKey(): string {
   // Synchronous CSPRNG — randomUUID() is backed by the native secure RNG
-  return Crypto.randomUUID().replace(/-/g, '');  // 32 hex chars, 122 bits entropy
+  return Crypto.randomUUID().replace(/-/g, ''); // 32 hex chars, 122 bits entropy
 }
 
 // In catch path — persist the key even if first attempt failed:
 const newKey = generateEncryptionKey();
-try { SecureStore.setItem(ENCRYPTION_KEY_ID, newKey); } catch { /* log */ }
+try {
+  SecureStore.setItem(ENCRYPTION_KEY_ID, newKey);
+} catch {
+  /* log */
+}
 return newKey;
 ```
 
@@ -189,12 +200,12 @@ The original filter `key !== 'me'` matches nothing — `api.me()` is called impe
 const PERSISTABLE_ROOTS = new Set(['decks', 'marketplace', 'study']);
 
 export const dehydrateOptions = {
-  shouldDehydrateQuery: (query: Query) =>
-    PERSISTABLE_ROOTS.has(query.queryKey[0] as string),
+  shouldDehydrateQuery: (query: Query) => PERSISTABLE_ROOTS.has(query.queryKey[0] as string)
 };
 ```
 
 Pass to `PersistQueryClientProvider`:
+
 ```tsx
 <PersistQueryClientProvider
   client={queryClient}
@@ -273,12 +284,13 @@ The `mobile/CLAUDE.md` should document (in order):
 `AuthProvider` initializes with `loading: true` and only sets `false` after `api.me()` completes. `AuthGate` renders a full-screen spinner while loading. Every app open shows a spinner until the server round-trip resolves (100–300ms good network; several seconds on bad network with retries).
 
 **Fix (simpler to add now before auth screens are built):**
+
 ```typescript
 const USER_CACHE_KEY = 'cached-user';
 
 // In AuthProvider initial state:
 const cachedUserJson = storage.getString(USER_CACHE_KEY);
-const cachedUser = cachedUserJson ? JSON.parse(cachedUserJson) as User : null;
+const cachedUser = cachedUserJson ? (JSON.parse(cachedUserJson) as User) : null;
 
 const [user, setUser] = useState<User | null>(cachedUser);
 const [loading, setLoading] = useState(cachedUser === null); // spinner only on first install
@@ -303,7 +315,7 @@ The `ErrorBoundary` component uses `useThemedStyles` (requires `ThemeProvider`).
 `router.navigate()` in Expo Router v4 **always pushes** a new entry to the stack. To return to a screen that already exists in the stack, use:
 
 ```typescript
-router.dismissTo('/(tabs)/home');  // returns to existing screen
+router.dismissTo('/(tabs)/home'); // returns to existing screen
 // NOT: router.navigate('/(tabs)/home')  // would push a duplicate
 ```
 

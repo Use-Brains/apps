@@ -7,15 +7,22 @@ topic: ios-monetization-and-subscriptions
 
 ## What We're Building
 
-A dual-payment architecture that lets AI Notecards sell Pro subscriptions through Apple IAP on iOS while keeping Stripe as the payment backbone on web. The iOS app uses RevenueCat to manage StoreKit 2 subscriptions, which sync to the same server-side `plan` column that Stripe already writes to. Marketplace purchases route through the web browser on iOS -- they do not go through Apple IAP. Seller payouts remain on Stripe Connect regardless of how the buyer paid.
+A dual-payment architecture that lets AI Notecards sell Pro subscriptions through Apple IAP on iOS while keeping Stripe as the payment backbone on web. The iOS app uses RevenueCat to manage StoreKit 2 subscriptions, which sync to the same server-side `plan` column that Stripe already writes to today. Marketplace purchases route through the web browser on iOS -- they do not go through Apple IAP. Seller payouts remain on Stripe Connect regardless of how the buyer paid.
 
 This is the single hardest architectural decision in the iOS build. Every choice here has revenue, compliance, and code complexity implications. The strategy optimizes for App Store approval, indie economics (sub-$1M, 15% Apple commission), and keeping the existing Stripe infrastructure intact rather than replacing it.
+
+**Current repo reality (2026-03-15 refresh):**
+
+- Web subscriptions already exist through Stripe and write `plan` / `stripe_subscription_id` in `server/src/routes/stripe.js`
+- Marketplace purchases and seller payouts already run through Stripe Checkout + Stripe Connect
+- Mobile auth now exists as a native token-based flow, so RevenueCat can attach to authenticated mobile users after login instead of inventing a second identity model
+- Legal/product docs currently describe marketplace economics as **70% seller / 30% platform**, so this brainstorm should align with that and not the earlier 50/50 assumption
 
 ## Why This Approach
 
 Three strategies were considered:
 
-1. **All-Apple IAP** -- route both subscriptions and marketplace purchases through StoreKit. Simple for App Store compliance but devastating for marketplace economics. Apple's 15% on top of a $2 deck sale, combined with the existing 50/50 platform split, would leave sellers with almost nothing. Also makes Stripe Connect payouts extremely complex since Apple doesn't pay sellers directly.
+1. **All-Apple IAP** -- route both subscriptions and marketplace purchases through StoreKit. Simple for App Store compliance but devastating for marketplace economics. Apple's 15% on top of a $2 deck sale, combined with the intended 70/30 marketplace split, still damages low-ticket deck economics and makes Stripe Connect payouts extremely complex since Apple doesn't pay sellers directly.
 
 2. **All-web via Reader Rule** -- use the reader rule (post-2022 US settlement) to link users to the website for all purchases. Avoids Apple's cut entirely but risks App Store rejection. The reader rule applies to "reader" apps (content consumption), and AI Notecards generates content, not just reads it. Apple has rejected apps for stretching this definition. Too risky for a first submission.
 
@@ -60,7 +67,7 @@ Three strategies were considered:
 - The purchase fulfillment webhook fires as it does today. The app polls or receives a push notification to refresh the user's deck library.
 - This is the same pattern used by Etsy, Depop, Poshmark, and other marketplace apps. Apple's guidelines (3.1.1) exempt "goods and services not consumed within the app" -- and while flashcard decks are consumed in-app, the marketplace framing as a multi-sided platform with independent sellers has been accepted for similar apps.
 - If Apple rejects this approach during review, the fallback is to make the marketplace browse-only on iOS with a "Purchase on web" link. This is explicitly allowed under the reader rule changes and the US court settlement (Epic v. Apple).
-- Do NOT implement IAP for marketplace purchases. The math doesn't work: a $2 deck with Apple's 15% ($0.30) plus the 50/50 platform split means the seller gets $0.85 instead of $1.00. More critically, Apple pays the developer, not the seller -- so the platform would need to collect from Apple, then pay sellers via Stripe Connect, adding a multi-week delay and reconciliation nightmare.
+- Do NOT implement IAP for marketplace purchases. The math doesn't work well at low price points: a $2 deck with Apple's 15% cut plus the intended 70/30 seller-platform split compresses already-small margins, and Apple pays the developer, not the seller -- so the platform would need to collect from Apple, then pay sellers via Stripe Connect, adding delay and reconciliation complexity.
 
 **App Store review framing:** Position the app as a "learning marketplace platform" where independent educators create and sell content. The subscription unlocks creation tools. The marketplace is a peer-to-peer transaction facilitated by the platform. This framing is accurate and matches approved precedent.
 
@@ -73,8 +80,10 @@ Three strategies were considered:
 - The `users` table `plan` column remains the single source of truth. Both Stripe webhooks and RevenueCat webhooks write to it.
 - Add a `subscription_platform` column to `users`: `'stripe'` | `'apple'` | `null`. This tracks where the active subscription originated.
 - Add `revenuecat_app_user_id` column to `users` -- set to the user's UUID. RevenueCat uses this to identify users.
-- On iOS app launch, call `Purchases.logIn(userId)` with the authenticated user's ID. RevenueCat then associates the Apple subscription with the correct user.
-- The `/api/auth/me` endpoint already returns `plan` -- no iOS-specific changes needed for the client to know the current tier.
+- On iOS app launch after native auth completes, call `Purchases.logIn(userId)` with the authenticated user's ID. RevenueCat then associates the Apple subscription with the correct user.
+- The mobile app already receives `plan` through the existing auth payload and `/api/auth/me`, so the source-of-truth contract stays server-first rather than SDK-first.
+
+**Current gap in the repo:** Stripe-backed subscription state exists today (`stripe_subscription_id`, billing portal flow, Stripe webhook writes to `plan`), but `subscription_platform` and `revenuecat_app_user_id` do **not** exist yet. This step will introduce them rather than “aligning” existing fields.
 
 **Conflict resolution:** If a user has both a Stripe subscription and an Apple subscription (rare but possible):
 
@@ -90,7 +99,7 @@ Three strategies were considered:
 
 ### 5. Receipt Validation and Subscription Sync
 
-**Problem:** When a user subscribes via Apple IAP on iOS, the server needs to know about it to update the `plan` column, and it needs to handle renewals, cancellations, and billing failures.
+**Problem:** When a user subscribes via Apple IAP on iOS, the server needs to know about it to update the `plan` column, and it needs to handle renewals, cancellations, and billing failures without regressing the existing Stripe webhook behavior.
 
 **Approach:** RevenueCat handles all of this via its server-to-server webhook.
 
@@ -108,7 +117,7 @@ Three strategies were considered:
   | `PRODUCT_CHANGE` | Handle annual/monthly switch (update metadata) |
 
 - Verify the RevenueCat webhook authorization header to prevent spoofing.
-- This mirrors the existing Stripe webhook structure almost exactly -- same state transitions, same side effects (delisting on downgrade, email notifications).
+- This should mirror the existing Stripe webhook structure closely -- same state transitions, same downgrade side effects, and the same “server owns entitlements” rule.
 
 **No direct App Store Server API calls needed.** RevenueCat abstracts the App Store Server Notifications v2 and handles grace periods, billing retries, and offer codes. This is the primary reason to use RevenueCat over raw StoreKit 2.
 
@@ -154,16 +163,21 @@ Three strategies were considered:
 | Seller payouts | Stripe Connect (unchanged) | Marketplace payments always flow through Stripe regardless of platform |
 | Source of truth for plan status | `users.plan` column in PostgreSQL | Both Stripe and RevenueCat webhooks write to the same column |
 | Subscription platform tracking | New `subscription_platform` column | Needed to resolve conflicts and route cancellations correctly |
+| RevenueCat identity mapping | `revenuecat_app_user_id = users.id` | Avoids a second identifier scheme on mobile |
 | Annual plan | $79.99/yr on both platforms | Higher LTV, lower churn, better Apple commission after year 1 |
 | Fallback if Apple rejects marketplace checkout | Browse-only marketplace on iOS, purchase on web | Kindle/Audible model; preserves seller economics |
 
+## Resolved Questions
+
+- **Manage subscription routing:** Yes. Show “Manage Subscription” based on `subscription_platform` — Apple subscribers go to Apple’s manage-subscription surface, Stripe subscribers go to the Stripe billing portal.
+- **Existing Stripe subscribers on iOS:** Treat them as already entitled. The app should never prompt an already-Pro user to subscribe again just because they authenticated on iOS.
+- **RevenueCat experiments / pricing tests:** Not for v1. Keep pricing static until the base dual-platform billing path is stable.
+- **Marketplace review fallback:** Keep a browse-only fallback ready for iOS if Apple rejects external marketplace checkout during review.
+- **Annual web parity:** Yes. Annual pricing should exist on both platforms; the implementation plan should include the Stripe annual price ID and pricing-surface updates.
+
 ## Open Questions
 
-- Should the iOS app show a "Manage Subscription" button that opens the Apple subscription management page (for Apple subscribers) vs the Stripe billing portal (for Stripe subscribers)? Likely yes -- route based on `subscription_platform` column.
-- Do we need a migration path for existing Stripe subscribers who start using the iOS app? They should not be prompted to subscribe again. The app checks `plan` on login and skips the paywall if already Pro.
-- Should we implement RevenueCat Offerings to A/B test pricing (e.g., $9.99/mo vs $11.99/mo on iOS)? Not for v1 -- YAGNI. But RevenueCat makes this trivial later.
-- Will Apple approve the SFSafariViewController marketplace checkout flow on first review? Have the browse-only fallback ready before submission.
-- Should the annual plan be available on web via Stripe as well? Yes, for parity. Add a `STRIPE_PRO_ANNUAL_PRICE_ID` env var and a toggle on the Pricing page.
+- None blocking for planning. The remaining uncertainty is App Review outcome for marketplace checkout, and that is already handled by the explicit browse-only fallback.
 
 ## Scope Boundaries
 
