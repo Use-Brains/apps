@@ -808,14 +808,14 @@ const handleSetPassword = async (e) => {
 - [x] No `manifest.json` — deferred to post-launch
 
 ### Phase 2: Legal Pages
-- [ ] `/terms` renders Terms of Service page with Navbar and Footer
-- [ ] `/privacy` renders Privacy Policy page with Navbar and Footer
-- [ ] Both pages are accessible without authentication
-- [ ] Both pages show "Last Updated" date at the top
-- [ ] Footer component appears on Landing, Terms, Privacy, Pricing, Marketplace pages
-- [ ] Landing page inline footer replaced with shared Footer component
-- [ ] Login page shows "By continuing, you agree to our Terms and Privacy Policy" with links
-- [ ] Seller terms modal links to full Terms of Service
+- [x] `/terms` renders Terms of Service page with Navbar and Footer
+- [x] `/privacy` renders Privacy Policy page with Navbar and Footer
+- [x] Both pages are accessible without authentication
+- [x] Both pages show "Last Updated" date at the top
+- [x] Footer component appears on Landing, Terms, Privacy, Pricing, Marketplace pages
+- [x] Landing page inline footer replaced with shared Footer component
+- [x] Login page shows "By continuing, you agree to our Terms and Privacy Policy" with links
+- [x] Seller terms modal links to full Terms of Service
 
 ### Phase 3: Error Handling
 - [ ] Navigating to `/nonexistent-url` shows NotFound page with Navbar and contextual CTA

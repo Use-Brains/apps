@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../lib/AuthContext.jsx';
 import { api } from '../lib/api.js';
 import Navbar from '../components/Navbar.jsx';
+import Footer from '../components/Footer.jsx';
 
 const FREE_FEATURES = [
   '1 AI generation per day',
@@ -142,6 +143,7 @@ export default function Pricing() {
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }

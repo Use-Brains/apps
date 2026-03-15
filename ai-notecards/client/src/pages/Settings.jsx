@@ -44,6 +44,11 @@ function SellerTermsModal({ onAccept, onClose }) {
             We reserve the right to remove listings that violate our content guidelines
           </li>
         </ul>
+        <p className="text-xs text-[#6B635A] mb-4">
+          See our full{' '}
+          <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-[#1B6B5A] hover:underline">Terms of Service</a>
+          {' '}for details.
+        </p>
         <label className="flex items-center gap-2 mb-5 cursor-pointer">
           <input
             type="checkbox"

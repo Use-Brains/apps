@@ -18,6 +18,8 @@ import ListDeck from './pages/ListDeck.jsx';
 import SellerDashboard from './pages/SellerDashboard.jsx';
 import Profile from './pages/Profile.jsx';
 import Admin from './pages/Admin.jsx';
+import Terms from './pages/Terms.jsx';
+import Privacy from './pages/Privacy.jsx';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -59,6 +61,8 @@ export default function App() {
           <Route path="/verify-code" element={<PublicRoute><VerifyCode /></PublicRoute>} />
           <Route path="/welcome" element={<ProtectedRoute><Welcome /></ProtectedRoute>} />
           <Route path="/pricing" element={<Pricing />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
           <Route path="/marketplace" element={<Marketplace />} />
           <Route path="/marketplace/:id" element={<MarketplaceDeck />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/AuthContext.jsx';
 import Navbar from '../components/Navbar.jsx';
+import Footer from '../components/Footer.jsx';
 
 const SORT_OPTIONS = [
   { value: 'popular', label: 'Most Popular' },
@@ -236,6 +237,7 @@ export default function Marketplace() {
           </>
         )}
       </div>
+      <Footer />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar.jsx';
+import Footer from '../components/Footer.jsx';
 
 export default function Landing() {
   return (
@@ -163,12 +164,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-gray-200 py-8">
-        <p className="text-center text-sm text-[#6B635A]">
-          AI Notecards — Study smarter, not harder.
-        </p>
-      </footer>
+      <Footer />
     </div>
   );
 }

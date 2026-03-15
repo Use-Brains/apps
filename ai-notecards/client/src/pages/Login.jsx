@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import toast from 'react-hot-toast';
 import { useAuth } from '../lib/AuthContext.jsx';
@@ -88,6 +88,12 @@ export default function Login() {
 
             <p className="mt-6 text-center text-xs text-gray-400">
               We'll send you a 6-digit code to sign in. No password needed.
+            </p>
+            <p className="mt-3 text-center text-xs text-gray-400">
+              By continuing, you agree to our{' '}
+              <Link to="/terms" className="text-[#1B6B5A] hover:underline">Terms of Service</Link>
+              {' '}and{' '}
+              <Link to="/privacy" className="text-[#1B6B5A] hover:underline">Privacy Policy</Link>.
             </p>
           </div>
         </div>
