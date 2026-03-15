@@ -1,9 +1,25 @@
 v1 features:
--- still needs to be addressed?
+---
+Gaps to Build an iOS App
+If the goal is to ship an iOS app (per the apps/CLAUDE.md indie iOS app playbook):
 
-- 030 — Helmet security headers (separate infra concern)
-- 041 — auth-magic.js deleted_at filter (pre-existing bug, not part of this plan)
--
+┌───────────────────────────────────────────────┬────────┬─────────────────────────────────────────────────────────────────┐
+│                      Gap                      │ Effort │                              Notes                              │
+├───────────────────────────────────────────────┼────────┼─────────────────────────────────────────────────────────────────┤
+│ Native app shell (React Native/Expo or Swift) │ Large  │ Nothing exists. Need to pick a framework and build from scratch │
+├───────────────────────────────────────────────┼────────┼─────────────────────────────────────────────────────────────────┤
+│ Apple Sign-In                                 │ Medium │ Deferred to v2 in prd.json. Required for App Store              │
+├───────────────────────────────────────────────┼────────┼─────────────────────────────────────────────────────────────────┤
+│ RevenueCat / StoreKit                         │ Medium │ Currently Stripe-only. App Store requires IAP for subscriptions │
+├───────────────────────────────────────────────┼────────┼─────────────────────────────────────────────────────────────────┤
+│ Push notifications                            │ Medium │ Currently no notification delivery at all (v2 item)             │
+├───────────────────────────────────────────────┼────────┼─────────────────────────────────────────────────────────────────┤
+│ Offline study mode                            │ Medium │ Web app is online-only; native users expect offline access      │
+├───────────────────────────────────────────────┼────────┼─────────────────────────────────────────────────────────────────┤
+│ App Store assets                              │ Small  │ Screenshots, description, privacy labels                        │
+├───────────────────────────────────────────────┼────────┼─────────────────────────────────────────────────────────────────┤
+│ Deep linking                                  │ Small  │ For marketplace sharing to work across web ↔ app                │
+└───────────────────────────────────────────────┴────────┴─────────────────────────────────────────────────────────────────┘
 
 ---
 
@@ -11,23 +27,23 @@ Brand New Ideas Not in the PRD
 
 1. Forgot Password / Password Reset
    Not in prd.json at all. Not in v1, not in v2, not mentioned. Critical auth flow.
-1. Legal Pages (ToS + Privacy Policy)
+2. Legal Pages (ToS + Privacy Policy)
    Not mentioned anywhere. Required for Stripe, app store listing, and legal compliance.
-1. 404 / Error Boundary
+3. 404 / Error Boundary
    Not mentioned. Every web app needs this.
-1. Stripe Billing Portal
+4. Stripe Billing Portal
    Not mentioned. One endpoint + one button. Standard for any subscription app.
-1. Social Sharing / Open Graph Meta
+5. Social Sharing / Open Graph Meta
    Not mentioned. Marketplace listings should be shareable with rich previews. Sellers would share their listings to drive traffic.
-1. Favicon + PWA Manifest
+6. Favicon + PWA Manifest
    No favicon. No manifest.json. Can't be added to home screen as a PWA. Small but professional.
-1. Rate Limit UX
+7. Rate Limit UX
    When users hit rate limits, they get JSON errors. No user-friendly messaging on the frontend explaining "you've hit your limit, try again in X minutes" or "upgrade to Pro for more."
-1. Marketplace Listing Share Button
+8. Marketplace Listing Share Button
    Sellers have no way to share their listing URL. A copy-link button on MarketplaceDeck would let sellers promote their own listings externally.
-1. Deck Duplicate
+9. Deck Duplicate
    Users can't copy/duplicate a deck. If they want to study a subset or create a variation, they have to regenerate from scratch. Simple feature, high utility.
-1. Keyboard Shortcuts in Study Mode
+10. Keyboard Shortcuts in Study Mode
    Multiple choice has keyboard support (1-4 keys), but flip mode has no keyboard shortcuts for correct/incorrect/flip. Power users studying hundreds of cards need this.
 
 ---
