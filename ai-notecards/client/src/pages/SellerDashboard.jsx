@@ -111,7 +111,7 @@ export default function SellerDashboard() {
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-[#1A1614] mb-3">Start selling your decks</h1>
-          <p className="text-[#6B635A] mb-8 max-w-md mx-auto">Connect your Stripe account to start earning money from your flashcard decks. You'll earn 50% of every sale.</p>
+          <p className="text-[#6B635A] mb-8 max-w-md mx-auto">Connect your Stripe account to start earning money from your flashcard decks. You'll earn 70% of every sale.</p>
           {user?.plan === 'pro' ? (
             <button onClick={handleOnboard} disabled={onboarding} className="px-8 py-3 bg-[#1B6B5A] text-white rounded-xl font-semibold hover:bg-[#155a4a] transition-colors disabled:opacity-50">
               {onboarding ? 'Redirecting to Stripe...' : 'Connect with Stripe'}

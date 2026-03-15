@@ -221,6 +221,9 @@ router.post('/:id/flag', requireXHR, authenticate, requireActiveUser, async (req
 // Purchase — create Stripe Checkout session
 router.post('/:id/purchase', requireXHR, authenticate, requireActiveUser, async (req, res) => {
   try {
+    if (req.get('X-Client-Platform') === 'ios-native' && process.env.IOS_MARKETPLACE_WEB_PURCHASES_ENABLED === 'false') {
+      return res.status(409).json({ error: 'Marketplace purchases on iOS are currently disabled', code: 'IOS_MARKETPLACE_WEB_PURCHASES_DISABLED' });
+    }
     const url = await createPurchaseCheckout(req.userId, req.params.id);
     res.json({ url });
   } catch (err) {

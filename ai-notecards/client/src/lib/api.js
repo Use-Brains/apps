@@ -74,7 +74,7 @@ export const api = {
   getStats: () => request('/study/stats'),
 
   // Stripe
-  createCheckout: () => request('/stripe/checkout', { method: 'POST' }),
+  createCheckout: (billingPeriod = 'monthly') => request('/stripe/checkout', { method: 'POST', body: JSON.stringify({ billingPeriod }) }),
   cancelSubscription: () => request('/stripe/cancel', { method: 'POST' }),
   createBillingPortal: () => request('/stripe/portal', { method: 'POST' }),
 

@@ -361,6 +361,7 @@ export default function Settings() {
   const hasAcceptedTerms = !!user?.seller_terms_accepted_at;
   const isActiveSeller = hasAcceptedTerms && user?.connect_charges_enabled;
   const needsConnectSetup = hasAcceptedTerms && !user?.connect_charges_enabled;
+  const subscriptionPlatform = user?.subscription_platform || 'stripe';
 
   return (
     <div className="min-h-screen bg-[#FAF7F2]">
@@ -545,7 +546,16 @@ export default function Settings() {
           )}
           {user?.plan === 'pro' && (
             <div className="flex gap-3">
-              {user?.stripe_customer_id && (
+              {subscriptionPlatform === 'apple' ? (
+                <a
+                  href="https://apps.apple.com/account/subscriptions"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 text-sm text-[#1B6B5A] border border-[#1B6B5A]/30 rounded-xl hover:bg-[#E8F5F0] transition-colors"
+                >
+                  Manage in Apple
+                </a>
+              ) : user?.has_billing_account ? (
                 <button
                   onClick={async () => {
                     setPortalLoading(true);
@@ -562,8 +572,8 @@ export default function Settings() {
                 >
                   {portalLoading ? 'Redirecting to Stripe...' : 'Manage Billing'}
                 </button>
-              )}
-              {!user?.cancel_at_period_end && (
+              ) : null}
+              {subscriptionPlatform !== 'apple' && !user?.cancel_at_period_end && (
                 <button
                   onClick={handleCancel}
                   className="px-4 py-2 text-sm text-red-600 border border-red-200 rounded-xl hover:bg-red-50 transition-colors"

@@ -198,7 +198,7 @@ export default function ListDeck() {
               ))}
             </div>
             <p className="text-sm text-[#6B635A] mt-2">
-              You earn <span className="font-mono font-semibold text-[#1B6B5A]">${(sellerEarnings / 100).toFixed(2)}</span> after 50% platform fee
+              You earn <span className="font-mono font-semibold text-[#1B6B5A]">${(sellerEarnings / 100).toFixed(2)}</span> after 30% platform fee
             </p>
           </div>
 
