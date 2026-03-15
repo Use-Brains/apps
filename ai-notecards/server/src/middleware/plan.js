@@ -73,9 +73,17 @@ export async function checkGenerationLimits(req, res, next) {
     const currentCount = isNewDay ? 0 : user.daily_generation_count;
 
     if (currentCount >= limits.generationsPerDay) {
+      const now = new Date();
+      const midnight = new Date(now);
+      midnight.setUTCDate(midnight.getUTCDate() + 1);
+      midnight.setUTCHours(0, 0, 0, 0);
+      const retryAfter = Math.ceil((midnight - now) / 1000);
+
       return res.status(429).json({
-        error: `Daily generation limit reached (${limits.generationsPerDay}/day). ${plan === 'free' ? 'Upgrade to Pro for more generations.' : 'Limit resets tomorrow.'}`,
-        limit: true,
+        error: `Daily generation limit reached (${limits.generationsPerDay}/day). ${
+          plan === 'free' ? 'Upgrade to Pro for more generations.' : 'Limit resets tomorrow.'
+        }`,
+        retry_after: retryAfter,
       });
     }
 
@@ -87,8 +95,7 @@ export async function checkGenerationLimits(req, res, next) {
       );
       if (parseInt(countRows[0].count) >= limits.maxDecks) {
         return res.status(429).json({
-          error: `Maximum deck limit reached (${limits.maxDecks}). Upgrade to Pro for unlimited decks.`,
-          limit: true,
+          error: `Maximum deck limit reached (${limits.maxDecks}). Delete a deck or upgrade to Pro for unlimited decks.`,
         });
       }
     }

@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import rateLimit from 'express-rate-limit';
 import pool from '../db/pool.js';
+import { PLAN_LIMITS } from '../middleware/plan.js';
 
 const router = Router();
 export const SALT_ROUNDS = 12;
@@ -170,7 +171,8 @@ router.get('/me', async (req, res) => {
       user.plan = 'free';
     }
 
-    res.json({ user: sanitizeUser(user) });
+    const limits = PLAN_LIMITS[user.plan] || PLAN_LIMITS.free;
+    res.json({ user: sanitizeUser(user), daily_generation_limit: limits.generationsPerDay });
   } catch {
     res.clearCookie('token');
     res.json({ user: null });

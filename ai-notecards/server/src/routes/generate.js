@@ -16,7 +16,13 @@ const generateLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many requests. Please try again later.' },
+  handler: (req, res) => {
+    const retryAfter = Math.ceil((req.rateLimit.resetTime - Date.now()) / 1000);
+    res.status(429).json({
+      error: 'Too many requests. Please try again later.',
+      retry_after: retryAfter,
+    });
+  },
 });
 
 const upload = multer({

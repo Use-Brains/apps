@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { api } from '../lib/api.js';
+import { useAuth } from '../lib/AuthContext.jsx';
 import { resizeImages } from '../lib/imageResize.js';
 import Navbar from '../components/Navbar.jsx';
 
@@ -10,6 +11,7 @@ const MAX_INPUT_LENGTH = 50000;
 const supportsImageBitmap = typeof createImageBitmap === 'function';
 
 export default function Generate() {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [input, setInput] = useState('');
   const [title, setTitle] = useState('');
@@ -21,6 +23,16 @@ export default function Generate() {
   const previewUrls = useRef([]);
   const controllerRef = useRef(null);
   const savingRef = useRef(false);
+  const [generationsUsed, setGenerationsUsed] = useState(user?.daily_generation_count || 0);
+  const [generationLimit, setGenerationLimit] = useState(null);
+
+  // Fetch generation limit on mount
+  useEffect(() => {
+    api.me().then(data => {
+      if (data.daily_generation_limit) setGenerationLimit(data.daily_generation_limit);
+      if (data.user) setGenerationsUsed(data.user.daily_generation_count || 0);
+    }).catch(() => {});
+  }, []);
 
   // Revoke all preview URLs on unmount + abort in-flight generation
   useEffect(() => {
@@ -89,6 +101,9 @@ export default function Generate() {
       }
       if (controller.signal.aborted) return;
       setPreviewCards(data.cards);
+      if (data.generationsRemaining != null && generationLimit != null) {
+        setGenerationsUsed(generationLimit - data.generationsRemaining);
+      }
     } catch (err) {
       if (err.name === 'AbortError') return;
       if (err.data?.limit) {
@@ -218,9 +233,23 @@ export default function Generate() {
       <Navbar />
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Generate Flashcards</h1>
-        <p className="text-gray-500 mb-8">
+        <p className="text-gray-500 mb-6">
           Paste your notes, type a topic, or snap photos of your notes — AI will create study cards for you.
         </p>
+
+        {/* Generation counter */}
+        {generationLimit != null && (
+          <div className="mb-6 flex items-center justify-between bg-white border border-gray-200 rounded-xl px-4 py-3">
+            <span className="text-sm text-gray-600">
+              {generationsUsed} of {generationLimit} generations used today
+            </span>
+            {user?.plan === 'free' && (
+              <Link to="/pricing" className="text-sm font-medium text-[#1B6B5A] hover:underline">
+                Upgrade for {10} generations/day
+              </Link>
+            )}
+          </div>
+        )}
 
         <form onSubmit={handleGenerate} className="space-y-6">
           <div>
