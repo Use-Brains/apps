@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import * as Sentry from '@sentry/react';
 import { api } from './api.js';
 
 const AuthContext = createContext(null);
@@ -10,7 +11,10 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     api.me()
-      .then((data) => setUser(data.user))
+      .then((data) => {
+        setUser(data.user);
+        if (data.user) Sentry.setUser({ id: data.user.id });
+      })
       .catch(() => setUser(null))
       .finally(() => setLoading(false));
   }, []);
@@ -18,12 +22,14 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     const data = await api.login(email, password);
     setUser(data.user);
+    if (data.user) Sentry.setUser({ id: data.user.id });
     return data;
   };
 
   const signup = async (email, password) => {
     const data = await api.signup(email, password);
     setUser(data.user);
+    if (data.user) Sentry.setUser({ id: data.user.id });
     return data;
   };
 
@@ -33,6 +39,7 @@ export function AuthProvider({ children }) {
     try {
       const data = await api.authGoogle(idToken);
       setUser(data.user);
+      if (data.user) Sentry.setUser({ id: data.user.id });
       return data;
     } finally {
       authInProgress.current = false;
@@ -49,6 +56,7 @@ export function AuthProvider({ children }) {
     try {
       const data = await api.magicLinkVerify(email, code);
       setUser(data.user);
+      if (data.user) Sentry.setUser({ id: data.user.id });
       return data;
     } finally {
       authInProgress.current = false;
@@ -58,6 +66,7 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     await api.logout();
     setUser(null);
+    Sentry.setUser(null);
   };
 
   const refreshUser = async () => {

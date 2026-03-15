@@ -831,18 +831,18 @@ const handleSetPassword = async (e) => {
 - [x] `GET /api/nonexistent` returns `{ "error": "Not found" }` with 404 status (not HTML)
 
 ### Phase 4: Sentry
-- [ ] Client errors are captured in Sentry with source-mapped stack traces
-- [ ] Server errors are captured in Sentry
-- [ ] User ID is attached to Sentry events (not email)
-- [ ] Client `beforeSend` strips any PII (email, username) from events
-- [ ] Server `beforeSend` strips PII and request body data (may contain passwords)
-- [ ] Generic Express error handler added after `Sentry.setupExpressErrorHandler` — returns JSON, not HTML
-- [ ] ErrorBoundary uses top-level ESM `import * as Sentry` (NOT `require()`)
-- [ ] ErrorBoundary guards Sentry call with `typeof Sentry?.captureException === 'function'`
-- [ ] `createRoot` `onUncaughtError` reports to Sentry with `level: 'fatal'`
-- [ ] Sentry only initializes when DSN env var is set (no-op in local dev without DSN)
-- [ ] Source maps use `sourcemap: 'hidden'` and are deleted after upload
-- [ ] No Replay integration, no performance tracing (deferred)
+- [x] Client errors are captured in Sentry with source-mapped stack traces
+- [x] Server errors are captured in Sentry
+- [x] User ID is attached to Sentry events (not email)
+- [x] Client `beforeSend` strips any PII (email, username) from events
+- [x] Server `beforeSend` strips PII and request body data (may contain passwords)
+- [x] Generic Express error handler added after `Sentry.setupExpressErrorHandler` — returns JSON, not HTML
+- [x] ErrorBoundary uses top-level ESM `import * as Sentry` (NOT `require()`)
+- [x] ErrorBoundary guards Sentry call with `typeof Sentry?.captureException === 'function'`
+- [x] `createRoot` `onUncaughtError` reports to Sentry with `level: 'fatal'`
+- [x] Sentry only initializes when DSN env var is set (no-op in local dev without DSN)
+- [x] Source maps use `sourcemap: 'hidden'` and are deleted after upload
+- [x] No Replay integration, no performance tracing (deferred)
 
 ### Phase 5: Email Verification
 - [ ] `email_verified` added to existing `USER_SELECT` string (one field, not a rewrite)

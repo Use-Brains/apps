@@ -5,6 +5,31 @@ import { dirname, join } from 'path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: join(__dirname, '../.env') });
 
+import * as Sentry from '@sentry/node';
+
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV || 'development',
+    beforeSend(event) {
+      if (event.user) {
+        delete event.user.email;
+        delete event.user.username;
+      }
+      if (event.request?.data) {
+        delete event.request.data;
+      }
+      if (event.request?.cookies) {
+        delete event.request.cookies;
+      }
+      if (event.request?.headers?.cookie) {
+        delete event.request.headers.cookie;
+      }
+      return event;
+    },
+  });
+}
+
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
@@ -141,6 +166,15 @@ app.get('/api/health', async (req, res) => {
 // API 404 catch-all (after all route registrations)
 app.use('/api/*', (req, res) => {
   res.status(404).json({ error: 'Not found' });
+});
+
+// Sentry error handler (captures errors before the generic handler)
+Sentry.setupExpressErrorHandler(app);
+
+// Generic catch-all error handler — prevents Express from leaking stack traces
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(err.status || 500).json({ error: 'Internal server error' });
 });
 
 app.listen(PORT, () => {
