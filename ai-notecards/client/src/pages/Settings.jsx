@@ -228,6 +228,28 @@ export default function Settings() {
     }
   };
 
+  const handleSetPassword = async (e) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      return toast.error('Passwords do not match');
+    }
+    if (newPassword.length < 8) {
+      return toast.error('Password must be at least 8 characters');
+    }
+    setChangingPassword(true);
+    try {
+      await api.changePassword(null, newPassword);
+      toast.success('Password set successfully');
+      refreshUser();
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
   const handleExport = async () => {
     setBusyAction('exporting');
     try {
@@ -368,9 +390,39 @@ export default function Settings() {
               </button>
             </form>
           ) : (
-            <p className="text-sm text-[#6B635A] mb-4">
-              No password set. You can set a password via magic link.
-            </p>
+            <form onSubmit={handleSetPassword} className="space-y-3 mb-4">
+              <h3 className="text-sm font-medium text-[#1A1614]">Set Password</h3>
+              <p className="text-xs text-[#6B635A]">
+                Add a password to your account. You can always sign in with email code or Google instead.
+              </p>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="New password (min 8 characters)"
+                required
+                minLength={8}
+                maxLength={128}
+                className="w-full px-4 py-2.5 bg-[#FAF7F2] border border-gray-200 rounded-xl text-[#1A1614] focus:outline-none focus:ring-2 focus:ring-[#1B6B5A]/30 focus:border-[#1B6B5A]"
+              />
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirm password"
+                required
+                minLength={8}
+                maxLength={128}
+                className="w-full px-4 py-2.5 bg-[#FAF7F2] border border-gray-200 rounded-xl text-[#1A1614] focus:outline-none focus:ring-2 focus:ring-[#1B6B5A]/30 focus:border-[#1B6B5A]"
+              />
+              <button
+                type="submit"
+                disabled={changingPassword}
+                className="px-5 py-2.5 bg-[#1B6B5A] text-white rounded-xl font-medium hover:bg-[#155a4a] transition-colors disabled:opacity-50 text-sm"
+              >
+                {changingPassword ? 'Setting...' : 'Set password'}
+              </button>
+            </form>
           )}
 
           {/* Connected Accounts */}

@@ -87,7 +87,7 @@ export default function Login() {
             </form>
 
             <p className="mt-6 text-center text-xs text-gray-400">
-              We'll send you a 6-digit code to sign in. No password needed.
+              You can always sign in with a code — no password needed.
             </p>
             <p className="mt-3 text-center text-xs text-gray-400">
               By continuing, you agree to our{' '}

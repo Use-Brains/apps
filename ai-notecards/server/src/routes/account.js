@@ -99,23 +99,46 @@ router.delete('/avatar', authenticate, requireXHR, requireActiveUser, async (req
   }
 });
 
-// PATCH /password — change password
+// PATCH /password — set or change password
 router.patch('/password', authenticate, requireXHR, requireActiveUser, passwordLimiter, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({ error: 'Current and new password are required' });
+
+    // Validate new password — fail fast before any DB queries
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+    if (newPassword.length > 128) {
+      return res.status(400).json({ error: 'Password must be 128 characters or fewer' });
     }
 
+    // Atomic check-and-set for users with no password
+    // Single UPDATE with WHERE password_hash IS NULL prevents race condition
+    // Uses NOW() - INTERVAL '1 second' so the fresh JWT (iat ≈ NOW()) stays valid
+    if (!currentPassword) {
+      const { rowCount } = await pool.query(
+        `UPDATE users SET password_hash = $1, token_revoked_at = NOW() - INTERVAL '1 second'
+         WHERE id = $2 AND password_hash IS NULL`,
+        [await bcrypt.hash(newPassword, SALT_ROUNDS), req.userId]
+      );
+      if (rowCount === 0) {
+        // password_hash was NOT null — they need to provide currentPassword
+        return res.status(400).json({ error: 'Current password is required' });
+      }
+      setTokenCookie(res, req.userId);
+      return res.json({ ok: true });
+    }
+
+    // Existing flow: verify current password, then update
     const { rows } = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.userId]);
     if (!rows[0].password_hash) {
-      return res.status(400).json({ error: 'No password set. Use magic link to set a password.' });
+      return res.status(400).json({ error: 'No password set' });
     }
 
     const valid = await bcrypt.compare(currentPassword, rows[0].password_hash);
-    if (!valid) return res.status(401).json({ error: 'Current password is incorrect' });
-
-    if (newPassword.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    if (!valid) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
 
     const hash = await bcrypt.hash(newPassword, SALT_ROUNDS);
     await pool.query(
@@ -123,7 +146,6 @@ router.patch('/password', authenticate, requireXHR, requireActiveUser, passwordL
       [hash, req.userId]
     );
 
-    // Re-issue token so current session stays valid
     setTokenCookie(res, req.userId);
     res.json({ ok: true });
   } catch (err) {

@@ -853,17 +853,17 @@ const handleSetPassword = async (e) => {
 - [x] No Dashboard banner (deferred)
 
 ### Phase 6: Password Recovery
-- [ ] Login page shows "You can always sign in with a code" help text (not "Forgot your password?")
-- [ ] Settings page shows "Set Password" form when user has no password
-- [ ] "Set Password" form requires only new password + confirm (no current password)
-- [ ] Settings page shows "Change Password" form when user has a password (existing behavior)
-- [ ] Server validates password min 8 / max 128 characters before any DB queries
-- [ ] Middleware chain preserved: `authenticate, requireXHR, requireActiveUser, passwordLimiter`
-- [ ] `PATCH /api/account/password` uses atomic single-query `UPDATE SET password_hash, token_revoked_at WHERE password_hash IS NULL`
-- [ ] Token revocation uses `NOW() - INTERVAL '1 second'` (matches existing pattern at account.js:122)
-- [ ] Setting a password issues a fresh JWT via `setTokenCookie`
-- [ ] Response shape is `{ ok: true }`
-- [ ] Client calls `refreshUser()` after successful password set to sync `has_password` state
+- [x] Login page shows "You can always sign in with a code" help text (not "Forgot your password?")
+- [x] Settings page shows "Set Password" form when user has no password
+- [x] "Set Password" form requires only new password + confirm (no current password)
+- [x] Settings page shows "Change Password" form when user has a password (existing behavior)
+- [x] Server validates password min 8 / max 128 characters before any DB queries
+- [x] Middleware chain preserved: `authenticate, requireXHR, requireActiveUser, passwordLimiter`
+- [x] `PATCH /api/account/password` uses atomic single-query `UPDATE SET password_hash, token_revoked_at WHERE password_hash IS NULL`
+- [x] Token revocation uses `NOW() - INTERVAL '1 second'` (matches existing pattern at account.js:122)
+- [x] Setting a password issues a fresh JWT via `setTokenCookie`
+- [x] Response shape is `{ ok: true }`
+- [x] Client calls `refreshUser()` after successful password set to sync `has_password` state
 
 ## Dependencies & Ordering
 
