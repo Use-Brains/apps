@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 
 import {
   applyRevenueCatWebhookPayload,
+  calculatePlatformFeeCents,
+  getPlatformFeeRate,
   getRevenueCatProductStateFromSubscriber,
   projectBillingState,
   syncRevenueCatStateForUser,
@@ -51,6 +53,28 @@ test('projectBillingState keeps user pro when Apple is active and Stripe is canc
     cancelAtPeriodEnd: false,
     cancelAt: '2026-04-30T00:00:00.000Z',
   });
+});
+
+test('getPlatformFeeRate defaults to 50/50 and respects env overrides', async () => {
+  await withEnv(
+    {
+      MARKETPLACE_PLATFORM_FEE_RATE: undefined,
+    },
+    () => {
+      assert.equal(getPlatformFeeRate(), 0.5);
+      assert.equal(calculatePlatformFeeCents(500), 250);
+    }
+  );
+
+  await withEnv(
+    {
+      MARKETPLACE_PLATFORM_FEE_RATE: '0.35',
+    },
+    () => {
+      assert.equal(getPlatformFeeRate(), 0.35);
+      assert.equal(calculatePlatformFeeCents(500), 175);
+    }
+  );
 });
 
 test('getRevenueCatProductStateFromSubscriber ignores unknown product ids', async () => {

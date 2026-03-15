@@ -1,5 +1,25 @@
-export const PLATFORM_FEE_RATE = 0.3;
 const DEFAULT_ENTITLEMENT = 'pro';
+const DEFAULT_MARKETPLACE_PLATFORM_FEE_RATE = 0.5;
+
+export function getPlatformFeeRate() {
+  const configured = Number(process.env.MARKETPLACE_PLATFORM_FEE_RATE);
+
+  if (!Number.isFinite(configured) || configured < 0 || configured > 1) {
+    return DEFAULT_MARKETPLACE_PLATFORM_FEE_RATE;
+  }
+
+  return configured;
+}
+
+export function calculatePlatformFeeCents(priceCents) {
+  return Math.round(priceCents * getPlatformFeeRate());
+}
+
+export function calculateSellerEarningsCents(priceCents) {
+  return priceCents - calculatePlatformFeeCents(priceCents);
+}
+
+export const PLATFORM_FEE_RATE = getPlatformFeeRate();
 
 function parseDate(value) {
   if (!value) return null;

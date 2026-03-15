@@ -253,7 +253,7 @@ export default function Footer() {
 3. AI-Generated Content — disclaimers on accuracy, no guarantee of correctness, user responsibility to review
 4. Intellectual Property — user owns generated content, sellers grant display license, buyers get personal-use license
 5. Prohibited Content — explicit, hate speech, violence, spam, copyright infringement
-6. Payment Terms — Stripe processes payments, 70/30 split, payout timing per Stripe Connect
+6. Payment Terms — Stripe processes payments, 50/50 split, payout timing per Stripe Connect
 7. Account Termination — suspension for violations, soft-delete with PII scrub
 8. Limitation of Liability — standard SaaS limitation
 

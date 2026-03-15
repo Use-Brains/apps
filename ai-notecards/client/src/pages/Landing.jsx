@@ -84,7 +84,7 @@ export default function Landing() {
           {[
             { title: 'Discover decks', desc: 'Browse hundreds of decks across 13 categories — science, languages, programming, and more.' },
             { title: 'Buy & study instantly', desc: 'Purchase a deck for $1–$5 and start studying immediately. Cards are copied to your library.' },
-            { title: 'Sell your knowledge', desc: 'List your best decks on the marketplace. Earn 70% of every sale with Stripe Connect.' },
+            { title: 'Sell your knowledge', desc: 'List your best decks on the marketplace. Earn 50% of every sale with Stripe Connect.' },
           ].map((item, i) => (
             <div key={i} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
               <h3 className="font-semibold text-[#1A1614] mb-2">{item.title}</h3>

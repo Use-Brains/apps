@@ -7,7 +7,7 @@ import { sendTransactionalEmail } from '../services/email.js';
 import { getStripe } from '../services/stripe.js';
 import pool from '../db/pool.js';
 import { trackServerEvent } from '../services/analytics.js';
-import { getStripePriceIdForPeriod, reconcileUserBillingState, PLATFORM_FEE_RATE } from '../services/billing.js';
+import { calculateSellerEarningsCents, getStripePriceIdForPeriod, reconcileUserBillingState } from '../services/billing.js';
 
 const router = Router();
 
@@ -295,7 +295,7 @@ router.post('/webhook', async (req, res) => {
             `, [result.purchaseId]);
 
             if (emailData) {
-              const earnings = Math.round(emailData.price_cents * (1 - PLATFORM_FEE_RATE));
+              const earnings = calculateSellerEarningsCents(emailData.price_cents);
               Promise.allSettled([
                 sendTransactionalEmail('sale_notification', emailData.seller_email, {
                   title: emailData.title,

@@ -1,6 +1,6 @@
 import { getStripe } from './stripe.js';
 import pool from '../db/pool.js';
-import { PLATFORM_FEE_RATE } from './billing.js';
+import { calculatePlatformFeeCents } from './billing.js';
 
 /**
  * Create a Stripe Checkout Session for a marketplace purchase.
@@ -62,7 +62,7 @@ export async function createPurchaseCheckout(userId, listingId) {
     await pool.query('UPDATE users SET stripe_customer_id = $1 WHERE id = $2', [customerId, userId]);
   }
 
-  const platformFeeCents = Math.round(listing.price_cents * PLATFORM_FEE_RATE);
+  const platformFeeCents = calculatePlatformFeeCents(listing.price_cents);
 
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
@@ -132,7 +132,7 @@ export async function fulfillPurchase(paymentIntentId, metadata) {
     [listing_id]
   );
   const priceCents = listings[0]?.price_cents || 0;
-  const platformFeeCents = Math.round(priceCents * PLATFORM_FEE_RATE);
+  const platformFeeCents = calculatePlatformFeeCents(priceCents);
 
   // Write transaction: create purchase record + copy deck + cards
   const client = await pool.connect();

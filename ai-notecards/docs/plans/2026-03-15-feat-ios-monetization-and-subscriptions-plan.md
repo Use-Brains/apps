@@ -22,7 +22,7 @@ reviewed: 2026-03-15
 3. **Expo requires a dev build for real purchase testing** — RevenueCat’s Expo docs explicitly require a development build for real native purchase flows; Expo Go is only sufficient for preview-mode logic.
 4. **Marketplace web checkout is review-risky** — `expo-web-browser` opens `SFSafariViewController` on iOS, which fits the intended UX, but App Review fallback must be designed up front.
 5. **Current billing state is Stripe-only** — the repo has `stripe_subscription_id`, `cancel_at_period_end`, and `cancel_at`, but no `subscription_platform`, no RevenueCat identity column, and no Apple webhook path yet.
-6. **Current marketplace economics are internally inconsistent** — legal/docs currently say 70/30 seller/platform, but `server/src/routes/stripe.js` and related purchase flow still assume a 50% platform fee. This must be explicitly resolved during implementation, not ignored.
+6. **Marketplace economics must stay configurable** — seller/platform split should default to 50/50 today, but the implementation should keep the fee rate centralized so it can change later without invasive refactors.
 
 ## Technical Review Findings
 
@@ -231,7 +231,7 @@ Make the monetization surface coherent across platforms and reviewable by Apple.
 - **Webhook race risk:** Stripe and RevenueCat events can both affect `plan`; downgrade logic must inspect the alternate platform before revoking Pro
 - **Restore timing risk:** Apple purchase restore may complete in the SDK before the server sees the matching webhook
 - **Settings regression risk:** existing cancellation UI currently assumes Stripe-only semantics
-- **Economics inconsistency risk:** the current repo still uses a 50% platform fee constant while legal/docs say 70/30
+- **Economics configuration risk:** payout copy and calculations must stay aligned with the single configured marketplace fee rate
 
 ## Acceptance Criteria
 
@@ -259,7 +259,7 @@ Make the monetization surface coherent across platforms and reviewable by Apple.
 - [x] Surface cancellation / billing-issue status cleanly in mobile settings
 - [x] Add a clear review-note checklist for App Store submission
 - [x] Align legal/product copy with the final monetization implementation
-- [x] Resolve the 50/50 vs 70/30 marketplace split inconsistency before shipping iOS marketplace purchase copy
+- [x] Keep seller/platform split aligned at 50/50 across implementation and product copy
 - [x] Put iOS marketplace purchasing behind a feature flag so review fallback is operationally simple
 - [x] Make cancellation-state UI accurate for both Apple and Stripe subscribers without reusing Stripe-only assumptions blindly
 

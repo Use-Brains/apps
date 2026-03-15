@@ -16,13 +16,13 @@ This is the single hardest architectural decision in the iOS build. Every choice
 - Web subscriptions already exist through Stripe and write `plan` / `stripe_subscription_id` in `server/src/routes/stripe.js`
 - Marketplace purchases and seller payouts already run through Stripe Checkout + Stripe Connect
 - Mobile auth now exists as a native token-based flow, so RevenueCat can attach to authenticated mobile users after login instead of inventing a second identity model
-- Legal/product docs currently describe marketplace economics as **70% seller / 30% platform**, so this brainstorm should align with that and not the earlier 50/50 assumption
+- Marketplace economics should remain **50% seller / 50% platform** across Stripe web checkout and any future iOS monetization paths.
 
 ## Why This Approach
 
 Three strategies were considered:
 
-1. **All-Apple IAP** -- route both subscriptions and marketplace purchases through StoreKit. Simple for App Store compliance but devastating for marketplace economics. Apple's 15% on top of a $2 deck sale, combined with the intended 70/30 marketplace split, still damages low-ticket deck economics and makes Stripe Connect payouts extremely complex since Apple doesn't pay sellers directly.
+1. **All-Apple IAP** -- route both subscriptions and marketplace purchases through StoreKit. Simple for App Store compliance but still damaging for marketplace economics. Apple's 15% on top of a $2 deck sale, combined with the intended 50/50 marketplace split, still adds complexity and makes Stripe Connect payouts extremely difficult since Apple doesn't pay sellers directly.
 
 2. **All-web via Reader Rule** -- use the reader rule (post-2022 US settlement) to link users to the website for all purchases. Avoids Apple's cut entirely but risks App Store rejection. The reader rule applies to "reader" apps (content consumption), and AI Notecards generates content, not just reads it. Apple has rejected apps for stretching this definition. Too risky for a first submission.
 
@@ -67,7 +67,7 @@ Three strategies were considered:
 - The purchase fulfillment webhook fires as it does today. The app polls or receives a push notification to refresh the user's deck library.
 - This is the same pattern used by Etsy, Depop, Poshmark, and other marketplace apps. Apple's guidelines (3.1.1) exempt "goods and services not consumed within the app" -- and while flashcard decks are consumed in-app, the marketplace framing as a multi-sided platform with independent sellers has been accepted for similar apps.
 - If Apple rejects this approach during review, the fallback is to make the marketplace browse-only on iOS with a "Purchase on web" link. This is explicitly allowed under the reader rule changes and the US court settlement (Epic v. Apple).
-- Do NOT implement IAP for marketplace purchases. The math doesn't work well at low price points: a $2 deck with Apple's 15% cut plus the intended 70/30 seller-platform split compresses already-small margins, and Apple pays the developer, not the seller -- so the platform would need to collect from Apple, then pay sellers via Stripe Connect, adding delay and reconciliation complexity.
+- Do NOT implement IAP for marketplace purchases. The math doesn't work well at low price points: a $2 deck with Apple's 15% cut plus the intended 50/50 seller-platform split still compresses margins, and Apple pays the developer, not the seller -- so the platform would need to collect from Apple, then pay sellers via Stripe Connect, adding delay and reconciliation complexity.
 
 **App Store review framing:** Position the app as a "learning marketplace platform" where independent educators create and sell content. The subscription unlocks creation tools. The marketplace is a peer-to-peer transaction facilitated by the platform. This framing is accurate and matches approved precedent.
 
@@ -127,7 +127,7 @@ Three strategies were considered:
 
 **Approach:** This is a non-problem with the chosen hybrid strategy.
 
-- Marketplace purchases always go through Stripe (via web checkout), even when initiated from the iOS app. Stripe Connect destination charges work exactly as they do today. Sellers receive their 70% split directly from Stripe. No change to seller payout infrastructure.
+- Marketplace purchases always go through Stripe (via web checkout), even when initiated from the iOS app. Stripe Connect destination charges work exactly as they do today. Sellers receive their 50% split directly from Stripe. No change to seller payout infrastructure.
 - Stripe Connect onboarding happens on the web (it already does -- the Stripe Connect Express flow opens in a browser). On iOS, the seller onboarding link opens in `SFSafariViewController`.
 - The Seller Dashboard in the iOS app displays earnings data fetched from the existing `/api/seller/dashboard` endpoint. No iOS-specific seller payout code needed.
 

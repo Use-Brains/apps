@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { api } from '../lib/api.js';
+import { calculatePlatformFeeCents, calculateSellerEarningsCents, MARKETPLACE_PLATFORM_FEE_RATE } from '../lib/marketplace.js';
 import { useAuth } from '../lib/AuthContext.jsx';
 import Navbar from '../components/Navbar.jsx';
 
@@ -63,8 +64,9 @@ export default function ListDeck() {
     }
   };
 
-  const platformFee = Math.round(priceCents * 0.5);
-  const sellerEarnings = priceCents - platformFee;
+  const platformFee = calculatePlatformFeeCents(priceCents);
+  const sellerEarnings = calculateSellerEarningsCents(priceCents);
+  const platformFeeLabel = `${Math.round(MARKETPLACE_PLATFORM_FEE_RATE * 100)}%`;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -198,7 +200,7 @@ export default function ListDeck() {
               ))}
             </div>
             <p className="text-sm text-[#6B635A] mt-2">
-              You earn <span className="font-mono font-semibold text-[#1B6B5A]">${(sellerEarnings / 100).toFixed(2)}</span> after 30% platform fee
+              You earn <span className="font-mono font-semibold text-[#1B6B5A]">${(sellerEarnings / 100).toFixed(2)}</span> after {platformFeeLabel} platform fee
             </p>
           </div>
 

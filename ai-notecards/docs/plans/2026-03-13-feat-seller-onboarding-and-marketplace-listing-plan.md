@@ -352,7 +352,7 @@ WHERE stripe_connect_account_id = $1;
 **6b. Fix fee split discrepancy:**
 
 - SellerDashboard.jsx line 83 says "50% of every sale"
-- ListDeck.jsx line 58 calculates 30% platform fee (seller gets 70%)
+- ListDeck.jsx line 58 calculates 50% platform fee (seller gets 50%)
 - purchase.js line 69 calculates `Math.round(listing.price_cents * 0.3)` as `application_fee_amount`
 - **Action:** Verify intended split with product owner. Update all references to match. Last commit message (`f394c2d`) mentions "update seller split to 50%". If 50/50 is correct:
   - Update `purchase.js` to use `0.5` instead of `0.3`
@@ -436,7 +436,7 @@ WHERE stripe_connect_account_id = $1;
 | Webhook delay after checkout — user arrives before plan is updated | Seller prompt doesn't show | Only show prompt when `user.plan === 'pro'` confirmed; Settings fallback |
 | User accepts terms but abandons Stripe Connect                     | Stuck in limbo state       | Settings shows "Finish Stripe Setup" CTA; no data loss                   |
 | Concurrent onboarding from two tabs                                | Duplicate Stripe accounts  | Server reuses existing `stripe_connect_account_id` — already handled     |
-| Fee split confusion between 50/50 and 70/30                        | Incorrect payouts          | Resolve before implementation; update all references atomically          |
+| Fee split confusion across docs and implementation                 | Incorrect payouts          | Resolve before implementation; update all references atomically          |
 | Terms change in the future                                         | Compliance gap             | `seller_terms_version` column allows tracking which version was accepted |
 
 ## References & Research

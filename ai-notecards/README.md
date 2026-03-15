@@ -7,7 +7,7 @@ AI-powered flashcard app with a peer-to-peer marketplace. Paste your notes or ty
 - **AI Generation** — Paste notes or type a topic, get 8–25 study flashcards in seconds (Groq + Gemini fallback)
 - **Study Mode** — Flip-card interface with keyboard shortcuts, progress tracking, and study score
 - **Deck Marketplace** — Browse, search, and buy flashcard decks from other users ($1–$5)
-- **Sell Your Decks** — List your best AI-generated decks and earn 70% of every sale via Stripe Connect
+- **Sell Your Decks** — List your best AI-generated decks and earn 50% of every sale via Stripe Connect
 - **Ratings & Reviews** — Rate purchased decks after studying, 1–5 stars
 - **Content Moderation** — Report inappropriate listings, admin review queue
 - **Tiered Plans** — Free (1 gen/day), 7-day trial (10 gen/day), Pro at $9/mo (10 gen/day + selling)
@@ -144,7 +144,7 @@ stripe listen --forward-to localhost:3001/webhooks/stripe-connect --connect
 
 **Key flows:**
 
-- **Purchase:** Buyer clicks Buy -> Stripe Checkout (destination charge, 70/30 split) -> `payment_intent.succeeded` webhook -> idempotent copy-on-purchase (deck + cards copied in transaction)
+- **Purchase:** Buyer clicks Buy -> Stripe Checkout (destination charge, 50/50 split) -> `payment_intent.succeeded` webhook -> idempotent copy-on-purchase (deck + cards copied in transaction)
 - **Rating:** Complete study session on purchased deck -> rating modal -> atomic SQL average update
 - **Trial:** Signup sets `trial_ends_at = NOW() + 7 days` -> `checkTrialExpiry` middleware auto-downgrades on every authenticated request (no cron needed)
 
