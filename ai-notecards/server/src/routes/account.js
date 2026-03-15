@@ -3,8 +3,8 @@ import bcrypt from 'bcrypt';
 import multer from 'multer';
 import { fileTypeFromBuffer } from 'file-type';
 import rateLimit from 'express-rate-limit';
-import Stripe from 'stripe';
 import { authenticate, requireActiveUser } from '../middleware/auth.js';
+import { getStripe } from '../services/stripe.js';
 import { requireXHR } from '../middleware/csrf.js';
 import { SALT_ROUNDS, setTokenCookie } from './auth.js';
 import { uploadAvatar, deleteAvatar } from '../services/storage.js';
@@ -168,7 +168,7 @@ router.delete('/', authenticate, requireXHR, deleteLimiter, async (req, res) => 
     );
     if (user.plan === 'pro' && user.stripe_customer_id) {
       try {
-        const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+        const stripe = getStripe();
         const subs = await stripe.subscriptions.list({ customer: user.stripe_customer_id, status: 'active' });
         await Promise.all(subs.data.map(sub => stripe.subscriptions.cancel(sub.id)));
       } catch (stripeErr) {

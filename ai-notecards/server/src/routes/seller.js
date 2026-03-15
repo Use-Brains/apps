@@ -1,12 +1,9 @@
 import { Router } from 'express';
-import Stripe from 'stripe';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, requireActiveUser } from '../middleware/auth.js';
+import { requireXHR } from '../middleware/csrf.js';
 import { checkTrialExpiry, requirePlan } from '../middleware/plan.js';
+import { getStripe } from '../services/stripe.js';
 import pool from '../db/pool.js';
-
-function getStripe() {
-  return new Stripe(process.env.STRIPE_SECRET_KEY);
-}
 
 const router = Router();
 
@@ -14,7 +11,7 @@ const MAX_ACTIVE_LISTINGS = 50;
 const MIN_CARD_COUNT = 10;
 
 // Create a new listing
-router.post('/listings', authenticate, checkTrialExpiry, requirePlan('pro'), async (req, res) => {
+router.post('/listings', requireXHR, authenticate, requireActiveUser, checkTrialExpiry, requirePlan('pro'), async (req, res) => {
   const { deck_id, category_id, description, price_cents, tags = [] } = req.body;
 
   if (!deck_id || !category_id || !description || !price_cents) {
@@ -129,7 +126,7 @@ router.post('/listings', authenticate, checkTrialExpiry, requirePlan('pro'), asy
 });
 
 // Update a listing
-router.patch('/listings/:id', authenticate, checkTrialExpiry, requirePlan('pro'), async (req, res) => {
+router.patch('/listings/:id', requireXHR, authenticate, requireActiveUser, checkTrialExpiry, requirePlan('pro'), async (req, res) => {
   const { description, price_cents, tags } = req.body;
 
   try {
@@ -196,7 +193,7 @@ router.patch('/listings/:id', authenticate, checkTrialExpiry, requirePlan('pro')
 });
 
 // Delist a listing (soft delete)
-router.delete('/listings/:id', authenticate, async (req, res) => {
+router.delete('/listings/:id', requireXHR, authenticate, requireActiveUser, async (req, res) => {
   try {
     const { rows } = await pool.query(
       `UPDATE marketplace_listings SET status = 'delisted', delisted_at = NOW(), updated_at = NOW()
@@ -215,7 +212,7 @@ router.delete('/listings/:id', authenticate, async (req, res) => {
 });
 
 // Relist a delisted listing
-router.post('/listings/:id/relist', authenticate, checkTrialExpiry, requirePlan('pro'), async (req, res) => {
+router.post('/listings/:id/relist', requireXHR, authenticate, requireActiveUser, checkTrialExpiry, requirePlan('pro'), async (req, res) => {
   try {
     const { rows: userRows } = await pool.query(
       'SELECT connect_charges_enabled, seller_terms_accepted_at FROM users WHERE id = $1',
@@ -295,7 +292,7 @@ router.get('/dashboard', authenticate, async (req, res) => {
 });
 
 // Accept seller terms
-router.post('/accept-terms', authenticate, checkTrialExpiry, requirePlan('pro'), async (req, res) => {
+router.post('/accept-terms', requireXHR, authenticate, requireActiveUser, checkTrialExpiry, requirePlan('pro'), async (req, res) => {
   try {
     const { rows } = await pool.query(
       'SELECT seller_terms_accepted_at, seller_terms_version FROM users WHERE id = $1',
@@ -323,7 +320,7 @@ router.post('/accept-terms', authenticate, checkTrialExpiry, requirePlan('pro'),
 });
 
 // Stripe Connect onboarding — create Express account + account link
-router.post('/onboard', authenticate, checkTrialExpiry, requirePlan('pro'), async (req, res) => {
+router.post('/onboard', requireXHR, authenticate, requireActiveUser, checkTrialExpiry, requirePlan('pro'), async (req, res) => {
   try {
     // Gate on terms acceptance
     const { rows: termsRows } = await pool.query(

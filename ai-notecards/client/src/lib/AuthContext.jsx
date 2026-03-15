@@ -69,10 +69,35 @@ export function AuthProvider({ children }) {
     Sentry.setUser(null);
   };
 
-  const refreshUser = async () => {
-    const data = await api.me();
-    setUser(data.user);
-  };
+  // Deduplicated refreshUser — concurrent calls share one /me request
+  const refreshPromise = useRef(null);
+  const lastRefreshRef = useRef(0);
+
+  const refreshUser = useCallback(async () => {
+    if (refreshPromise.current) return refreshPromise.current;
+    const promise = api.me()
+      .then((data) => {
+        setUser(data.user);
+        return data;
+      })
+      .finally(() => {
+        refreshPromise.current = null;
+        lastRefreshRef.current = Date.now();
+      });
+    refreshPromise.current = promise;
+    return promise;
+  }, []);
+
+  // Throttled visibilitychange refetch (5s minimum between refreshes)
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (Date.now() - lastRefreshRef.current < 5000) return;
+      refreshUser().catch(() => {});
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [refreshUser]);
 
   return (
     <AuthContext.Provider value={{

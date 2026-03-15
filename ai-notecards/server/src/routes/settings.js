@@ -29,7 +29,7 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // Update user profile
-router.patch('/', authenticate, async (req, res) => {
+router.patch('/', requireXHR, authenticate, requireActiveUser, async (req, res) => {
   const { display_name } = req.body;
   try {
     const { rows } = await pool.query(

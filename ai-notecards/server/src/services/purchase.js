@@ -1,9 +1,5 @@
-import Stripe from 'stripe';
+import { getStripe } from './stripe.js';
 import pool from '../db/pool.js';
-
-function getStripe() {
-  return new Stripe(process.env.STRIPE_SECRET_KEY);
-}
 
 /**
  * Create a Stripe Checkout Session for a marketplace purchase.

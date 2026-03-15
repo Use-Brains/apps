@@ -1,17 +1,14 @@
 import { Router } from 'express';
-import Stripe from 'stripe';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, requireActiveUser } from '../middleware/auth.js';
+import { requireXHR } from '../middleware/csrf.js';
 import { fulfillPurchase } from '../services/purchase.js';
+import { getStripe } from '../services/stripe.js';
 import pool from '../db/pool.js';
 
 const router = Router();
 
-function getStripe() {
-  return new Stripe(process.env.STRIPE_SECRET_KEY);
-}
-
 // Create a Pro subscription checkout session
-router.post('/checkout', authenticate, async (req, res) => {
+router.post('/checkout', requireXHR, authenticate, requireActiveUser, async (req, res) => {
   try {
     const stripe = getStripe();
 
@@ -63,7 +60,7 @@ router.post('/checkout', authenticate, async (req, res) => {
 });
 
 // Cancel subscription (voluntary — cancel_at_period_end)
-router.post('/cancel', authenticate, async (req, res) => {
+router.post('/cancel', requireXHR, authenticate, requireActiveUser, async (req, res) => {
   try {
     const stripe = getStripe();
 

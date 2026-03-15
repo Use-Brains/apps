@@ -6,7 +6,7 @@ import { useAuth } from '../lib/AuthContext.jsx';
 import Navbar from '../components/Navbar.jsx';
 
 export default function SellerDashboard() {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, loading: authLoading } = useAuth();
   const [searchParams] = useSearchParams();
   const [dashboard, setDashboard] = useState(null);
   const [listings, setListings] = useState([]);
@@ -14,16 +14,18 @@ export default function SellerDashboard() {
   const [onboarding, setOnboarding] = useState(false);
 
   useEffect(() => {
+    if (authLoading) return;
     const connectStatus = searchParams.get('connect');
     if (connectStatus === 'return') {
-      api
-        .refreshOnboarding()
+      window.history.replaceState({}, '', '/seller');
+      api.refreshOnboarding()
         .then(() => refreshUser())
         .catch(() => {});
     } else if (connectStatus === 'refresh') {
+      window.history.replaceState({}, '', '/seller');
       toast.error('Your Stripe link expired. Click below to try again.');
     }
-  }, []);
+  }, [authLoading]);
 
   useEffect(() => {
     if (!user?.connect_charges_enabled) {

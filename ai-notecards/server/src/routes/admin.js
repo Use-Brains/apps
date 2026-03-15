@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, requireActiveUser } from '../middleware/auth.js';
+import { requireXHR } from '../middleware/csrf.js';
 import pool from '../db/pool.js';
 
 const router = Router();
@@ -18,7 +19,7 @@ function requireAdmin(req, res, next) {
 }
 
 // Get reported content
-router.get('/flags', authenticate, requireAdmin, async (req, res) => {
+router.get('/flags', authenticate, requireActiveUser, requireAdmin, async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT cf.*, ml.title AS listing_title, ml.seller_id,
@@ -40,7 +41,7 @@ router.get('/flags', authenticate, requireAdmin, async (req, res) => {
 });
 
 // Resolve a flag
-router.patch('/flags/:id', authenticate, requireAdmin, async (req, res) => {
+router.patch('/flags/:id', requireXHR, authenticate, requireActiveUser, requireAdmin, async (req, res) => {
   const { status, admin_notes, suspend_seller } = req.body;
 
   if (!status || !['upheld', 'dismissed'].includes(status)) {
@@ -121,8 +122,14 @@ router.patch('/flags/:id', authenticate, requireAdmin, async (req, res) => {
 });
 
 // Suspend/unsuspend a user
-router.patch('/users/:id/suspend', authenticate, requireAdmin, async (req, res) => {
+router.patch('/users/:id/suspend', requireXHR, authenticate, requireActiveUser, requireAdmin, async (req, res) => {
   const { suspended, reason } = req.body;
+
+  // Prevent admin from suspending themselves
+  if (req.params.id === req.userId) {
+    return res.status(400).json({ error: 'Cannot suspend your own account' });
+  }
+
   try {
     await pool.query(
       'UPDATE users SET suspended = $1, suspended_reason = $2 WHERE id = $3',

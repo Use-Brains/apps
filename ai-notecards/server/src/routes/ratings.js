@@ -1,11 +1,12 @@
 import { Router } from 'express';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, requireActiveUser } from '../middleware/auth.js';
+import { requireXHR } from '../middleware/csrf.js';
 import pool from '../db/pool.js';
 
 const router = Router();
 
 // Submit a rating (one per user per listing, must have completed the deck)
-router.post('/', authenticate, async (req, res) => {
+router.post('/', requireXHR, authenticate, requireActiveUser, async (req, res) => {
   const { listingId, stars, reviewText } = req.body;
 
   if (!listingId || !stars) {

@@ -98,9 +98,9 @@ app.use('/api/ratings', ratingsRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Stripe Connect webhook (separate endpoint, separate signing secret)
-import Stripe from 'stripe';
+import { getStripe } from './services/stripe.js';
 app.post('/webhooks/stripe-connect', async (req, res) => {
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  const stripe = getStripe();
   const sig = req.headers['stripe-signature'];
   let event;
   try {

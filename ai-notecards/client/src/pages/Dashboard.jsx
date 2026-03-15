@@ -137,15 +137,17 @@ export default function Dashboard() {
   const [sortOption, setSortOption] = useState('newest');
   const debounceRef = useRef(null);
 
+  const { loading: authLoading } = useAuth();
   useEffect(() => {
+    if (authLoading) return;
     if (searchParams.get('upgraded') === 'true') {
-      toast.success('Welcome to Pro! Enjoy full access.');
-      refreshUser().then(() => {
-        setShowSellerPrompt(true);
-      });
       window.history.replaceState({}, '', '/dashboard');
+      toast.success('Welcome to Pro! Enjoy full access.');
+      refreshUser()
+        .then(() => setShowSellerPrompt(true))
+        .catch(() => toast.error('Could not refresh. Please reload.'));
     }
-  }, []);
+  }, [authLoading]);
 
   useEffect(() => {
     Promise.all([api.getDecks(), api.getStats()])

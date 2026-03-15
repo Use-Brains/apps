@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, requireActiveUser } from '../middleware/auth.js';
+import { requireXHR } from '../middleware/csrf.js';
 import { createPurchaseCheckout } from '../services/purchase.js';
 import pool from '../db/pool.js';
 
@@ -121,7 +122,7 @@ router.get('/:id', async (req, res) => {
       FROM marketplace_listings ml
       JOIN marketplace_categories mc ON mc.id = ml.category_id
       JOIN users u ON u.id = ml.seller_id
-      WHERE ml.id = $1
+      WHERE ml.id = $1 AND ml.status = 'active'
     `, [req.params.id]);
 
     if (listings.length === 0) {
@@ -157,7 +158,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Flag a listing or review
-router.post('/:id/flag', authenticate, async (req, res) => {
+router.post('/:id/flag', requireXHR, authenticate, requireActiveUser, async (req, res) => {
   const { reason, flagType = 'listing', ratingId = null } = req.body;
   const VALID_REASONS = ['Inappropriate', 'Misleading', 'Spam', 'Low Quality', 'Other'];
 
@@ -200,7 +201,7 @@ router.post('/:id/flag', authenticate, async (req, res) => {
 });
 
 // Purchase — create Stripe Checkout session
-router.post('/:id/purchase', authenticate, async (req, res) => {
+router.post('/:id/purchase', requireXHR, authenticate, requireActiveUser, async (req, res) => {
   try {
     const url = await createPurchaseCheckout(req.userId, req.params.id);
     res.json({ url });

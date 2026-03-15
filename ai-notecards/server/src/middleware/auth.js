@@ -36,15 +36,18 @@ export async function requireEmailVerified(req, res, next) {
   }
 }
 
-// DB check for sensitive operations — verifies user isn't deleted and token isn't revoked
+// DB check for sensitive operations — verifies user isn't deleted, suspended, or token revoked
 export async function requireActiveUser(req, res, next) {
   try {
     const { rows } = await pool.query(
-      'SELECT deleted_at, token_revoked_at FROM users WHERE id = $1',
+      'SELECT deleted_at, token_revoked_at, suspended FROM users WHERE id = $1',
       [req.userId]
     );
     if (!rows[0] || rows[0].deleted_at) {
       return res.status(401).json({ error: 'Unauthorized' });
+    }
+    if (rows[0].suspended) {
+      return res.status(403).json({ error: 'Account suspended' });
     }
     if (rows[0].token_revoked_at && new Date(rows[0].token_revoked_at) > new Date(req.tokenIat * 1000)) {
       return res.status(401).json({ error: 'Session expired' });
