@@ -3,6 +3,8 @@ date: 2026-03-13
 topic: deck-rating-and-results-screen
 ---
 
+<!-- FINISHED -->
+
 # Deck Rating & Results Screen
 
 ## What We're Building
@@ -16,6 +18,7 @@ Rework the post-study flow into two distinct screens:
 ## Why This Approach
 
 The current flow shows a basic summary with a skippable rating modal overlay. This redesign:
+
 - Makes rating mandatory for purchased decks (no skip button) — improves rating coverage on marketplace
 - Separates results from rating into distinct, focused screens
 - Adds meaningful stats (best score, times completed, improvement delta) to encourage repeated study
@@ -35,12 +38,12 @@ The current flow shows a basic summary with a skippable rating modal overlay. Th
 
 ### Results Screen (all decks, every completion)
 
-| Stat | Source |
-|------|--------|
-| Cards correct / total | Current session (`correct`, `total_cards`) |
-| Current accuracy % | Computed from session |
-| Best accuracy % | `deck_stats.best_accuracy` |
-| Times completed | `deck_stats.times_completed` |
+| Stat                  | Source                                                                                    |
+| --------------------- | ----------------------------------------------------------------------------------------- |
+| Cards correct / total | Current session (`correct`, `total_cards`)                                                |
+| Current accuracy %    | Computed from session                                                                     |
+| Best accuracy %       | `deck_stats.best_accuracy`                                                                |
+| Times completed       | `deck_stats.times_completed`                                                              |
 | Improvement indicator | Compare current vs best: "New personal best!" or "Up X% from best" or "Down X% from best" |
 
 Buttons: "Study Again" and "Continue" (goes to rating screen for eligible purchased decks, or back to dashboard)
@@ -64,6 +67,7 @@ Buttons: "Study Again" and "Continue" (goes to rating screen for eligible purcha
 ## Data Changes
 
 ### New table: `deck_stats`
+
 - `user_id` UUID FK → users
 - `deck_id` UUID FK → decks
 - `times_completed` INT DEFAULT 0
@@ -72,9 +76,11 @@ Buttons: "Study Again" and "Continue" (goes to rating screen for eligible purcha
 - Updated atomically when study session completes via UPSERT
 
 ### Alter `ratings` table
+
 - ADD COLUMN `review_text` TEXT (nullable, max 200 enforced in app)
 
 ### Backend changes
+
 - `PATCH /api/study/:id` — upsert `deck_stats` on completion, return stats for results screen
 - `POST /api/ratings` — accept optional `review_text`, remove the skip path
 - `GET /api/ratings/listing/:id` — include `review_text` and `display_name` in response

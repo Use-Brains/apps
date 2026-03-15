@@ -1,5 +1,7 @@
 # Photo Upload + AI Vision Generation
 
+<!-- FINISHED -->
+
 **Date:** 2026-03-13
 **Status:** Brainstorm complete
 
@@ -19,6 +21,7 @@ This is the **first phase** of a larger photo feature. Phase 2 (future) would ad
 - Gemini SDK (`@google/genai`) is already a dependency in the project
 
 **Rejected alternatives:**
+
 - Groq vision models — newer, less battle-tested, may differ in card generation quality
 - OCR-then-text pipeline — two API calls (slower), loses visual context from diagrams/charts
 

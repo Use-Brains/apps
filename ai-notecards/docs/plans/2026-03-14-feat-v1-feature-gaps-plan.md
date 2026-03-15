@@ -1,9 +1,11 @@
 ---
-title: "V1 Feature Gaps: Study Modes, Recap, Preview, Search, Streaks, Randomization"
+title: 'V1 Feature Gaps: Study Modes, Recap, Preview, Search, Streaks, Randomization'
 type: feat
 date: 2026-03-14
 deepened: 2026-03-14
 ---
+
+<!-- FINISHED -->
 
 # V1 Feature Gaps
 
@@ -41,21 +43,21 @@ The app's core loop (generate → study → improve) works but lacks depth. Stud
 
 Decisions made from SpecFlow analysis:
 
-| Question | Decision | Rationale |
-|----------|----------|-----------|
-| Match mode min cards | 6 cards | More accessible, works with smaller decks |
-| Match mode batching | 6 random pairs per session | Provides variety on replay; total_cards = 6 for scoring |
-| Type-the-answer algorithm | Levenshtein, 85% threshold | Higher threshold prevents false positives on short answers (e.g., DNA vs RNA = 67%, correctly rejected) |
-| Type-the-answer "close" state | Binary right/wrong; "Close!" text if 70-85% | Keeps scoring simple but gives learning feedback |
-| Study mode persistence | Per-session selection, no persistence | Simplest for v1; user picks each time |
-| Generation preview rate limiting | Count consumed at preview time | Prevents unlimited AI calls; user "spends" a generation on preview even if they discard |
-| Save endpoint | New `POST /api/decks/save` | Distinct from listing creation; accepts title + cards[] + source_text |
-| Streak vs daily goal | Independent — any session maintains streak; daily goal is progress bar only | Missing goal doesn't break streak |
-| Study Again from recap | Restarts in same mode | Reduces friction for repeated study |
-| Recap data persistence | Ephemeral, client-side only | No server storage of per-card results for v1 |
-| Stale card_order values | Leave in JSONB, remove from validation | Harmless dead data; no data migration needed |
-| Dashboard "Last Studied" | Modify `GET /api/decks` with subquery | Minor backend change, not purely client-side |
-| Recap + rating flow | Rating prompt triggers from recap's "Continue" button | Preserves existing purchased-deck rating flow |
+| Question                         | Decision                                                                    | Rationale                                                                                               |
+| -------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Match mode min cards             | 6 cards                                                                     | More accessible, works with smaller decks                                                               |
+| Match mode batching              | 6 random pairs per session                                                  | Provides variety on replay; total_cards = 6 for scoring                                                 |
+| Type-the-answer algorithm        | Levenshtein, 85% threshold                                                  | Higher threshold prevents false positives on short answers (e.g., DNA vs RNA = 67%, correctly rejected) |
+| Type-the-answer "close" state    | Binary right/wrong; "Close!" text if 70-85%                                 | Keeps scoring simple but gives learning feedback                                                        |
+| Study mode persistence           | Per-session selection, no persistence                                       | Simplest for v1; user picks each time                                                                   |
+| Generation preview rate limiting | Count consumed at preview time                                              | Prevents unlimited AI calls; user "spends" a generation on preview even if they discard                 |
+| Save endpoint                    | New `POST /api/decks/save`                                                  | Distinct from listing creation; accepts title + cards[] + source_text                                   |
+| Streak vs daily goal             | Independent — any session maintains streak; daily goal is progress bar only | Missing goal doesn't break streak                                                                       |
+| Study Again from recap           | Restarts in same mode                                                       | Reduces friction for repeated study                                                                     |
+| Recap data persistence           | Ephemeral, client-side only                                                 | No server storage of per-card results for v1                                                            |
+| Stale card_order values          | Leave in JSONB, remove from validation                                      | Harmless dead data; no data migration needed                                                            |
+| Dashboard "Last Studied"         | Modify `GET /api/decks` with subquery                                       | Minor backend change, not purely client-side                                                            |
+| Recap + rating flow              | Rating prompt triggers from recap's "Continue" button                       | Preserves existing purchased-deck rating flow                                                           |
 
 ---
 
@@ -93,16 +95,16 @@ CREATE INDEX IF NOT EXISTS idx_study_sessions_last_studied
 
 ### API Changes
 
-| Change | Endpoint | Details |
-|--------|----------|---------|
-| New | `POST /api/generate/preview` | AI generation only, returns `{ cards: [{front, back}] }`. Consumes generation count. Uses existing middleware chain. |
-| New | `POST /api/decks/save` | Save deck from preview. Accepts `{ title, source_text, cards: [{front, back}] }`. Checks deck count limits. Does NOT consume generation count. Max 30 cards, min 1. |
-| Modify | `POST /api/study` | Accept `mode` in body. Validate mode. Enforce min deck size per mode (MC: 4, Match: 6). Store on session. |
-| Modify | `PATCH /api/study/:id` | After existing logic, update streak atomically (see SQL below). |
-| Modify | `GET /api/decks` | Add `last_studied_at` via subquery on study_sessions. |
-| Modify | `GET /api/study/stats` | Return `current_streak`, `longest_streak`, `daily_goal` from users table + preferences. |
-| Modify | `PATCH /api/settings/preferences` | Add `daily_goal` to validatePreferences (integer, 5-100). |
-| Remove | `validatePreferences` | Remove `card_order` from allowlist. |
+| Change | Endpoint                          | Details                                                                                                                                                             |
+| ------ | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| New    | `POST /api/generate/preview`      | AI generation only, returns `{ cards: [{front, back}] }`. Consumes generation count. Uses existing middleware chain.                                                |
+| New    | `POST /api/decks/save`            | Save deck from preview. Accepts `{ title, source_text, cards: [{front, back}] }`. Checks deck count limits. Does NOT consume generation count. Max 30 cards, min 1. |
+| Modify | `POST /api/study`                 | Accept `mode` in body. Validate mode. Enforce min deck size per mode (MC: 4, Match: 6). Store on session.                                                           |
+| Modify | `PATCH /api/study/:id`            | After existing logic, update streak atomically (see SQL below).                                                                                                     |
+| Modify | `GET /api/decks`                  | Add `last_studied_at` via subquery on study_sessions.                                                                                                               |
+| Modify | `GET /api/study/stats`            | Return `current_streak`, `longest_streak`, `daily_goal` from users table + preferences.                                                                             |
+| Modify | `PATCH /api/settings/preferences` | Add `daily_goal` to validatePreferences (integer, 5-100).                                                                                                           |
+| Remove | `validatePreferences`             | Remove `card_order` from allowlist.                                                                                                                                 |
 
 #### API Security (incorporated into implementation details above)
 
@@ -146,11 +148,13 @@ RETURNING current_streak, longest_streak, study_score
 ### Generation Preview Architecture
 
 Current flow:
+
 ```
 Generate.jsx → POST /api/generate → AI + save in transaction → navigate to DeckView
 ```
 
 New flow:
+
 ```
 Generate.jsx → POST /api/generate/preview → AI only → Preview screen (edit/delete cards)
                                                        → POST /api/decks/save → navigate to DeckView
@@ -158,12 +162,14 @@ Generate.jsx → POST /api/generate/preview → AI only → Preview screen (edit
 ```
 
 The existing `POST /api/generate` endpoint is refactored into two:
+
 1. **`/api/generate/preview`** — Same middleware chain (rate limit, CSRF, auth, trial check, generation limits), calls AI service, returns unsaved cards. Generation count increments here.
 2. **`/api/decks/save`** — Auth + CSRF + deck limit check + rate limiter (20/hr). Accepts `{ title, source_text, cards }`. Inserts deck + cards in transaction. No generation count change.
 
 **Deck count check (inlined):** The save endpoint needs to check the user's deck count against their tier limit, but does NOT need to check generation count. Inline the ~12-line deck-count check from `checkGenerationLimits` (lines 82-94 of plan.js) directly in the save handler. Single consumer — no need to extract a separate middleware.
 
 **Multi-row INSERT for cards:** When saving, build a single INSERT with multiple VALUES instead of inserting cards in a loop. One round-trip vs 30:
+
 ```sql
 INSERT INTO cards (deck_id, front, back, position)
 VALUES ($1, $2, $3, $4), ($1, $5, $6, $7), ...
@@ -182,6 +188,7 @@ Photo-based generation: The preview endpoint handles multipart uploads the same 
 **Scope:** Remove dead `card_order` preference. Smallest change, can ship immediately.
 
 **Files:**
+
 - [x] `client/src/pages/Settings.jsx` — Remove "Card Order" radio buttons (lines ~389-404) and `card_order` from default preferences state (line ~149)
 - [x] `server/src/routes/settings.js` — Remove `card_order` block from `validatePreferences()` (lines 115-118)
 
@@ -190,6 +197,7 @@ Photo-based generation: The preview endpoint handles multipart uploads the same 
 #### Research Insight: Fisher-Yates Shuffle
 
 If Study.jsx currently uses `cards.sort(() => Math.random() - 0.5)`, replace with Fisher-Yates. The sort-based approach produces biased distributions (some orderings are more likely than others):
+
 ```js
 function shuffle(array) {
   const arr = [...array];
@@ -200,6 +208,7 @@ function shuffle(array) {
   return arr;
 }
 ```
+
 Place this `shuffle()` helper in **`client/src/lib/shuffle.js`** (follows the project's `lib/` convention for shared utilities — same pattern as `api.js`, `imageResize.js`). Import from Study.jsx, MultipleChoiceMode.jsx, and MatchMode.jsx for: shuffling cards at session start, shuffling MC option positions, and shuffling match tiles.
 
 ### Phase 2: Dashboard Search + Sort
@@ -207,6 +216,7 @@ Place this `shuffle()` helper in **`client/src/lib/shuffle.js`** (follows the pr
 **Scope:** Search bar + sort dropdown for the deck grid. Minor backend change for "Last Studied" data.
 
 **Backend:**
+
 - [x] `server/src/routes/decks.js` — Modify `GET /api/decks` query to include `last_studied_at` via LEFT JOIN subquery (not LATERAL — single scan vs N lookups):
   ```sql
   LEFT JOIN (
@@ -219,6 +229,7 @@ Place this `shuffle()` helper in **`client/src/lib/shuffle.js`** (follows the pr
   **Performance:** This does one scan of study_sessions filtered by user_id, versus LATERAL which executes a subquery per deck. The covering index `idx_study_sessions_last_studied` from the migration makes this fast.
 
 **Frontend:**
+
 - [x] `client/src/pages/Dashboard.jsx` — Add between header (line ~307) and deck grid (line ~310):
   - Search input filtering `decks` by title (case-insensitive `includes()`), debounced at 150ms to prevent jank on mobile during fast typing
   - Sort dropdown: Newest, Oldest, A-Z, Most Cards, Last Studied
@@ -231,6 +242,7 @@ Place this `shuffle()` helper in **`client/src/lib/shuffle.js`** (follows the pr
 **Scope:** Enhance the existing results phase in Study.jsx to show missed cards with correct answers.
 
 **Frontend only (no backend changes):**
+
 - [x] `client/src/pages/Study.jsx` — Extend the results phase (lines ~173-252):
   - Compute missed cards: `cards.filter((_, i) => results[i] === 'missed')`
   - Below existing stats grid, add "Missed Cards" section showing front + back for each missed card
@@ -244,6 +256,7 @@ Place this `shuffle()` helper in **`client/src/lib/shuffle.js`** (follows the pr
 **Scope:** Split generation endpoint, add preview screen with edit/delete capability.
 
 **Backend:**
+
 - [x] `npm install striptags` — Add HTML stripping dependency (used in save endpoint and all card-write paths)
 - [x] `server/src/routes/generate.js` — Refactor into two endpoints:
   - `POST /api/generate/preview` — Existing middleware chain (rate limit, CSRF, auth, trial, generation limits). Calls AI service. Returns `{ cards: [{front, back}], generationsRemaining }`. Increments generation count but does NOT create deck/cards in DB.
@@ -258,6 +271,7 @@ Place this `shuffle()` helper in **`client/src/lib/shuffle.js`** (follows the pr
   - Returns saved deck with cards (from RETURNING clause — no extra round-trip)
 
 **Frontend:**
+
 - [x] `client/src/pages/Generate.jsx` — Change flow:
   - On submit, call `api.generatePreview(input, title)` or `api.generatePreviewWithPhotos(input, title, files)`
   - On success, set `previewCards` state (stay on Generate page, show preview section)
@@ -277,6 +291,7 @@ Place this `shuffle()` helper in **`client/src/lib/shuffle.js`** (follows the pr
 #### Preview Frontend Race Conditions
 
 **Ref guard on save:** Prevent double-submit with a synchronous ref check before the async save call:
+
 ```js
 const savingRef = useRef(false);
 const handleSave = async () => {
@@ -291,6 +306,7 @@ const handleSave = async () => {
 ```
 
 **AbortController per-request (not per-mount):** The controller must be scoped to each generation call, not to the component lifecycle. This is critical for Regenerate — clicking Regenerate must abort the previous in-flight generation to prevent the old response from overwriting edited cards:
+
 ```js
 const controllerRef = useRef(null);
 
@@ -320,33 +336,37 @@ useEffect(() => () => controllerRef.current?.abort(), []);
 
 **Prerequisite — make `api.js` `request()` signal forwarding explicit:**
 The current `request()` already forwards `signal` accidentally via `...restOptions`, but this should be made explicit with a single-pass destructuring to prevent subtle bugs if the function is refactored:
+
 ```js
 async function request(path, options = {}) {
   const isFormData = options.body instanceof FormData;
   const { headers: optHeaders, signal, ...restOptions } = options; // single-pass destructure
   const res = await fetch(`${BASE}${path}`, {
-    headers: isFormData
-      ? { 'X-Requested-With': 'XMLHttpRequest', ...optHeaders }
-      : { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', ...optHeaders },
+    headers: isFormData ? { 'X-Requested-With': 'XMLHttpRequest', ...optHeaders } : { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', ...optHeaders },
     credentials: 'include',
     signal, // Explicit — not relying on restOptions spread
-    ...restOptions,
+    ...restOptions
   });
   // ...
 }
 ```
+
 Without explicit `signal` forwarding, the AbortController pattern works by accident and could silently break on refactor.
 
 **Navigate-away confirmation — `beforeunload` only for v1:**
 Add a `beforeunload` listener while `previewCards` is non-null (handles browser navigation, tab close, refresh):
+
 ```js
 useEffect(() => {
   if (!previewCards || previewCards.length === 0) return;
-  const handler = (e) => { e.preventDefault(); };
+  const handler = e => {
+    e.preventDefault();
+  };
   window.addEventListener('beforeunload', handler);
   return () => window.removeEventListener('beforeunload', handler);
 }, [previewCards]);
 ```
+
 **Why not `useBlocker`:** In react-router v7, `useBlocker` does NOT auto-show a browser dialog — it returns a `blocker` object requiring custom confirmation UI (`blocker.state === 'blocked'` → render confirm/cancel). This adds component complexity for an edge case (user clicking an in-app link while staring at preview cards). If data loss reports emerge from in-app navigation, add `useBlocker` with a custom dialog in a follow-up.
 
 **Clear preview state before post-save navigation:** After a successful save, `setPreviewCards(null)` MUST precede `navigate()`. Otherwise the `beforeunload` listener fires on the happy path (harmless but sloppy) and any future `useBlocker` addition would block the post-save redirect.
@@ -360,6 +380,7 @@ The Code Simplicity Reviewer recommends removing the old `POST /api/generate` en
 **Scope:** Add mode selection and three new study modes. Largest feature.
 
 **Backend:**
+
 - [x] `server/src/db/migrations/009_study_modes_and_streaks.sql` — Add `mode` column to study_sessions, streak columns to users (migration covers both Phase 5 and Phase 6)
 - [x] `server/src/routes/study.js` — Add `requireXHR` middleware to `POST /api/study` and `PATCH /api/study/:id`
 - [x] `server/src/routes/study.js` — Modify `POST /api/study`:
@@ -386,6 +407,7 @@ The Code Simplicity Reviewer recommends removing the old `POST /api/generate` en
   - No other change to completion logic — correct/totalCards works the same regardless of mode
 
 **Frontend — Mode Selection:**
+
 - [x] `client/src/pages/Study.jsx` — Add new phase `'mode-select'` before `'studying'`:
   - **Move session creation from mount effect to mode-select handler.** Currently `api.startSession` fires on mount — with mode-select added, the session should only be created after the user picks a mode. The mount effect should only fetch deck data.
   - Show 4 mode cards: Flip Cards, Multiple Choice, Type the Answer, Match
@@ -395,6 +417,7 @@ The Code Simplicity Reviewer recommends removing the old `POST /api/generate` en
   - Store selected `mode` in state for recap "Study Again" button
 
 **Frontend — Multiple Choice Mode:**
+
 - [x] `client/src/components/study/MultipleChoiceMode.jsx` — Extracted component:
   - Show card front as the question
   - Generate 4 options: correct answer (current card's `back`) + 3 random distractors (other cards' `back` values from same deck, deduplicated — skip cards with identical `back` text)
@@ -404,7 +427,7 @@ The Code Simplicity Reviewer recommends removing the old `POST /api/generate` en
     ```js
     const advancingRef = useRef(false);
     const advanceTimeoutRef = useRef(null);
-    const handleOptionClick = (i) => {
+    const handleOptionClick = i => {
       if (advancingRef.current) return;
       advancingRef.current = true;
       // ... highlight, call onRate ...
@@ -420,6 +443,7 @@ The Code Simplicity Reviewer recommends removing the old `POST /api/generate` en
   - Truncate long answers in options (max ~100 chars with ellipsis)
 
 **Frontend — Type-the-Answer Mode:**
+
 - [x] `client/src/components/study/TypeAnswerMode.jsx` — Extracted component (if >80 lines with Levenshtein helper, otherwise inline in Study.jsx):
   - Show card front
   - Text input field with "Type your answer" placeholder, auto-focused via ref
@@ -433,10 +457,12 @@ The Code Simplicity Reviewer recommends removing the old `POST /api/generate` en
   - Calls `onRate('correct'|'missed')` callback
 
   **Levenshtein helper** (client-side, ~25 lines, two-row optimization for O(min(m,n)) space):
+
   ```js
   function similarity(a, b) {
     const normalize = s => s.toLowerCase().trim().replace(/\s+/g, ' ');
-    const s1 = normalize(a), s2 = normalize(b);
+    const s1 = normalize(a),
+      s2 = normalize(b);
     if (s1 === s2) return 1;
     // Max-length guard: Levenshtein is O(m*n), which causes UI stutter on mobile
     // for long strings. Card backs can be up to 5000 chars — fall back to exact match.
@@ -449,9 +475,11 @@ The Code Simplicity Reviewer recommends removing the old `POST /api/generate` en
     // Return 1 - (distance / len)
   }
   ```
+
   **Thresholds (resolved):** 0.85 for correct, 0.70 for "close". Higher correct threshold prevents false positives on short answers where one character is meaningful (e.g., "DNA" vs "RNA" = 0.67, correctly rejected).
 
 **Frontend — Match Mode:**
+
 - [x] `client/src/components/study/MatchMode.jsx` — Extracted component (complex tile state warrants its own file):
   - Select 6 random cards from shuffled deck
   - Create 12 tiles: 6 fronts + 6 backs, shuffled with Fisher-Yates
@@ -476,12 +504,13 @@ client/src/components/study/TypeAnswerMode.jsx     ← Only if >80 lines (Levens
 ```
 
 **Callback contract (orchestrator ↔ mode):**
+
 - Orchestrator provides: `card` (current card), `allCards` (for MC distractors), `onRate(result)` callback
 - `onRate('correct'|'missed')` is **synchronous** — it records the result and returns. The orchestrator decides when to advance to the next card (or complete the session).
 - **Use a ref for results accumulation** to avoid stale closures. A `useCallback` with `[results]` in its deps would capture a stale `results` array if called twice before React re-renders (e.g., MC keyboard mashing). The ref-based approach makes `onRate` truly stable:
   ```js
   const resultsRef = useRef([]);
-  const handleRate = useCallback((rating) => {
+  const handleRate = useCallback(rating => {
     if (!['correct', 'missed'].includes(rating)) return; // guard against invalid strings
     resultsRef.current = [...resultsRef.current, rating];
     setResults(resultsRef.current); // trigger re-render
@@ -498,10 +527,12 @@ client/src/components/study/TypeAnswerMode.jsx     ← Only if >80 lines (Levens
 #### Match Mode State Machine
 
 Prevent race conditions from rapid tile taps:
+
 ```
 IDLE → (tap tile) → FIRST_SELECTED → (tap second tile) → EVALUATING → (after delay) → IDLE
                                     ↘ (tap same tile) → IDLE (deselect)
 ```
+
 During EVALUATING, ignore all taps. Use a ref (`evaluatingRef`) checked synchronously before any state update. The 0.5s incorrect flash timeout must be cancelable on unmount.
 
 #### Simplification Note
@@ -513,6 +544,7 @@ The Code Simplicity Reviewer recommends deferring Match mode to v2 (it's the mos
 **Scope:** Streak tracking, dashboard widget, daily goal preference.
 
 **Backend (migration already in Phase 5):**
+
 - [x] `server/src/routes/study.js` — In `PATCH /api/study/:id`, replace the separate `UPDATE users SET study_score = study_score + 1` with the combined streak+score CTE-based UPDATE (see Atomic Streak SQL above)
 - [x] `server/src/routes/account.js` — **PII scrub:** Add streak columns AND pre-existing behavioral columns to account deletion UPDATE:
   ```sql
@@ -542,6 +574,7 @@ The Code Simplicity Reviewer recommends deferring Match mode to v2 (it's the mos
   ```
 
 **Frontend:**
+
 - [x] `client/src/pages/Dashboard.jsx` — Add streak widget to stats grid:
   - Flame icon with current streak count
   - "day streak" / "days streak" label
@@ -565,9 +598,12 @@ The streak update merges with the existing `study_score` increment (see Atomic S
 #### Streak Frontend: bfcache Awareness
 
 If a user studies, presses back, then navigates forward, the browser may serve the page from bfcache with stale streak data. Add a `pageshow` listener to refetch stats:
+
 ```js
 useEffect(() => {
-  const handler = (e) => { if (e.persisted) refetchStats(); };
+  const handler = e => {
+    if (e.persisted) refetchStats();
+  };
   window.addEventListener('pageshow', handler);
   return () => window.removeEventListener('pageshow', handler);
 }, []);
@@ -619,24 +655,24 @@ The Code Simplicity Reviewer recommends dropping daily goal (keep just the strea
 
 ## Files Changed Summary
 
-| File | Changes |
-|------|---------|
-| `server/src/db/migrations/009_study_modes_and_streaks.sql` | New: mode column + NOT VALID CHECK on study_sessions, streak columns on users, covering index |
-| `server/src/routes/generate.js` | Refactor: split into preview endpoint, remove old generate endpoint |
-| `server/src/routes/decks.js` | Add: `POST /api/decks/save` (with rate limiter, validation, HTML strip, inline deck limit), modify: `GET /api/decks` with last_studied_at. **Also fix pre-existing gaps:** add `requireXHR` to all 5 existing mutation endpoints (`PATCH /:id`, `DELETE /:id`, `POST /:id/cards`, `PATCH /:deckId/cards/:cardId`, `DELETE /:deckId/cards/:cardId`), add max-length validation to existing `POST /:id/cards`, `PATCH /:deckId/cards/:cardId`, and title length on `PATCH /:id` |
-| `server/src/routes/study.js` | Modify: add `requireXHR`, accept mode with explicit allowlist on start, combined streak+score UPDATE on complete, streak data in stats |
-| `server/src/routes/settings.js` | Modify: remove card_order, add daily_goal to validatePreferences |
-| `server/src/routes/account.js` | **Fix PII scrub:** add `current_streak`, `longest_streak`, `last_study_date`, `study_score`, `daily_generation_count`, `last_generation_date` to deletion UPDATE. **Delete `deck_stats` and `study_sessions` rows** for the user (soft-delete doesn't trigger CASCADE). |
-| `server/src/middleware/plan.js` | **Export `PLAN_LIMITS`** (named export for save endpoint deck count check) |
-| `client/src/lib/shuffle.js` | New: Fisher-Yates shuffle utility (shared by Study.jsx, MultipleChoiceMode, MatchMode) |
-| `client/src/pages/Study.jsx` | Major: orchestrator + FlipMode/ModeSelect/SessionRecap inline, mode selection phase, move session creation to mode-select handler |
-| `client/src/components/study/MultipleChoiceMode.jsx` | New: distractor generation, option shuffling, advancingRef guard, keyboard handling |
-| `client/src/components/study/MatchMode.jsx` | New: 12-tile grid, pair state machine, evaluatingRef lock, cancelable timeouts |
-| `client/src/components/study/TypeAnswerMode.jsx` | New (if >80 lines): Levenshtein helper, two-phase input state, input lockout |
-| `client/src/pages/Dashboard.jsx` | Add: debounced search bar, sort dropdown, streak widget, streak-at-risk banner |
-| `client/src/pages/Generate.jsx` | Refactor: per-request AbortController (with identity check in finally), beforeunload listener, preview state, editable card list, regenerate flow |
-| `client/src/pages/Settings.jsx` | Remove: card order radios. Add: daily goal input |
-| `client/src/lib/api.js` | Add: generatePreview, generatePreviewWithPhotos, saveDeck, update startSession signature to `(deckId, mode)` → `JSON.stringify({ deckId, mode })`. **Fix:** make `signal` forwarding explicit in `request()` via single-pass destructuring |
+| File                                                       | Changes                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/src/db/migrations/009_study_modes_and_streaks.sql` | New: mode column + NOT VALID CHECK on study_sessions, streak columns on users, covering index                                                                                                                                                                                                                                                                                                                                                                                 |
+| `server/src/routes/generate.js`                            | Refactor: split into preview endpoint, remove old generate endpoint                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `server/src/routes/decks.js`                               | Add: `POST /api/decks/save` (with rate limiter, validation, HTML strip, inline deck limit), modify: `GET /api/decks` with last_studied_at. **Also fix pre-existing gaps:** add `requireXHR` to all 5 existing mutation endpoints (`PATCH /:id`, `DELETE /:id`, `POST /:id/cards`, `PATCH /:deckId/cards/:cardId`, `DELETE /:deckId/cards/:cardId`), add max-length validation to existing `POST /:id/cards`, `PATCH /:deckId/cards/:cardId`, and title length on `PATCH /:id` |
+| `server/src/routes/study.js`                               | Modify: add `requireXHR`, accept mode with explicit allowlist on start, combined streak+score UPDATE on complete, streak data in stats                                                                                                                                                                                                                                                                                                                                        |
+| `server/src/routes/settings.js`                            | Modify: remove card_order, add daily_goal to validatePreferences                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `server/src/routes/account.js`                             | **Fix PII scrub:** add `current_streak`, `longest_streak`, `last_study_date`, `study_score`, `daily_generation_count`, `last_generation_date` to deletion UPDATE. **Delete `deck_stats` and `study_sessions` rows** for the user (soft-delete doesn't trigger CASCADE).                                                                                                                                                                                                       |
+| `server/src/middleware/plan.js`                            | **Export `PLAN_LIMITS`** (named export for save endpoint deck count check)                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `client/src/lib/shuffle.js`                                | New: Fisher-Yates shuffle utility (shared by Study.jsx, MultipleChoiceMode, MatchMode)                                                                                                                                                                                                                                                                                                                                                                                        |
+| `client/src/pages/Study.jsx`                               | Major: orchestrator + FlipMode/ModeSelect/SessionRecap inline, mode selection phase, move session creation to mode-select handler                                                                                                                                                                                                                                                                                                                                             |
+| `client/src/components/study/MultipleChoiceMode.jsx`       | New: distractor generation, option shuffling, advancingRef guard, keyboard handling                                                                                                                                                                                                                                                                                                                                                                                           |
+| `client/src/components/study/MatchMode.jsx`                | New: 12-tile grid, pair state machine, evaluatingRef lock, cancelable timeouts                                                                                                                                                                                                                                                                                                                                                                                                |
+| `client/src/components/study/TypeAnswerMode.jsx`           | New (if >80 lines): Levenshtein helper, two-phase input state, input lockout                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `client/src/pages/Dashboard.jsx`                           | Add: debounced search bar, sort dropdown, streak widget, streak-at-risk banner                                                                                                                                                                                                                                                                                                                                                                                                |
+| `client/src/pages/Generate.jsx`                            | Refactor: per-request AbortController (with identity check in finally), beforeunload listener, preview state, editable card list, regenerate flow                                                                                                                                                                                                                                                                                                                             |
+| `client/src/pages/Settings.jsx`                            | Remove: card order radios. Add: daily goal input                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `client/src/lib/api.js`                                    | Add: generatePreview, generatePreviewWithPhotos, saveDeck, update startSession signature to `(deckId, mode)` → `JSON.stringify({ deckId, mode })`. **Fix:** make `signal` forwarding explicit in `request()` via single-pass destructuring                                                                                                                                                                                                                                    |
 
 ---
 

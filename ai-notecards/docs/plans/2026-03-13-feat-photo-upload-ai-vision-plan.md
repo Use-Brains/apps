@@ -1,8 +1,10 @@
 ---
-title: "feat: Photo Upload AI Vision Generation"
+title: 'feat: Photo Upload AI Vision Generation'
 type: feat
 date: 2026-03-13
 ---
+
+<!-- FINISHED -->
 
 # feat: Photo Upload AI Vision Generation
 
@@ -12,6 +14,7 @@ date: 2026-03-13
 **Research agents used:** Gemini Vision API, Multer Security, Client Image Resize, Security Sentinel, Performance Oracle, Code Simplicity Reviewer, Context7 SDK Docs
 
 ### Key Improvements from Research
+
 1. Use Gemini's `responseMimeType: 'application/json'` with schema for guaranteed valid JSON — eliminates flaky parsing
 2. Add `file-type` package for magic byte validation — MIME type alone is spoofable
 3. Resize to 1568px (not 2048px) — matches Gemini's internal tiling threshold, saves tokens
@@ -27,6 +30,7 @@ date: 2026-03-13
 13. Server-side request timeout — cap Gemini call at 60s to prevent zombie requests
 
 ### New Risks Discovered
+
 - CSRF: multipart `POST` is a CORS "simple request" — browser sends cookies without preflight. **Mitigated:** custom `X-Requested-With` header required on all requests, validated server-side.
 - iOS Safari canvas limit: 16MP max area, 384MB total budget. Sequential processing + cleanup mandatory.
 - JPEG chroma subsampling: quality below 1.0 blurs text in Chromium. Use quality 1.0 at 1568px (files still small: 200-800KB).
@@ -51,14 +55,14 @@ Route photo-containing requests to Gemini (`gemini-2.5-flash-lite`) which native
 
 ### Files to Modify
 
-| File | Change |
-|------|--------|
-| `client/src/pages/Generate.jsx` | Photo upload UI, preview, camera capture, form validation |
-| `client/src/lib/api.js` | Make `request()` handle FormData, add `generateWithPhotos` method |
-| `client/src/lib/imageResize.js` | New file — canvas resize utility (~20 lines) |
+| File                            | Change                                                                             |
+| ------------------------------- | ---------------------------------------------------------------------------------- |
+| `client/src/pages/Generate.jsx` | Photo upload UI, preview, camera capture, form validation                          |
+| `client/src/lib/api.js`         | Make `request()` handle FormData, add `generateWithPhotos` method                  |
+| `client/src/lib/imageResize.js` | New file — canvas resize utility (~20 lines)                                       |
 | `server/src/routes/generate.js` | Multer middleware, magic byte validation, rate limiter, route to vision or text AI |
-| `server/src/services/ai.js` | New `generateCardsWithVision()` function, vision prompt, JSON schema |
-| `server/package.json` | Add `multer`, `file-type` dependencies |
+| `server/src/services/ai.js`     | New `generateCardsWithVision()` function, vision prompt, JSON schema               |
+| `server/package.json`           | Add `multer`, `file-type` dependencies                                             |
 
 ### No Changes Needed
 
@@ -80,11 +84,9 @@ async function request(path, options = {}) {
   const isFormData = options.body instanceof FormData;
   const { headers: optHeaders, ...restOptions } = options;
   const res = await fetch(`${BASE}${path}`, {
-    headers: isFormData
-      ? { 'X-Requested-With': 'XMLHttpRequest', ...optHeaders }
-      : { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', ...optHeaders },
+    headers: isFormData ? { 'X-Requested-With': 'XMLHttpRequest', ...optHeaders } : { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', ...optHeaders },
     credentials: 'include',
-    ...restOptions,
+    ...restOptions
   });
   // ... existing error handling unchanged
 }
@@ -108,9 +110,9 @@ generateWithPhotos: (input, title, files) => {
 
 ### Research Insights — API Layer
 
-- **Why modify `request()` instead of bypassing it:** The original plan duplicated 12 lines of error-handling code. If error handling changes later, you'd need to update two places. The FormData check is 1 line. *(Source: Simplicity Review)*
-- **`X-Requested-With` on all requests:** Multipart `POST` is a CORS "simple request" — browsers send cookies without preflight. Adding any custom header forces a preflight, which the server's CORS policy will reject for unauthorized origins. This also protects future non-JSON endpoints. *(Source: Security Review)*
-- **Destructure headers from options:** Using `const { headers, ...rest } = options` prevents `...options` from re-spreading `headers` and overwriting the computed header object. Without this, any caller passing `options.headers` for a FormData request would reintroduce JSON content-type. *(Source: Architecture Review)*
+- **Why modify `request()` instead of bypassing it:** The original plan duplicated 12 lines of error-handling code. If error handling changes later, you'd need to update two places. The FormData check is 1 line. _(Source: Simplicity Review)_
+- **`X-Requested-With` on all requests:** Multipart `POST` is a CORS "simple request" — browsers send cookies without preflight. Adding any custom header forces a preflight, which the server's CORS policy will reject for unauthorized origins. This also protects future non-JSON endpoints. _(Source: Security Review)_
+- **Destructure headers from options:** Using `const { headers, ...rest } = options` prevents `...options` from re-spreading `headers` and overwriting the computed header object. Without this, any caller passing `options.headers` for a FormData request would reintroduce JSON content-type. _(Source: Architecture Review)_
 
 ---
 
@@ -157,12 +159,12 @@ export async function resizeImages(files, maxDimension = 1568) {
 
 ### Research Insights — Client Resize
 
-- **1568px instead of 2048px:** Gemini internally tiles images into 768x768 blocks. At 1568px, a typical photo produces 4 tiles (~1,032 tokens). At 2048px, it's 6-9 tiles (~1,548-2,322 tokens) with no meaningful quality improvement for text recognition. Output files at 1568px are 200-800KB at quality 1.0. *(Source: Gemini Vision API Research)*
-- **JPEG quality 1.0 instead of 0.85:** Chromium and Safari use chroma subsampling at quality < 1.0, which blurs sharp text edges. At 1568px, quality 1.0 still produces small files (200-800KB). This is critical for handwriting/textbook readability. *(Source: Client Resize Research — whatwg/html #5395)*
-- **`createImageBitmap` + `bitmap.close()`:** More memory-efficient than `new Image()`. Explicit `close()` frees decoded image data immediately. *(Source: Client Resize Research)*
-- **Canvas cleanup (width=1, height=1):** iOS Safari retains canvas bitmap memory even after DOM removal. Setting dimensions to 1x1 forces release. Total iOS canvas budget is 384MB — five 2048px canvases could exhaust it. *(Source: Client Resize Research — PQINA canvas memory article)*
-- **Sequential processing:** Parallel canvas resizing on mobile can spike memory 300-500MB and crash Safari. Process one at a time. *(Source: Performance Oracle, Client Resize Research)*
-- **HEIC handling:** Do NOT include `image/heic` in the `accept` attribute. iOS Safari auto-converts HEIC to JPEG when `accept` lists only JPEG/PNG/WebP. The canvas resize also converts any format to JPEG as a final safety net. *(Source: Client Resize Research — Apple Developer Forums)*
+- **1568px instead of 2048px:** Gemini internally tiles images into 768x768 blocks. At 1568px, a typical photo produces 4 tiles (~1,032 tokens). At 2048px, it's 6-9 tiles (~1,548-2,322 tokens) with no meaningful quality improvement for text recognition. Output files at 1568px are 200-800KB at quality 1.0. _(Source: Gemini Vision API Research)_
+- **JPEG quality 1.0 instead of 0.85:** Chromium and Safari use chroma subsampling at quality < 1.0, which blurs sharp text edges. At 1568px, quality 1.0 still produces small files (200-800KB). This is critical for handwriting/textbook readability. _(Source: Client Resize Research — whatwg/html #5395)_
+- **`createImageBitmap` + `bitmap.close()`:** More memory-efficient than `new Image()`. Explicit `close()` frees decoded image data immediately. _(Source: Client Resize Research)_
+- **Canvas cleanup (width=1, height=1):** iOS Safari retains canvas bitmap memory even after DOM removal. Setting dimensions to 1x1 forces release. Total iOS canvas budget is 384MB — five 2048px canvases could exhaust it. _(Source: Client Resize Research — PQINA canvas memory article)_
+- **Sequential processing:** Parallel canvas resizing on mobile can spike memory 300-500MB and crash Safari. Process one at a time. _(Source: Performance Oracle, Client Resize Research)_
+- **HEIC handling:** Do NOT include `image/heic` in the `accept` attribute. iOS Safari auto-converts HEIC to JPEG when `accept` lists only JPEG/PNG/WebP. The canvas resize also converts any format to JPEG as a final safety net. _(Source: Client Resize Research — Apple Developer Forums)_
 
 ---
 
@@ -207,10 +209,10 @@ function requireXHR(req, res, next) {
 // Returns JSON (not plain text) to match the API's error format
 const generateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 30,  // 30 requests per 15 min per IP
+  max: 30, // 30 requests per 15 min per IP
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many requests. Please try again later.' },
+  message: { error: 'Too many requests. Please try again later.' }
 });
 
 const upload = multer({
@@ -222,13 +224,13 @@ const upload = multer({
       return cb(new Error('Unsupported file type. Accepted: JPEG, PNG, WebP.'));
     }
     cb(null, true);
-  },
+  }
 });
 
 // Conditional multer — only apply on multipart requests so JSON text-only flow is unaffected
 function optionalMulter(req, res, next) {
   if (req.is('multipart/form-data')) {
-    return upload.array('photos', 5)(req, res, (err) => {
+    return upload.array('photos', 5)(req, res, err => {
       if (err instanceof multer.MulterError) {
         if (err.code === 'LIMIT_FILE_SIZE') {
           return res.status(413).json({ error: 'File too large. Maximum 5MB per photo.' });
@@ -279,6 +281,7 @@ generateLimiter → requireXHR → authenticate → checkTrialExpiry → checkGe
 ```
 
 **Handler updates:**
+
 - Read `input` and `title` from `req.body` (multer parses form fields too; for JSON requests, `express.json()` already parsed them)
 - Validate input text length: `if (input && input.length > 50000)` → 400 (**applies to both JSON and multipart paths**)
 - Validate title length: `if (title && title.length > 200)` → 400
@@ -293,18 +296,18 @@ generateLimiter → requireXHR → authenticate → checkTrialExpiry → checkGe
 
 ### Research Insights — Server Security & Performance
 
-- **Magic byte validation is critical:** Multer's `file.mimetype` comes from the client's Content-Type header, which is trivially spoofable. An attacker can send any file with `Content-Type: image/jpeg`. The `file-type` package reads actual file signatures (JPEG: `FF D8 FF`, PNG: `89 50 4E 47`). *(Source: Security Sentinel, Multer Security Research)*
-- **`fileFilter` must throw Error, not return false:** Calling `cb(null, false)` silently skips the file. Always pass an `Error` to `cb` for rejections so the handler can return a meaningful error message. *(Source: Multer Security Research — multer issue #659)*
-- **5MB per file instead of 10MB:** Client-side resize to 1568px JPEG produces 200-800KB files. 5MB is generous and halves worst-case memory. *(Source: Security Sentinel, Performance Oracle)*
-- **Rate limiter on generate endpoint:** Currently unprotected. An attacker with a free account can flood 50MB multipart payloads. The per-day generation counter only runs after multer buffers files. *(Source: Security Sentinel)*
-- **DB connection timing:** Do NOT acquire a pool connection before the Gemini API call. Gemini takes 15-30s for vision — holding a connection that long with a 12-connection pool will cause pool exhaustion at ~12 concurrent requests. Acquire only for the final DB write. *(Source: Performance Oracle)*
-- **`fieldSize: 250 * 1024`:** Limits text field size in multipart requests to 250KB. Without this, an attacker can send a 1MB text string via multipart that bypasses `express.json()` limits. Set to 250KB (not 100KB) because the 50,000 character text limit can reach ~200KB with multi-byte UTF-8 characters (CJK, emoji). *(Source: Security Sentinel, Flow Analysis)*
-- **Conditional multer (`optionalMulter`):** Multer must only run on `multipart/form-data` requests. If multer runs on a `application/json` request, it will not parse the body and `req.body` will be empty — breaking the existing text-only flow entirely. The conditional wrapper checks `req.is('multipart/form-data')` and skips multer for JSON requests. *(Source: Architecture Review, Flow Analysis)*
-- **Multer error handling:** Multer throws `MulterError` with codes like `LIMIT_FILE_SIZE` and `LIMIT_FILE_COUNT`. Without explicit error handling, these surface as generic 500 errors. The `optionalMulter` wrapper catches these and returns user-friendly JSON responses with appropriate HTTP status codes (413, 400, 422). *(Source: Architecture Review, Security Review)*
-- **CSRF `requireXHR` middleware:** Multipart POST is a CORS "simple request" — browsers send cookies without preflight. An attacker on another origin can craft a form that POSTs to `/api/generate` with the victim's session cookie. The `X-Requested-With` custom header forces a CORS preflight, which the server's CORS policy rejects for unauthorized origins. *(Source: Security Review)*
-- **Concurrency semaphore:** Each vision request holds ~40-70MB of memory for 15-30 seconds. Without a limit, 10 concurrent vision users = 400-700MB — enough to OOM on Railway. The semaphore caps concurrent vision requests at 4, returning 503 with a retry message when full. *(Source: Performance Review)*
-- **Rate limiter JSON response:** The default `express-rate-limit` response is plain text. The client's `request()` calls `res.json()` on errors, which fails to parse plain text. Configure `message: { error: "..." }` to match the API's JSON error format. *(Source: Flow Analysis)*
-- **Null out buffers after encoding:** After `file.buffer.toString('base64')`, set `file.buffer = null` to allow garbage collection. This prevents holding both the raw buffer and the base64 string simultaneously. *(Source: Performance Oracle, Multer Security Research)*
+- **Magic byte validation is critical:** Multer's `file.mimetype` comes from the client's Content-Type header, which is trivially spoofable. An attacker can send any file with `Content-Type: image/jpeg`. The `file-type` package reads actual file signatures (JPEG: `FF D8 FF`, PNG: `89 50 4E 47`). _(Source: Security Sentinel, Multer Security Research)_
+- **`fileFilter` must throw Error, not return false:** Calling `cb(null, false)` silently skips the file. Always pass an `Error` to `cb` for rejections so the handler can return a meaningful error message. _(Source: Multer Security Research — multer issue #659)_
+- **5MB per file instead of 10MB:** Client-side resize to 1568px JPEG produces 200-800KB files. 5MB is generous and halves worst-case memory. _(Source: Security Sentinel, Performance Oracle)_
+- **Rate limiter on generate endpoint:** Currently unprotected. An attacker with a free account can flood 50MB multipart payloads. The per-day generation counter only runs after multer buffers files. _(Source: Security Sentinel)_
+- **DB connection timing:** Do NOT acquire a pool connection before the Gemini API call. Gemini takes 15-30s for vision — holding a connection that long with a 12-connection pool will cause pool exhaustion at ~12 concurrent requests. Acquire only for the final DB write. _(Source: Performance Oracle)_
+- **`fieldSize: 250 * 1024`:** Limits text field size in multipart requests to 250KB. Without this, an attacker can send a 1MB text string via multipart that bypasses `express.json()` limits. Set to 250KB (not 100KB) because the 50,000 character text limit can reach ~200KB with multi-byte UTF-8 characters (CJK, emoji). _(Source: Security Sentinel, Flow Analysis)_
+- **Conditional multer (`optionalMulter`):** Multer must only run on `multipart/form-data` requests. If multer runs on a `application/json` request, it will not parse the body and `req.body` will be empty — breaking the existing text-only flow entirely. The conditional wrapper checks `req.is('multipart/form-data')` and skips multer for JSON requests. _(Source: Architecture Review, Flow Analysis)_
+- **Multer error handling:** Multer throws `MulterError` with codes like `LIMIT_FILE_SIZE` and `LIMIT_FILE_COUNT`. Without explicit error handling, these surface as generic 500 errors. The `optionalMulter` wrapper catches these and returns user-friendly JSON responses with appropriate HTTP status codes (413, 400, 422). _(Source: Architecture Review, Security Review)_
+- **CSRF `requireXHR` middleware:** Multipart POST is a CORS "simple request" — browsers send cookies without preflight. An attacker on another origin can craft a form that POSTs to `/api/generate` with the victim's session cookie. The `X-Requested-With` custom header forces a CORS preflight, which the server's CORS policy rejects for unauthorized origins. _(Source: Security Review)_
+- **Concurrency semaphore:** Each vision request holds ~40-70MB of memory for 15-30 seconds. Without a limit, 10 concurrent vision users = 400-700MB — enough to OOM on Railway. The semaphore caps concurrent vision requests at 4, returning 503 with a retry message when full. _(Source: Performance Review)_
+- **Rate limiter JSON response:** The default `express-rate-limit` response is plain text. The client's `request()` calls `res.json()` on errors, which fails to parse plain text. Configure `message: { error: "..." }` to match the API's JSON error format. _(Source: Flow Analysis)_
+- **Null out buffers after encoding:** After `file.buffer.toString('base64')`, set `file.buffer = null` to allow garbage collection. This prevents holding both the raw buffer and the base64 string simultaneously. _(Source: Performance Oracle, Multer Security Research)_
 
 ---
 
@@ -343,13 +346,13 @@ const FLASHCARD_SCHEMA = {
         type: Type.OBJECT,
         properties: {
           front: { type: Type.STRING },
-          back: { type: Type.STRING },
+          back: { type: Type.STRING }
         },
-        required: ['front', 'back'],
-      },
-    },
+        required: ['front', 'back']
+      }
+    }
   },
-  required: ['cards'],
+  required: ['cards']
 };
 
 export async function generateCardsWithVision(input, files) {
@@ -357,9 +360,7 @@ export async function generateCardsWithVision(input, files) {
 
   // Build multimodal contents array
   const contents = [];
-  const userPrompt = input?.trim()
-    ? `Generate flashcards from these images.\n\nAdditional context: ${input}`
-    : 'Generate flashcards from the content in these images.';
+  const userPrompt = input?.trim() ? `Generate flashcards from these images.\n\nAdditional context: ${input}` : 'Generate flashcards from the content in these images.';
   contents.push(userPrompt);
 
   // Add image parts, null out buffers after encoding
@@ -367,8 +368,8 @@ export async function generateCardsWithVision(input, files) {
     contents.push({
       inlineData: {
         data: file.buffer.toString('base64'),
-        mimeType: file.detectedMime || file.mimetype,
-      },
+        mimeType: file.detectedMime || file.mimetype
+      }
     });
     file.buffer = null; // free memory immediately
   }
@@ -392,10 +393,10 @@ export async function generateCardsWithVision(input, files) {
           responseMimeType: 'application/json',
           responseJsonSchema: FLASHCARD_SCHEMA,
           temperature: 0.2,
-          maxOutputTokens: 8192,
-        },
+          maxOutputTokens: 8192
+        }
       }),
-      timeoutPromise,
+      timeoutPromise
     ]);
   } finally {
     clearTimeout(timeoutId);
@@ -458,23 +459,24 @@ const deckTitle = title || (input ? input.slice(0, 60).trim() + (input.length > 
 
 ### Research Insights — Gemini Vision API
 
-- **`config.systemInstruction` instead of concatenating:** The Gemini SDK has a dedicated field for system instructions. Using it gives better instruction-following behavior than concatenating into the user prompt. *(Source: Gemini Vision Research, Context7 SDK Docs)*
-- **`responseMimeType: 'application/json'` + `responseJsonSchema`:** Gemini enforces the JSON schema at output, guaranteeing valid JSON matching the schema. This eliminates the need for `parseCards()`'s markdown-stripping and JSON-recovery logic. *(Source: Gemini Vision Research)*
-- **Temperature 0.2:** For extracting content from notes/textbooks, faithfulness matters more than creativity. 0.2 minimizes hallucination while allowing natural card phrasing. *(Source: Gemini Vision Research)*
-- **`gemini-2.5-flash-lite` confirmed for vision:** Official docs confirm it supports text, images, audio, video, and PDF. It's the fastest and cheapest multimodal model in the 2.5 family. No model change needed. *(Source: Gemini Vision Research — Gemini Model Card)*
-- **Token costs:** A typical phone photo at 1568px costs ~1,032 tokens (2 tiles). Five photos ≈ 5,000 tokens input. At free tier (250K TPM), that's ~50 requests/minute before hitting the token limit. The 15 RPM limit is the actual bottleneck. *(Source: Gemini Vision Research)*
-- **Built-in retry:** The SDK automatically retries 429 and 5xx errors with exponential backoff (5 attempts, up to 60s delay). You only need to handle errors that exhaust retries. *(Source: Gemini Vision Research)*
-- **`file.buffer = null` after encoding:** Release the raw buffer immediately after base64 encoding. Each 5MB file creates a ~6.7MB base64 string. Without nulling, both are held in memory simultaneously — peak 58MB for 5 files. With nulling, peak drops to ~40MB. Actual per-request memory is ~40-70MB depending on GC timing, not the previously claimed 200MB. *(Source: Performance Oracle)*
-- **Use `file.detectedMime`:** After magic byte validation, use the verified MIME type (not the client-declared one) when sending to Gemini. *(Source: Security Sentinel)*
-- **Module-scope Gemini client:** Instantiate `GoogleGenAI` once via lazy singleton, not per-request. Avoids connection pool churn and potential memory leaks from accumulated client instances under load. The existing `generateWithGemini` has the same per-request pattern — this fixes it for the vision path. *(Source: Security Review, Architecture Review)*
-- **60-second request timeout via `Promise.race`:** The Gemini SDK retries up to 5 times with exponential backoff (up to 60s between attempts). Without a timeout, a single vision request could hang 5+ minutes, holding ~40-70MB of memory the entire time. `Promise.race` with a 60s timeout cap prevents zombie requests. The timer **must** be cleared in a `finally` block — a dangling `setTimeout` fires on every successful request, creating an unhandled promise rejection that crashes Node.js 22+ with `--unhandled-rejections=throw`. Note: the timeout does not cancel the underlying Gemini SDK call (it doesn't support `AbortSignal`), so an orphaned request may continue consuming memory until it naturally completes. This is bounded by the concurrency semaphore. *(Source: Performance Review, Security Review)*
-- **`err.code = 'NO_CARDS'` for empty results:** Distinguishes "photos were unreadable" (content issue, 422) from "Gemini is down" (infrastructure issue, 502). Without this, blurry photos show "Photo processing is temporarily unavailable" — misleading the user into thinking the service is broken. *(Source: Flow Analysis)*
+- **`config.systemInstruction` instead of concatenating:** The Gemini SDK has a dedicated field for system instructions. Using it gives better instruction-following behavior than concatenating into the user prompt. _(Source: Gemini Vision Research, Context7 SDK Docs)_
+- **`responseMimeType: 'application/json'` + `responseJsonSchema`:** Gemini enforces the JSON schema at output, guaranteeing valid JSON matching the schema. This eliminates the need for `parseCards()`'s markdown-stripping and JSON-recovery logic. _(Source: Gemini Vision Research)_
+- **Temperature 0.2:** For extracting content from notes/textbooks, faithfulness matters more than creativity. 0.2 minimizes hallucination while allowing natural card phrasing. _(Source: Gemini Vision Research)_
+- **`gemini-2.5-flash-lite` confirmed for vision:** Official docs confirm it supports text, images, audio, video, and PDF. It's the fastest and cheapest multimodal model in the 2.5 family. No model change needed. _(Source: Gemini Vision Research — Gemini Model Card)_
+- **Token costs:** A typical phone photo at 1568px costs ~1,032 tokens (2 tiles). Five photos ≈ 5,000 tokens input. At free tier (250K TPM), that's ~50 requests/minute before hitting the token limit. The 15 RPM limit is the actual bottleneck. _(Source: Gemini Vision Research)_
+- **Built-in retry:** The SDK automatically retries 429 and 5xx errors with exponential backoff (5 attempts, up to 60s delay). You only need to handle errors that exhaust retries. _(Source: Gemini Vision Research)_
+- **`file.buffer = null` after encoding:** Release the raw buffer immediately after base64 encoding. Each 5MB file creates a ~6.7MB base64 string. Without nulling, both are held in memory simultaneously — peak 58MB for 5 files. With nulling, peak drops to ~40MB. Actual per-request memory is ~40-70MB depending on GC timing, not the previously claimed 200MB. _(Source: Performance Oracle)_
+- **Use `file.detectedMime`:** After magic byte validation, use the verified MIME type (not the client-declared one) when sending to Gemini. _(Source: Security Sentinel)_
+- **Module-scope Gemini client:** Instantiate `GoogleGenAI` once via lazy singleton, not per-request. Avoids connection pool churn and potential memory leaks from accumulated client instances under load. The existing `generateWithGemini` has the same per-request pattern — this fixes it for the vision path. _(Source: Security Review, Architecture Review)_
+- **60-second request timeout via `Promise.race`:** The Gemini SDK retries up to 5 times with exponential backoff (up to 60s between attempts). Without a timeout, a single vision request could hang 5+ minutes, holding ~40-70MB of memory the entire time. `Promise.race` with a 60s timeout cap prevents zombie requests. The timer **must** be cleared in a `finally` block — a dangling `setTimeout` fires on every successful request, creating an unhandled promise rejection that crashes Node.js 22+ with `--unhandled-rejections=throw`. Note: the timeout does not cancel the underlying Gemini SDK call (it doesn't support `AbortSignal`), so an orphaned request may continue consuming memory until it naturally completes. This is bounded by the concurrency semaphore. _(Source: Performance Review, Security Review)_
+- **`err.code = 'NO_CARDS'` for empty results:** Distinguishes "photos were unreadable" (content issue, 422) from "Gemini is down" (infrastructure issue, 502). Without this, blurry photos show "Photo processing is temporarily unavailable" — misleading the user into thinking the service is broken. _(Source: Flow Analysis)_
 
 ---
 
 ## Acceptance Criteria
 
 ### Core Functionality
+
 - [x] User can upload 1-5 photos on the Generate page
 - [x] Photos are previewed as thumbnails with remove buttons
 - [x] User can submit photos alone (no text required)
@@ -486,6 +488,7 @@ const deckTitle = title || (input ? input.slice(0, 60).trim() + (input.length > 
 - [x] Deck title defaults to "Photo flashcards" when no text or title provided
 
 ### Client-Side
+
 - [x] Photos are resized to 1568px max and JPEG quality 1.0 client-side before upload
 - [x] Images processed sequentially on client (not parallel)
 - [x] File input does NOT include `image/heic` (iOS auto-converts)
@@ -497,6 +500,7 @@ const deckTitle = title || (input ? input.slice(0, 60).trim() + (input.length > 
 - [x] `X-Requested-With: XMLHttpRequest` header sent on all requests (JSON and FormData)
 
 ### Server Security
+
 - [x] Server validates `X-Requested-With: XMLHttpRequest` header (CSRF defense)
 - [x] Server validates file magic bytes (not just MIME type) via `file-type`
 - [x] Server enforces 5MB per file, 5 files max
@@ -507,6 +511,7 @@ const deckTitle = title || (input ? input.slice(0, 60).trim() + (input.length > 
 - [x] Title limited to 200 characters
 
 ### Server Performance
+
 - [x] Vision requests use Gemini with JSON schema enforcement
 - [x] DB connection acquired only after AI call (not during)
 - [x] `file.buffer` nulled after base64 encoding
@@ -515,12 +520,14 @@ const deckTitle = title || (input ? input.slice(0, 60).trim() + (input.length > 
 - [x] Gemini SDK client instantiated once (module-scope singleton), not per-request
 
 ### Error Handling
+
 - [x] If Gemini fails on a photo request, user sees "Photo processing failed" (502)
 - [x] If photos produce no cards (blurry/unreadable), user sees specific message (422)
 - [x] If vision concurrency limit reached, user sees "Photo processing is busy" (503)
 - [x] If rate limit hit, user sees JSON error (not plain text)
 
 ### Pre-Launch Validation
+
 - [ ] Test 5 worst-case photos (800KB each, ~4MB total) through Vercel proxy in staging
 
 ## Success Metrics
@@ -532,31 +539,31 @@ const deckTitle = title || (input ? input.slice(0, 60).trim() + (input.length > 
 
 ## Dependencies & Risks
 
-| Risk | Mitigation |
-|------|------------|
+| Risk                                            | Mitigation                                                                                                                                                                                |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Gemini vision quality varies with image quality | Vision prompt handles blurry images. JSON schema enforces output format. Temperature 0.2 for faithfulness. Distinct 422 error for "no cards generated" vs 502 for infrastructure failure. |
-| Large uploads on slow mobile connections | Client-side resize to 1568px reduces 5 photos from ~40MB to ~1-4MB total |
-| Server memory pressure from concurrent uploads | 5MB file limit, buffer nulling, rate limiter, **concurrency semaphore (default 3, env-configurable)**, 60s request timeout, `parts: 15` limit on multer |
-| iOS Safari canvas memory crashes | Sequential processing, bitmap.close(), canvas cleanup (1x1), createImageBitmap feature detection |
-| MIME type spoofing / malicious file upload | Magic byte validation via `file-type`, fileFilter rejects non-images |
-| CSRF on multipart endpoint | **`X-Requested-With` header required on all requests + validated server-side.** Custom header forces CORS preflight, which server rejects for unauthorized origins. |
-| JPEG chroma subsampling blurs text | Quality 1.0 at 1568px avoids subsampling while keeping files small (200-800KB) |
-| DB connection pool exhaustion during AI calls | Acquire connection only after Gemini returns, not before |
-| JSON/multipart coexistence on same route | Conditional multer middleware (`optionalMulter`) only runs on multipart requests; JSON text-only requests bypass multer entirely |
-| Multer errors surface as 500 | Error-handling callback in `optionalMulter` maps `MulterError` codes to user-friendly JSON responses |
-| Vercel proxy body limit (~4.5MB) | Client-resized photos are 200-800KB each (~1-4MB total for 5). Validate with 5 worst-case photos in staging before launch. |
-| Zombie vision requests from Gemini SDK retries | 60-second `Promise.race` timeout caps total wall-clock time per request |
-| Photo-only generation with no title | Deck title falls back to "Photo flashcards" when no text input or explicit title provided |
-| Double-submit on slow connections | `useRef` guard in `handleGenerate` prevents re-entry before React re-renders |
+| Large uploads on slow mobile connections        | Client-side resize to 1568px reduces 5 photos from ~40MB to ~1-4MB total                                                                                                                  |
+| Server memory pressure from concurrent uploads  | 5MB file limit, buffer nulling, rate limiter, **concurrency semaphore (default 3, env-configurable)**, 60s request timeout, `parts: 15` limit on multer                                   |
+| iOS Safari canvas memory crashes                | Sequential processing, bitmap.close(), canvas cleanup (1x1), createImageBitmap feature detection                                                                                          |
+| MIME type spoofing / malicious file upload      | Magic byte validation via `file-type`, fileFilter rejects non-images                                                                                                                      |
+| CSRF on multipart endpoint                      | **`X-Requested-With` header required on all requests + validated server-side.** Custom header forces CORS preflight, which server rejects for unauthorized origins.                       |
+| JPEG chroma subsampling blurs text              | Quality 1.0 at 1568px avoids subsampling while keeping files small (200-800KB)                                                                                                            |
+| DB connection pool exhaustion during AI calls   | Acquire connection only after Gemini returns, not before                                                                                                                                  |
+| JSON/multipart coexistence on same route        | Conditional multer middleware (`optionalMulter`) only runs on multipart requests; JSON text-only requests bypass multer entirely                                                          |
+| Multer errors surface as 500                    | Error-handling callback in `optionalMulter` maps `MulterError` codes to user-friendly JSON responses                                                                                      |
+| Vercel proxy body limit (~4.5MB)                | Client-resized photos are 200-800KB each (~1-4MB total for 5). Validate with 5 worst-case photos in staging before launch.                                                                |
+| Zombie vision requests from Gemini SDK retries  | 60-second `Promise.race` timeout caps total wall-clock time per request                                                                                                                   |
+| Photo-only generation with no title             | Deck title falls back to "Photo flashcards" when no text input or explicit title provided                                                                                                 |
+| Double-submit on slow connections               | `useRef` guard in `handleGenerate` prevents re-entry before React re-renders                                                                                                              |
 
 ## Token Cost Reference
 
-| Image scenario | Tiles | Tokens | Cost at Gemini free tier |
-|---|---|---|---|
-| Small screenshot (≤384px) | 1 | 258 | negligible |
-| Phone photo at 1568px | 2-4 | 516-1,032 | ~$0.0001 |
-| 5 phone photos at 1568px | 10-20 | 2,580-5,160 | ~$0.0005 |
-| Gemini 2.5 Flash-Lite free tier limits | — | 250K TPM / 15 RPM / 1K RPD | — |
+| Image scenario                         | Tiles | Tokens                     | Cost at Gemini free tier |
+| -------------------------------------- | ----- | -------------------------- | ------------------------ |
+| Small screenshot (≤384px)              | 1     | 258                        | negligible               |
+| Phone photo at 1568px                  | 2-4   | 516-1,032                  | ~$0.0001                 |
+| 5 phone photos at 1568px               | 10-20 | 2,580-5,160                | ~$0.0005                 |
+| Gemini 2.5 Flash-Lite free tier limits | —     | 250K TPM / 15 RPM / 1K RPD | —                        |
 
 ## References & Research
 

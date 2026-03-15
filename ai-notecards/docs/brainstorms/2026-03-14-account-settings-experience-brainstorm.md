@@ -3,6 +3,8 @@ date: 2026-03-14
 topic: account-settings-experience
 ---
 
+<!-- FINISHED -->
+
 # Account & Settings Experience
 
 ## What We're Building
@@ -31,30 +33,36 @@ The current Settings page mixes profile info with configuration. Splitting into 
 ## Feature Details
 
 ### Navbar Avatar Dropdown
+
 - Shows user's avatar (Google photo or uploaded) with fallback initials
 - Dropdown menu items: Profile, Settings, Seller Dashboard, Log out
 - Seller Dashboard link only shown for active sellers (or Pro users)
 
 ### Profile Page
+
 - Avatar (editable), display name (editable), email (read-only), plan badge
 - Study stats grid: study score, total sessions, cards studied, overall accuracy
 - Session history table/list: date, deck title, score, accuracy per session
 - Per-deck stats: times completed, best accuracy (from deck_stats table)
 
 ### Settings — Security
+
 - Change password (current password + new password + confirm)
 - Connected accounts: show Google linked status, option to link/unlink
 
 ### Settings — Study Preferences
+
 - Card order: shuffle (default) or sequential
 - Auto-flip timing: off (default), or 3s/5s/10s auto-reveal
 - Dark mode toggle
 
 ### Settings — Notifications
+
 - Email preferences: study reminders, marketplace activity (new ratings, purchases)
 - Simple on/off toggles per category
 
 ### Settings — Data & Privacy
+
 - Export decks: download all decks as JSON
 - Delete account: danger zone, requires typing "DELETE" to confirm, irreversible
 

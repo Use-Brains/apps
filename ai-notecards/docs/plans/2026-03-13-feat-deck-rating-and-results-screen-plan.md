@@ -1,10 +1,12 @@
 ---
-title: "feat: Deck Rating & Results Screen"
+title: 'feat: Deck Rating & Results Screen'
 type: feat
 date: 2026-03-13
 deepened: 2026-03-13
 reviewed: 2026-03-14
 ---
+
+<!-- FINISHED -->
 
 # Deck Rating & Results Screen
 
@@ -209,10 +211,7 @@ New behavior — add to the existing transaction:
 
 ```javascript
 // Inside the transaction, BEFORE the existing UPDATE:
-const sessionCheck = await client.query(
-  'SELECT total_cards FROM study_sessions WHERE id = $1 AND user_id = $2 AND completed_at IS NULL',
-  [req.params.id, req.userId]
-);
+const sessionCheck = await client.query('SELECT total_cards FROM study_sessions WHERE id = $1 AND user_id = $2 AND completed_at IS NULL', [req.params.id, req.userId]);
 if (sessionCheck.rows.length === 0) {
   await client.query('ROLLBACK');
   return res.status(404).json({ error: 'Session not found or already completed' });
@@ -240,6 +239,7 @@ RETURNING times_completed, best_accuracy;
 ```
 
 **Improvement indicator logic (frontend):** Use `times_completed` and `best_accuracy` from the response:
+
 - `times_completed === 1` → "First completion!"
 - `currentAccuracy >= bestAccuracy` (and `times_completed > 1`) → "New personal best!"
 - Otherwise → just show the stats grid (best accuracy is visible for comparison)
@@ -377,41 +377,44 @@ const completingRef = useRef(false);
 const advancingRef = useRef(false);
 const advanceTimeoutRef = useRef(null);
 
-const handleRate = useCallback(async (rating) => {
-  if (advancingRef.current) return; // Block input during card transition
+const handleRate = useCallback(
+  async rating => {
+    if (advancingRef.current) return; // Block input during card transition
 
-  const newResults = [...results, rating];
-  setResults(newResults);
+    const newResults = [...results, rating];
+    setResults(newResults);
 
-  if (newResults.length < cards.length) {
-    // Not the last card — advance with input lock
-    advancingRef.current = true;
-    setFlipped(false);
-    advanceTimeoutRef.current = setTimeout(() => {
-      setCurrentIndex((i) => i + 1);
-      advancingRef.current = false;
-    }, 200);
-    return;
-  }
+    if (newResults.length < cards.length) {
+      // Not the last card — advance with input lock
+      advancingRef.current = true;
+      setFlipped(false);
+      advanceTimeoutRef.current = setTimeout(() => {
+        setCurrentIndex(i => i + 1);
+        advancingRef.current = false;
+      }, 200);
+      return;
+    }
 
-  // Last card — complete session
-  if (completingRef.current) return;
-  completingRef.current = true;
+    // Last card — complete session
+    if (completingRef.current) return;
+    completingRef.current = true;
 
-  const correct = newResults.filter(r => r === 'correct').length;
-  const totalCards = cards.length;
+    const correct = newResults.filter(r => r === 'correct').length;
+    const totalCards = cards.length;
 
-  try {
-    const res = await api.completeSession(sessionId, correct, totalCards);
-    setDeckStats(res.deck_stats);
-    setHasRated(res.has_rated);
-    setListingId(res.listing_id);
-    setPhase('results');
-  } catch (err) {
-    toast.error('Failed to save results. Please try again.');
-    completingRef.current = false;
-  }
-}, [results, cards, sessionId]);
+    try {
+      const res = await api.completeSession(sessionId, correct, totalCards);
+      setDeckStats(res.deck_stats);
+      setHasRated(res.has_rated);
+      setListingId(res.listing_id);
+      setPhase('results');
+    } catch (err) {
+      toast.error('Failed to save results. Please try again.');
+      completingRef.current = false;
+    }
+  },
+  [results, cards, sessionId]
+);
 
 // Cleanup timeout on unmount
 useEffect(() => {
@@ -453,7 +456,7 @@ const handleStudyAgain = async () => {
     setCurrentIndex(0);
     setResults([]);
     setFlipped(false);
-    setCards((prev) => [...prev].sort(() => Math.random() - 0.5)); // Re-shuffle
+    setCards(prev => [...prev].sort(() => Math.random() - 0.5)); // Re-shuffle
     setPhase('studying');
     completingRef.current = false;
     advancingRef.current = false;
@@ -547,7 +550,7 @@ useEffect(() => {
       setData(listingData);
       setRatings(ratingsData.ratings || []);
     })
-    .catch((err) => toast.error(err.message))
+    .catch(err => toast.error(err.message))
     .finally(() => setLoading(false));
 }, [id]);
 ```

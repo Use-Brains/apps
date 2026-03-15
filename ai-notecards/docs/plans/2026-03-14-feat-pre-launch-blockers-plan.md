@@ -1,9 +1,11 @@
 ---
-title: "Pre-Launch Blockers: Password Recovery, Legal, Error Handling, SEO, Verification, Monitoring"
+title: 'Pre-Launch Blockers: Password Recovery, Legal, Error Handling, SEO, Verification, Monitoring'
 type: feat
 date: 2026-03-14
 deepened: 2026-03-14
 ---
+
+<!-- FINISHED -->
 
 # Pre-Launch Blockers
 
@@ -16,11 +18,13 @@ Six foundational pieces that must exist before real users pay real money: passwo
 **Research agents used:** Security Sentinel, Performance Oracle, Architecture Strategist, Code Simplicity Reviewer, Frontend Races Reviewer, Pattern Recognition Specialist, Best Practices Researcher, Auth Guide Learnings, Account Settings Learnings
 
 ### Key Improvements
+
 1. **Phase 4 (Sentry) trimmed** — removed Replay and performance tracing (YAGNI at launch scale), added `beforeSend` PII scrubbing on both client and server, switched to `sourcemap: "hidden"`, added generic Express error handler
 2. **Phase 5 (Email Verification) significantly trimmed** — reduced to diff-only changes: add `email_verified` to existing `USER_SELECT` and `sanitizeUser` (not a rewrite); middleware stub uses existing snake_case conventions
 3. **Phase 6 (Password Recovery) hardened** — full middleware chain preserved (`requireXHR`, `requireActiveUser`, `passwordLimiter`), atomic single-query update with `NOW() - INTERVAL '1 second'` offset, password max length 128, client `refreshUser()` after set
 
 ### Review Fixes Applied (from `/workflows:review`)
+
 - **P1:** Fixed Phase 6 middleware chain (was `authenticate` only, now full chain)
 - **P1:** Fixed token revocation to single atomic query with `- INTERVAL '1 second'` offset
 - **P1:** Fixed USER_SELECT/sanitizeUser to show diff-only (was a rewrite that dropped 13+ fields)
@@ -37,6 +41,7 @@ Six foundational pieces that must exist before real users pay real money: passwo
 - **P3:** Made ErrorBoundary console.error dev-only
 
 ### Review Fixes Applied (Round 2)
+
 - **P1:** Added `token_revoked_at` to Phase 5 USER_SELECT diff — `/me` endpoint revocation check was silently broken (always passed)
 - **P1:** Added note that existing `!currentPassword || !newPassword` guard at account.js:106 must be replaced (rejects Set Password flow)
 - **P2:** Added `GoogleOAuthProvider` wrapper to App.jsx code example (was missing, would break Google Sign-In)
@@ -47,9 +52,11 @@ Six foundational pieces that must exist before real users pay real money: passwo
 - **P3:** Updated Phase 4 createRoot reference to match Phase 3 fix
 
 ### Pre-existing bug (out of scope):
+
 - **auth-magic.js:115** — `SELECT ${USER_SELECT}, password_hash FROM users WHERE email = $1` has no `deleted_at IS NULL` filter. A soft-deleted user can log in via magic link. Fix separately.
 
 ### Considerations
+
 - **Security:** Full middleware chain on password endpoint; atomic single-query for set + revoke; max password length prevents bcrypt truncation surprises; `token_revoked_at` now in USER_SELECT so `/me` revocation check works; server Sentry strips cookies and request bodies
 - **Performance:** The `requireEmailVerified` middleware issues its own DB query — when eventually chained, consolidate via `loadUser` pattern to avoid 4+ queries per request
 - **Frontend:** ErrorBoundary uses `isRecovering` guard and navigates to `/` (works for all users); `ReactDOM.createRoot` error hooks preserve `StrictMode`; client must `refreshUser()` after password changes; `GoogleOAuthProvider` wrapper preserved in App.jsx
@@ -64,6 +71,7 @@ The core product is solid — generation, study modes, marketplace, payments all
 ## Problem Statement
 
 Six categories of gaps:
+
 1. **Password recovery**: Users who set a password in Settings can't reset it without knowing the current one. The Settings page shows "No password set" for magic link / Google users but has no mechanism to actually set one.
 2. **Legal compliance**: Stripe Connect requires ToS. GDPR requires a privacy policy. Neither exists.
 3. **Error handling**: No 404 page, no error boundary. Invalid URLs = blank screen. Component crash = white screen.
@@ -74,6 +82,7 @@ Six categories of gaps:
 ## Architectural Context
 
 **Critical finding from SpecFlow analysis:** The Login page currently only offers Google Sign-In and magic link. The `/signup` route redirects to `/login`. There is no email/password login form. This means:
+
 - **"Forgot password" is already handled** — users log in via magic link and can change their password in Settings
 - **Email verification is naturally satisfied** — both Google and magic link auto-verify
 - The real gap is the **Settings page password management** — users with `has_password = false` (magic link / Google users) see "No password set" but have no way to actually set one. Users who forgot their password can log in via magic link but then can't reset it in Settings because the change form requires `currentPassword`.
@@ -117,6 +126,7 @@ Six phases, each independently deployable. Ordered by dependencies.
 **Scope:** Static HTML changes only. No backend work. PWA manifest deferred — not needed for launch.
 
 **Files to modify:**
+
 - `client/index.html` — add meta description, OG tags, Twitter cards, favicon links, theme-color
 - `client/public/` — add favicon.ico, apple-touch-icon.png, og-image.png
 
@@ -147,6 +157,7 @@ Six phases, each independently deployable. Ordered by dependencies.
 ```
 
 **Design assets needed:**
+
 - `favicon.ico` — 32x32 notecard icon in brand green (#1B6B5A)
 - `apple-touch-icon.png` — 180x180
 - `og-image.png` — 1200x630 social card with app name, tagline, and a visual of the card flip UI
@@ -158,12 +169,14 @@ Six phases, each independently deployable. Ordered by dependencies.
 ### Research Insights: Meta Tags
 
 **Best Practices (2024-2026):**
+
 - OG image should be exactly 1200x630px for optimal rendering across platforms
 - Include `og:site_name` for better brand attribution in social cards
 - Twitter/X now supports `twitter:card` type `summary_large_image` — always prefer it over `summary` for visual apps
 - Use absolute URLs for OG images (not relative) — social scrapers need the full URL
 
 **Edge Cases:**
+
 - Some social platforms cache OG tags aggressively. After deploying, use Facebook's Sharing Debugger and Twitter Card Validator to force a re-scrape
 - If the domain changes (e.g., custom domain later), OG URLs will need updating — consider environment-variable-driven OG URLs in a future iteration
 
@@ -174,17 +187,20 @@ Six phases, each independently deployable. Ordered by dependencies.
 **Scope:** Two new static pages, a shared Footer component, and legal text links on Login.
 
 **New files:**
+
 - `client/src/pages/Terms.jsx` — Terms of Service content page
 - `client/src/pages/Privacy.jsx` — Privacy Policy content page
 - `client/src/components/Footer.jsx` — shared footer with legal links
 
 **Files to modify:**
+
 - `client/src/App.jsx` — add `/terms` and `/privacy` routes (unprotected, like `/pricing`)
 - `client/src/pages/Landing.jsx` — replace inline footer with `<Footer />`
 - `client/src/pages/Login.jsx` — add "By continuing, you agree to our Terms and Privacy Policy" text below magic link form
 - `client/src/pages/Pricing.jsx` — add `<Footer />`
 
 **Route registration pattern** (follows existing Pricing pattern — no auth wrapper):
+
 ```jsx
 // client/src/App.jsx
 <Route path="/terms" element={<Terms />} />
@@ -192,6 +208,7 @@ Six phases, each independently deployable. Ordered by dependencies.
 ```
 
 **Page template** (follows Landing/Pricing pattern):
+
 ```jsx
 // client/src/pages/Terms.jsx
 export default function Terms() {
@@ -209,6 +226,7 @@ export default function Terms() {
 ```
 
 **Footer component:**
+
 ```jsx
 // client/src/components/Footer.jsx
 export default function Footer() {
@@ -229,6 +247,7 @@ export default function Footer() {
 **Footer placement:** Landing, Terms, Privacy, Pricing, Marketplace pages. NOT on authenticated pages (Dashboard, Study, Settings, etc.) — keeps the study experience clean.
 
 **ToS content sections:**
+
 1. Account Responsibilities — accurate info, one account per person, password security
 2. Marketplace Rules — pricing ($1–$5), content standards, no plagiarism, refund policy (handled by Stripe disputes)
 3. AI-Generated Content — disclaimers on accuracy, no guarantee of correctness, user responsibility to review
@@ -239,6 +258,7 @@ export default function Footer() {
 8. Limitation of Liability — standard SaaS limitation
 
 **Privacy Policy content sections:**
+
 1. Data We Collect — email, display name, study data, payment info (via Stripe, not stored by us)
 2. How We Use It — account management, AI generation, study tracking, marketplace operations
 3. Third-Party Services — Stripe (payments), Supabase (database/storage), Groq/Gemini (AI generation), Resend (email), Sentry (error monitoring — added in Phase 4)
@@ -253,12 +273,14 @@ export default function Footer() {
 ### Research Insights: Legal Pages
 
 **Best Practices:**
+
 - Include a "Last Updated" date at the top of both pages — required for compliance and user trust
 - Add a "Changes to this Policy" section explaining that updates will be communicated (email or in-app banner)
 - AI-generated content disclaimer is especially important — state clearly that AI output may contain errors and users are responsible for verifying accuracy
 - Stripe Connect requires a publicly accessible ToS URL during seller onboarding — verify this URL is provided in the Connect OAuth flow
 
 **Edge Cases:**
+
 - Users who signed up before the ToS existed: consider a "terms acceptance" banner on next login (post-launch, not a blocker)
 - CCPA applicability: if any users are in California, add a "Do Not Sell" section (even if you don't sell data, CCPA requires the statement)
 
@@ -269,15 +291,18 @@ export default function Footer() {
 **Scope:** Catch-all route, error recovery UI, and server-side API 404.
 
 **New files:**
+
 - `client/src/pages/NotFound.jsx` — 404 page
 - `client/src/components/ErrorBoundary.jsx` — React error boundary class component
 
 **Files to modify:**
+
 - `client/src/App.jsx` — add catch-all route, wrap `<Routes>` with `<ErrorBoundary>`
 - `client/src/main.jsx` — add React 19 `createRoot` error hooks
 - `server/src/index.js` — add JSON 404 catch-all for `/api/*` routes
 
 **NotFound page:**
+
 ```jsx
 // client/src/pages/NotFound.jsx
 import { Link } from 'react-router-dom';
@@ -288,8 +313,8 @@ export default function NotFound() {
   const { user, loading } = useAuth();
 
   // Guard CTA behind loading state to prevent auth flash
-  const ctaTarget = loading ? '/' : (user ? '/dashboard' : '/');
-  const ctaLabel = loading ? 'Go Home' : (user ? 'Go to Dashboard' : 'Go Home');
+  const ctaTarget = loading ? '/' : user ? '/dashboard' : '/';
+  const ctaLabel = loading ? 'Go Home' : user ? 'Go to Dashboard' : 'Go Home';
 
   return (
     <div className="min-h-screen bg-[#FAF7F2]">
@@ -297,13 +322,8 @@ export default function NotFound() {
       <main className="max-w-md mx-auto px-4 py-24 text-center">
         <h1 className="text-6xl font-bold text-[#1B6B5A] mb-4">404</h1>
         <p className="text-xl text-[#1A1614] mb-2">Page not found</p>
-        <p className="text-[#6B635A] mb-8">
-          We couldn't find the page you're looking for.
-        </p>
-        <Link
-          to={ctaTarget}
-          className="inline-block bg-[#1B6B5A] text-white px-6 py-3 rounded-lg"
-        >
+        <p className="text-[#6B635A] mb-8">We couldn't find the page you're looking for.</p>
+        <Link to={ctaTarget} className="inline-block bg-[#1B6B5A] text-white px-6 py-3 rounded-lg">
           {ctaLabel}
         </Link>
       </main>
@@ -313,6 +333,7 @@ export default function NotFound() {
 ```
 
 **Error Boundary** (must be a class component — React 19 still requires this):
+
 ```jsx
 // client/src/components/ErrorBoundary.jsx
 import { Component } from 'react';
@@ -351,13 +372,8 @@ export default class ErrorBoundary extends Component {
         <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center">
           <div className="max-w-md mx-auto px-4 text-center">
             <h1 className="text-2xl font-bold text-[#1A1614] mb-4">Something went wrong</h1>
-            <p className="text-[#6B635A] mb-8">
-              An unexpected error occurred. Please try again.
-            </p>
-            <button
-              onClick={this.handleRecover}
-              className="bg-[#1B6B5A] text-white px-6 py-3 rounded-lg"
-            >
+            <p className="text-[#6B635A] mb-8">An unexpected error occurred. Please try again.</p>
+            <button onClick={this.handleRecover} className="bg-[#1B6B5A] text-white px-6 py-3 rounded-lg">
               Go Home
             </button>
           </div>
@@ -370,6 +386,7 @@ export default class ErrorBoundary extends Component {
 ```
 
 **App.jsx integration** (ErrorBoundary wraps Routes — Navbar stays in each page per Option 2):
+
 ```jsx
 // client/src/App.jsx — structure (NO Navbar here — each page renders its own)
 // GoogleOAuthProvider is the OUTERMOST wrapper — must be preserved
@@ -387,11 +404,13 @@ export default class ErrorBoundary extends Component {
 ```
 
 **Note:** Navbar is NOT moved to App.jsx. Each page continues to import and render `<Navbar />` individually (existing pattern). The ErrorBoundary fallback has no Navbar — this is acceptable because:
+
 - The fallback is a full-page takeover with a "Go Home" button
 - The user gets the Navbar back after navigation
 - Moving Navbar to App.jsx would require removing it from ~16 page components — too large a refactor for this phase
 
 **React 19 `createRoot` error hooks** (in `main.jsx` — preserves existing `React.StrictMode`):
+
 ```jsx
 // client/src/main.jsx — add error hooks to createRoot call
 // Uses ReactDOM.createRoot (matching existing import: import ReactDOM from 'react-dom/client')
@@ -403,7 +422,7 @@ ReactDOM.createRoot(document.getElementById('root'), {
   onRecoverableError(error) {
     // Hydration mismatches, recoverable issues — log silently
     console.warn('Recoverable React error:', error);
-  },
+  }
 }).render(
   <React.StrictMode>
     <BrowserRouter>
@@ -416,6 +435,7 @@ ReactDOM.createRoot(document.getElementById('root'), {
 **Note:** No `onCaughtError` hook — errors caught by ErrorBoundary are already logged in `componentDidCatch`. An empty hook is dead code.
 
 **Server-side API 404** (add after all route registrations in `server/src/index.js`):
+
 ```js
 // After all app.use('/api/...', router) calls
 app.use('/api/*', (req, res) => {
@@ -426,11 +446,13 @@ app.use('/api/*', (req, res) => {
 ### Research Insights: Error Handling
 
 **Best Practices:**
+
 - ErrorBoundary `handleRecover` should use `window.location.href` (full page load) NOT `setState + navigate` — setState triggers a re-render of the error tree which can throw again before navigation completes
 - React 19's `createRoot` error hooks are the new standard for error telemetry — they catch errors that class ErrorBoundary `componentDidCatch` misses (uncaught errors, recoverable errors)
 - The API 404 catch-all should be placed BEFORE Sentry's `setupExpressErrorHandler` but AFTER all route registrations
 
 **Edge Cases:**
+
 - **Auth flash on 404:** If `useAuth()` hasn't resolved yet, the 404 page CTA can flash between "Go Home" and "Go to Dashboard". Solution: guard behind `loading` state (implemented above)
 - **Double Navbar:** If Navbar is kept per-page AND moved to App.jsx, some pages will render it twice. The plan keeps Navbar in pages, so this isn't a risk — but document it as a known pattern for future refactors
 
@@ -441,10 +463,12 @@ app.use('/api/*', (req, res) => {
 **Scope:** Client + server error tracking. Depends on Phase 3 (ErrorBoundary integration). Trimmed to essentials — no Replay, no performance tracing at launch scale.
 
 **New dependencies:**
+
 - Client: `@sentry/react`, `@sentry/vite-plugin`
 - Server: `@sentry/node`
 
 **Files to modify:**
+
 - `client/src/main.jsx` — Sentry init before ReactDOM
 - `client/vite.config.js` — add `@sentry/vite-plugin` for source map upload
 - `client/src/components/ErrorBoundary.jsx` — add `Sentry.captureException` in `componentDidCatch`
@@ -454,6 +478,7 @@ app.use('/api/*', (req, res) => {
 - `client/.env.example` — add `VITE_SENTRY_DSN`
 
 **Client initialization** (`client/src/main.jsx`):
+
 ```js
 import * as Sentry from '@sentry/react';
 
@@ -469,12 +494,13 @@ if (import.meta.env.VITE_SENTRY_DSN) {
         delete event.user.username;
       }
       return event;
-    },
+    }
   });
 }
 ```
 
 **Server initialization** (`server/src/index.js` — at very top after dotenv):
+
 ```js
 import * as Sentry from '@sentry/node';
 
@@ -499,7 +525,7 @@ if (process.env.SENTRY_DSN) {
         delete event.request.headers.cookie;
       }
       return event;
-    },
+    }
   });
 }
 
@@ -516,6 +542,7 @@ app.use((err, req, res, next) => {
 ```
 
 **ErrorBoundary integration** (uses top-level ESM import — `require()` does not work in this Vite/ESM codebase):
+
 ```js
 // At the top of ErrorBoundary.jsx
 import * as Sentry from '@sentry/react';
@@ -532,6 +559,7 @@ componentDidCatch(error, errorInfo) {
 ```
 
 **User context** (in AuthContext.jsx):
+
 ```js
 // On successful login/signup
 import * as Sentry from '@sentry/react';
@@ -544,6 +572,7 @@ Sentry.setUser(null);
 **Privacy:** Capture user ID only, not email or name. `beforeSend` strips any accidentally attached PII. Disclose in Privacy Policy (Phase 2).
 
 **Source maps** (`client/vite.config.js`):
+
 ```js
 import { sentryVitePlugin } from '@sentry/vite-plugin';
 
@@ -556,14 +585,15 @@ export default defineConfig({
       project: process.env.SENTRY_PROJECT,
       authToken: process.env.SENTRY_AUTH_TOKEN,
       sourcemaps: {
-        filesToDeleteAfterUpload: ['./dist/**/*.map'], // Remove maps from deploy
-      },
-    }),
-  ],
+        filesToDeleteAfterUpload: ['./dist/**/*.map'] // Remove maps from deploy
+      }
+    })
+  ]
 });
 ```
 
 **React 19 createRoot hooks integration** (update `onUncaughtError` from Phase 3 to add Sentry):
+
 ```js
 // In the ReactDOM.createRoot options from Phase 3
 onUncaughtError(error) {
@@ -579,12 +609,14 @@ onUncaughtError(error) {
 ### Research Insights: Sentry
 
 **Best Practices (2024-2026):**
+
 - Use `sourcemap: 'hidden'` instead of `sourcemap: true` — uploads maps to Sentry for readable stack traces but doesn't serve them publicly (security best practice)
 - Use `filesToDeleteAfterUpload` to remove `.map` files from the deployment artifact
 - `beforeSend` is the right place for PII scrubbing — defense in depth beyond just not setting it
 - Skip Replay and performance tracing at launch — they consume quota and add bundle size. Add when you have enough users to make the data useful.
 
 **What NOT to do:**
+
 - Don't add `tracesSampleRate` or `Sentry.browserTracingIntegration()` yet — these add HTTP overhead per request and consume Sentry quota. At pre-launch scale, you don't need performance monitoring.
 - Don't add `Sentry.replayIntegration()` yet — it adds ~50KB to the bundle and is most valuable once you have real user flows to debug.
 
@@ -595,6 +627,7 @@ onUncaughtError(error) {
 **Scope:** Expose `email_verified` to the client and add middleware. **Trimmed significantly** — all current users are verified (Google + magic link auto-verify), so this is pure infrastructure for future auth methods. Dashboard banner and "verify now" flow deferred until an unverified auth method exists.
 
 **Files to modify:**
+
 - `server/src/routes/auth.js` — add `email_verified` + `token_revoked_at` to `USER_SELECT`, add `email_verified` to `sanitizeUser` (3 lines)
 - `server/src/middleware/auth.js` — add `requireEmailVerified` export
 
@@ -603,6 +636,7 @@ onUncaughtError(error) {
 Add `email_verified` and `token_revoked_at` to the existing string. Do NOT rewrite — the real `USER_SELECT` has 20+ fields.
 
 **Why `token_revoked_at`?** The `/me` endpoint (auth.js:158) checks `user.token_revoked_at` to reject revoked sessions, but the current `USER_SELECT` doesn't include it. This means `user.token_revoked_at` is always `undefined`, and the revocation check silently passes. The `authenticate` middleware does its own query for `token_revoked_at` (so protected routes work), but `/me` is a public endpoint that bypasses `authenticate` — making it the one place revocation is broken.
+
 ```diff
   display_name, role, suspended, google_user_id, created_at,
 - avatar_url, google_avatar_url, preferences,
@@ -613,6 +647,7 @@ Add `email_verified` and `token_revoked_at` to the existing string. Do NOT rewri
 **sanitizeUser change** (`server/src/routes/auth.js:32-63`):
 
 Add `email_verified` only — `token_revoked_at` is used server-side by `/me` but must NOT be exposed to the client. The real `sanitizeUser` uses `snake_case` and includes avatar resolution logic, `google_connected`, etc. — do NOT rewrite it.
+
 ```diff
   has_password: user.has_password,
   google_connected: !!user.google_user_id,
@@ -621,14 +656,12 @@ Add `email_verified` only — `token_revoked_at` is used server-side by `/me` bu
 ```
 
 **Middleware** (lightweight — add to existing `server/src/middleware/auth.js`):
+
 ```js
 // server/src/middleware/auth.js (add to existing exports)
 export async function requireEmailVerified(req, res, next) {
   // If loadUser middleware is adopted, read from req.userRecord instead
-  const { rows } = await pool.query(
-    'SELECT email_verified FROM users WHERE id = $1 AND deleted_at IS NULL',
-    [req.userId]
-  );
+  const { rows } = await pool.query('SELECT email_verified FROM users WHERE id = $1 AND deleted_at IS NULL', [req.userId]);
   if (!rows[0]?.email_verified) {
     return res.status(403).json({
       error: 'email_verification_required',
@@ -640,11 +673,13 @@ export async function requireEmailVerified(req, res, next) {
 ```
 
 **Deferred (not needed for launch):**
+
 - Gating marketplace/seller endpoints behind `requireEmailVerified` — defer until an unverified auth method exists. Currently all users are verified, so the middleware would never trigger.
 - Dashboard verification banner and "verify now" flow — no unverified users exist to show it to.
 - Client error handling for `email_verification_required` — no endpoint returns it yet.
 
 **Why still build the USER_SELECT + middleware?**
+
 1. Exposes `emailVerified` to the client for future UI decisions (2 lines of code)
 2. The middleware is ready to chain onto endpoints when email/password signup is added
 3. Prevents a larger retrofit later — the pattern is established and can be tested
@@ -664,16 +699,18 @@ export async function requireEmailVerified(req, res, next) {
 **Key insight:** The Login page already IS the password recovery flow — users log in via magic link. The actual gap is in Settings: users who authenticated via magic link and have `has_password = false` can't set a password, and users who forgot their password can't reset it in Settings because the change form requires `currentPassword`.
 
 **Files to modify:**
+
 - `client/src/pages/Login.jsx` — add "Forgot your password? Use the email login above" help text
 - `client/src/pages/Settings.jsx` — add "Set password" form for users with `has_password = false`
 - `server/src/routes/account.js` — modify `PATCH /api/account/password` to allow setting password without current when `password_hash IS NULL`
 
 **Login page change** (minimal — just explanatory text):
+
 ```jsx
-{/* Below the magic link email form */}
-<p className="text-xs text-[#6B635A] mt-2">
-  You can always sign in with a code — no password needed.
-</p>
+{
+  /* Below the magic link email form */
+}
+<p className="text-xs text-[#6B635A] mt-2">You can always sign in with a code — no password needed.</p>;
 ```
 
 **Note:** The Login page has no password field (only Google + magic link), so "Forgot your password?" text would be misleading. This wording is clearer and doesn't imply a password field exists.
@@ -683,12 +720,14 @@ export async function requireEmailVerified(req, res, next) {
 The Settings Security section should show one of two forms:
 
 **Form A: "Set Password"** (when `user.has_password === false`):
+
 - New password input
 - Confirm password input
 - "Set Password" button
 - No `currentPassword` required — the user just proved identity via magic link/Google login
 
 **Form B: "Change Password"** (when `user.has_password === true` — existing form):
+
 - Current password input
 - New password input
 - Confirm password input
@@ -699,6 +738,7 @@ The Settings Security section should show one of two forms:
 **Server endpoint change** (`PATCH /api/account/password`):
 
 Preserves the existing middleware chain: `authenticate, requireXHR, requireActiveUser, passwordLimiter`.
+
 ```js
 // server/src/routes/account.js — PATCH /api/account/password
 router.patch('/password', authenticate, requireXHR, requireActiveUser, passwordLimiter, async (req, res) => {
@@ -742,10 +782,7 @@ router.patch('/password', authenticate, requireXHR, requireActiveUser, passwordL
     }
 
     const hash = await bcrypt.hash(newPassword, SALT_ROUNDS);
-    await pool.query(
-      "UPDATE users SET password_hash = $1, token_revoked_at = NOW() - INTERVAL '1 second' WHERE id = $2",
-      [hash, req.userId]
-    );
+    await pool.query("UPDATE users SET password_hash = $1, token_revoked_at = NOW() - INTERVAL '1 second' WHERE id = $2", [hash, req.userId]);
 
     setTokenCookie(res, req.userId);
     res.json({ ok: true });
@@ -773,9 +810,10 @@ router.patch('/password', authenticate, requireXHR, requireActiveUser, passwordL
 **Client-side "Set Password" form handler** (in Settings.jsx security section):
 
 The existing `api.changePassword(currentPassword, newPassword)` at `api.js:108` already sends `{ currentPassword, newPassword }`. For "Set Password", call it with `null` for `currentPassword`:
+
 ```jsx
 // Settings.jsx — Set Password handler (when user.has_password === false)
-const handleSetPassword = async (e) => {
+const handleSetPassword = async e => {
   e.preventDefault();
   if (newPassword !== confirmPassword) {
     return toast.error('Passwords do not match');
@@ -801,6 +839,7 @@ const handleSetPassword = async (e) => {
 ## Acceptance Criteria
 
 ### Phase 1: Meta Tags
+
 - [x] `index.html` has meta description, OG tags (title, description, image, url, type), Twitter card tags
 - [x] Favicon displays in browser tab
 - [x] Apple touch icon works on iOS "Add to Home Screen"
@@ -808,6 +847,7 @@ const handleSetPassword = async (e) => {
 - [x] No `manifest.json` — deferred to post-launch
 
 ### Phase 2: Legal Pages
+
 - [x] `/terms` renders Terms of Service page with Navbar and Footer
 - [x] `/privacy` renders Privacy Policy page with Navbar and Footer
 - [x] Both pages are accessible without authentication
@@ -818,6 +858,7 @@ const handleSetPassword = async (e) => {
 - [x] Seller terms modal links to full Terms of Service
 
 ### Phase 3: Error Handling
+
 - [x] Navigating to `/nonexistent-url` shows NotFound page with Navbar and contextual CTA
 - [x] NotFound page shows "Go to Dashboard" for authenticated users, "Go Home" for others
 - [x] NotFound CTA does not flash between states during auth loading
@@ -831,6 +872,7 @@ const handleSetPassword = async (e) => {
 - [x] `GET /api/nonexistent` returns `{ "error": "Not found" }` with 404 status (not HTML)
 
 ### Phase 4: Sentry
+
 - [x] Client errors are captured in Sentry with source-mapped stack traces
 - [x] Server errors are captured in Sentry
 - [x] User ID is attached to Sentry events (not email)
@@ -845,6 +887,7 @@ const handleSetPassword = async (e) => {
 - [x] No Replay integration, no performance tracing (deferred)
 
 ### Phase 5: Email Verification
+
 - [x] `email_verified` added to existing `USER_SELECT` string (one field, not a rewrite)
 - [x] `email_verified: !!user.email_verified` added to existing `sanitizeUser` return (one line, snake_case)
 - [x] `email_verified` is included in API responses (`GET /api/auth/me`, login, signup)
@@ -853,6 +896,7 @@ const handleSetPassword = async (e) => {
 - [x] No Dashboard banner (deferred)
 
 ### Phase 6: Password Recovery
+
 - [x] Login page shows "You can always sign in with a code" help text (not "Forgot your password?")
 - [x] Settings page shows "Set Password" form when user has no password
 - [x] "Set Password" form requires only new password + confirm (no current password)
@@ -890,20 +934,21 @@ Phases 1, 2, 5, and 6 are fully independent and could be parallelized. Phase 4 d
 
 ## Risk Analysis
 
-| Risk | Mitigation |
-|------|------------|
-| Legal content accuracy | Use a generator (Termly/iubenda) as starting point, customize for marketplace specifics. Flag for legal review before major marketing push. |
-| Sentry source map upload failing in CI | Use `sourcemap: 'hidden'` + `filesToDeleteAfterUpload`. Plugin is optional — Sentry still captures errors, just with minified traces. |
-| Email verification gating active users | Middleware exists but is NOT chained onto any endpoints yet. Zero impact on current users. |
-| Favicon/OG image design quality | Start with simple SVG notecard icon. Can iterate on design without code changes. |
-| Race condition on password set | Atomic single-query `UPDATE SET password_hash, token_revoked_at WHERE password_hash IS NULL` — DB enforces single-writer. |
-| Stale JWT after password change | Token revocation with `- INTERVAL '1 second'` offset + fresh JWT via `setTokenCookie`. Client calls `refreshUser()` to sync state. |
-| Stack trace leakage in production | Generic Express error handler after Sentry returns JSON `{ error: 'Internal server error' }`, not HTML. |
-| Server PII in Sentry events | Server-side `beforeSend` strips `event.user.email`, `event.user.username`, and `event.request.data`. |
+| Risk                                   | Mitigation                                                                                                                                  |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Legal content accuracy                 | Use a generator (Termly/iubenda) as starting point, customize for marketplace specifics. Flag for legal review before major marketing push. |
+| Sentry source map upload failing in CI | Use `sourcemap: 'hidden'` + `filesToDeleteAfterUpload`. Plugin is optional — Sentry still captures errors, just with minified traces.       |
+| Email verification gating active users | Middleware exists but is NOT chained onto any endpoints yet. Zero impact on current users.                                                  |
+| Favicon/OG image design quality        | Start with simple SVG notecard icon. Can iterate on design without code changes.                                                            |
+| Race condition on password set         | Atomic single-query `UPDATE SET password_hash, token_revoked_at WHERE password_hash IS NULL` — DB enforces single-writer.                   |
+| Stale JWT after password change        | Token revocation with `- INTERVAL '1 second'` offset + fresh JWT via `setTokenCookie`. Client calls `refreshUser()` to sync state.          |
+| Stack trace leakage in production      | Generic Express error handler after Sentry returns JSON `{ error: 'Internal server error' }`, not HTML.                                     |
+| Server PII in Sentry events            | Server-side `beforeSend` strips `event.user.email`, `event.user.username`, and `event.request.data`.                                        |
 
 ## References
 
 ### Source Files
+
 - `client/src/App.jsx` — route definitions, ProtectedRoute/PublicRoute guards (lines 56-72)
 - `client/index.html` — HTML shell, currently 15 lines, missing everything
 - `client/src/pages/Landing.jsx` — inline footer at lines 167-171
@@ -918,8 +963,10 @@ Phases 1, 2, 5, and 6 are fully independent and could be parallelized. Phase 4 d
 - `server/src/services/email.js` — Resend integration (sendMagicLinkCode)
 
 ### Brainstorm
+
 - `docs/brainstorms/2026-03-14-pre-launch-blockers-brainstorm.md`
 
 ### Related Solutions
+
 - `docs/solutions/auth-implementation-guide.md` — JWT patterns, token revocation, `setTokenCookie` usage
 - `docs/solutions/feature-patterns/account-settings-experience.md` — Settings architecture, conditional form rendering

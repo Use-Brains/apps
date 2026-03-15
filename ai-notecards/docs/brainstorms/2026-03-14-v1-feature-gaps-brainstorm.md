@@ -1,5 +1,7 @@
 # V1 Feature Gaps Brainstorm
 
+<!-- FINISHED -->
+
 **Date:** 2026-03-14
 **Status:** Decided
 **Scope:** New features needed to round out v1 before moving to v2
@@ -13,6 +15,7 @@ Six feature areas to fill the most impactful gaps in the current v1 product:
 ### 1. Session Recap Screen
 
 After completing a study session, show a summary screen with:
+
 - Score and accuracy (already exists in results)
 - List of missed cards with the correct answers displayed
 - Cards grouped: correct vs missed
@@ -36,6 +39,7 @@ All modes track correct/incorrect the same way and feed into the existing study_
 ### 3. Dashboard Search and Sort
 
 Add to the dashboard deck grid:
+
 - **Search bar** — filter decks by title (client-side for speed, deck list is already loaded)
 - **Sort dropdown** — options: Newest (default), Oldest, A-Z, Most Cards, Last Studied
 - **Last studied** — join against `study_sessions` to get most recent `completed_at` per deck. No new column; avoids a migration and keeps study_sessions as the source of truth. Acceptable performance since the deck list is already loaded client-side.
@@ -49,6 +53,7 @@ Currently the `card_order` preference allows "shuffle" or "sequential". Remove t
 **Why:** Sequential order lets users memorize position instead of content. This is a well-known learning science anti-pattern. The preference should not exist.
 
 This means:
+
 - Remove `card_order` from preferences validation/UI
 - Always shuffle cards client-side when loading a study session
 - Simplify the preferences section (one fewer option)
@@ -94,6 +99,7 @@ These six features target the three biggest weaknesses of the current product:
 4. **Generation quality** — preview before save puts users in control of AI output quality
 
 We deliberately excluded:
+
 - Card reordering (cards should always be random)
 - Deck folders/tags (search + sort is sufficient for v1)
 - Difficulty levels / card count targets (preview is the bigger win)
@@ -104,20 +110,20 @@ We deliberately excluded:
 
 ## Key Decisions
 
-| Decision | Choice | Reasoning |
-|----------|--------|-----------|
-| Card order | Always randomized | Prevents position memorization, backed by learning science |
-| Study modes | Flip + MC + Type + Match | Variety reduces study fatigue, all feed same tracking |
-| Recap screen | Show missed cards, no re-study button | Keep it simple, user can start new session manually |
-| Dashboard organization | Search + sort only (no folders) | Covers 90% of need, avoids complexity |
-| Generation customization | Preview only (no difficulty/count) | Highest impact, lets users curate AI output |
-| Streaks | Dashboard-only, no notifications | Passive motivation, email reminders are v2 |
-| MC distractors | Pull from same deck | Keeps distractors contextually relevant, min 4 cards |
-| Type-the-answer matching | Normalized fuzzy match | Lowercase, trim, collapse whitespace, similarity threshold |
-| Generation preview arch | Split into generate + save | Generate returns unsaved cards; save is a separate request. Generation count increments on save only. |
-| Streak day boundary | UTC | Avoids timezone preference complexity; acceptable tradeoff for v1 |
-| Match mode timer | No timer for v1 | Keep it simple; timer adds pressure without clear learning benefit |
-| Last studied sort | Join study_sessions, no new column | Avoids migration; deck list already loaded client-side |
+| Decision                 | Choice                                | Reasoning                                                                                             |
+| ------------------------ | ------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Card order               | Always randomized                     | Prevents position memorization, backed by learning science                                            |
+| Study modes              | Flip + MC + Type + Match              | Variety reduces study fatigue, all feed same tracking                                                 |
+| Recap screen             | Show missed cards, no re-study button | Keep it simple, user can start new session manually                                                   |
+| Dashboard organization   | Search + sort only (no folders)       | Covers 90% of need, avoids complexity                                                                 |
+| Generation customization | Preview only (no difficulty/count)    | Highest impact, lets users curate AI output                                                           |
+| Streaks                  | Dashboard-only, no notifications      | Passive motivation, email reminders are v2                                                            |
+| MC distractors           | Pull from same deck                   | Keeps distractors contextually relevant, min 4 cards                                                  |
+| Type-the-answer matching | Normalized fuzzy match                | Lowercase, trim, collapse whitespace, similarity threshold                                            |
+| Generation preview arch  | Split into generate + save            | Generate returns unsaved cards; save is a separate request. Generation count increments on save only. |
+| Streak day boundary      | UTC                                   | Avoids timezone preference complexity; acceptable tradeoff for v1                                     |
+| Match mode timer         | No timer for v1                       | Keep it simple; timer adds pressure without clear learning benefit                                    |
+| Last studied sort        | Join study_sessions, no new column    | Avoids migration; deck list already loaded client-side                                                |
 
 ---
 

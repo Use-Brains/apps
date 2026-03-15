@@ -3,6 +3,8 @@ date: 2026-03-13
 topic: auth-revamp
 ---
 
+<!-- FINISHED -->
+
 # Auth Revamp: Google + Apple + Magic Link
 
 ## What We're Building

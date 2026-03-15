@@ -1,11 +1,13 @@
 ---
-title: "feat: Auth revamp — Google Sign-In + Magic Link + Apple"
+title: 'feat: Auth revamp — Google Sign-In + Magic Link + Apple'
 type: feat
 status: active
 date: 2026-03-13
 origin: docs/brainstorms/2026-03-13-auth-revamp-brainstorm.md
 deepened: 2026-03-13
 ---
+
+<!-- FINISHED -->
 
 # Auth Revamp: Google Sign-In + Magic Link + Apple
 
@@ -111,6 +113,7 @@ User enters code → POST /api/auth/magic-link/verify
 
 **Critical fix — attempts counter design:**
 The original plan looked up codes by `email + code_hash` to check attempts. This is broken: if the user enters a wrong code, the hash won't match any row, so `attempts` never increments. Instead:
+
 1. Lookup by email only (most recent unexpired, unused code)
 2. Check `attempts >= 5` → reject immediately
 3. Increment `attempts` unconditionally
@@ -120,12 +123,14 @@ The original plan looked up codes by `email + code_hash` to check attempts. This
 If a user requests 3 codes in 10 minutes, all 3 are valid. This triples the brute-force surface (3 × 10^6 possibilities instead of 10^6). Fix: `UPDATE magic_link_codes SET used_at = NOW() WHERE email = $1 AND used_at IS NULL` before inserting a new code.
 
 **Atomic verify with UPDATE...RETURNING:**
+
 ```sql
 UPDATE magic_link_codes
 SET used_at = NOW()
 WHERE id = $1 AND used_at IS NULL
 RETURNING id;
 ```
+
 If this returns 0 rows, another request already consumed the code. This eliminates the TOCTOU race between SELECT and UPDATE.
 
 ### Account Identity Resolution
@@ -145,6 +150,7 @@ The simplicity reviewer recommends **auto-linking accounts on email match** inst
 **Implementation:** On Google sign-in, if `google_user_id` lookup fails but email matches an existing user, set `google_user_id` on that user and proceed with login. Same logic applies: magic link proves email → link to existing account. Apply the same pattern to Apple sign-in (`auth-apple.js`) — replace the 409 on email collision with auto-link (`SET apple_user_id` on the existing user).
 
 **Auto-link safety rules:**
+
 - **Require `email_verified: true`** from the Google ID token payload before auto-linking. Do not auto-link if Google reports the email as unverified.
 - **Never auto-link to Apple relay emails.** Block auto-link when the target account's email matches `*@privaterelay.appleid.com` or the synthetic `apple-*@private.relay` pattern. These are not real addresses and cannot be "proven owned" by a third-party provider.
 - When auto-linking, also set `email_verified = true` on the existing user (the provider proved ownership) and update `display_name` if currently NULL (Google provides a name).
@@ -193,6 +199,7 @@ UPDATE users SET email_verified = true
 **NOT NULL constraints on `attempts` and `created_at`:** Without `NOT NULL`, an explicit NULL insert bypasses the `attempts >= 5` security check (`NULL >= 5` evaluates to NULL/false, silently skipping the rate limit). Always use `NOT NULL DEFAULT` for security-critical columns.
 
 **Tasks:**
+
 - [x] Create `005_auth_revamp.sql` with above schema (numbered 005 — main branch has 001-004)
 - [x] Verify `password_hash` nullable — added `ALTER COLUMN password_hash DROP NOT NULL`
 - [x] Add `google_user_id` to `USER_SELECT` in `server/src/routes/auth.js`
@@ -203,6 +210,7 @@ UPDATE users SET email_verified = true
 - [x] Add `HMAC_SECRET` to env vars — reuses `JWT_SECRET` for HMAC-SHA256 code hashing
 
 **New env vars (add to `server/.env.example`):**
+
 - `RESEND_API_KEY` — Resend API key for sending magic link emails
 - `GOOGLE_CLIENT_ID` — Google OAuth Web client ID (used by backend for token verification AND by web client)
 - `GOOGLE_IOS_CLIENT_ID` — Google OAuth iOS client ID (optional, for audience array validation)
@@ -219,22 +227,24 @@ const resend = new Resend(process.env.RESEND_API_KEY); // undefined!
 // GOOD — lazy initialization
 let resend;
 function getResend() {
-    if (!resend) resend = new Resend(process.env.RESEND_API_KEY);
-    return resend;
+  if (!resend) resend = new Resend(process.env.RESEND_API_KEY);
+  return resend;
 }
 ```
 
 Same applies to `google-auth-library`'s `OAuth2Client`. Use lazy initialization or factory functions for both.
 
 **Add env var validation at server startup** in the entry point:
+
 ```javascript
 const required = ['RESEND_API_KEY', 'GOOGLE_CLIENT_ID'];
 for (const key of required) {
-    if (!process.env[key]) throw new Error(`Missing required env var: ${key}`);
+  if (!process.env[key]) throw new Error(`Missing required env var: ${key}`);
 }
 ```
 
 **New npm packages:**
+
 - `resend` — transactional email
 - `google-auth-library` — Google ID token verification
 
@@ -242,12 +252,13 @@ for (const key of required) {
 
 Mounted at `/api/auth/magic-link`
 
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/request` | Generate code, send email |
-| POST | `/verify` | Verify code, login/create user |
+| Method | Path       | Description                    |
+| ------ | ---------- | ------------------------------ |
+| POST   | `/request` | Generate code, send email      |
+| POST   | `/verify`  | Verify code, login/create user |
 
 **`POST /request` logic:**
+
 1. Validate email format, normalize with `.toLowerCase()`
 2. Rate limit: 10/IP/15min (DB-level attempts counter is the primary brute-force defense)
 3. **Invalidate existing codes:** `UPDATE magic_link_codes SET used_at = NOW() WHERE email = $1 AND used_at IS NULL`
@@ -267,13 +278,14 @@ res.json({ ok: true });
 
 // Fire-and-forget (log errors, don't block)
 sendMagicLinkCode(email, code).catch(err => {
-    console.error('Failed to send magic link email:', err);
+  console.error('Failed to send magic link email:', err);
 });
 ```
 
 This drops perceived latency from ~300-600ms to ~20-50ms.
 
 **`POST /verify` logic:**
+
 1. Rate limit: 10/IP/15min. Normalize email with `.toLowerCase()`
 2. Lookup most recent unexpired, unused code for this email (by email only, NOT by hash)
 3. If no code found: return `AUTH_MAGIC_CODE_EXPIRED`
@@ -295,6 +307,7 @@ DELETE FROM magic_link_codes WHERE email = $1 AND expires_at < NOW() - INTERVAL 
 ```
 
 **New error codes** (add to `server/src/constants/errors.js` + `ios/AINotecards/Models/APIError.swift`):
+
 - `AUTH_MAGIC_CODE_INVALID` — wrong code
 - `AUTH_MAGIC_CODE_EXPIRED` — code expired or max attempts exceeded
 - `AUTH_MAGIC_RATE_LIMITED` — too many requests
@@ -303,11 +316,12 @@ DELETE FROM magic_link_codes WHERE email = $1 AND expires_at < NOW() - INTERVAL 
 
 Mounted at `/api/auth/google`
 
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/` | Verify Google ID token, login/create user |
+| Method | Path | Description                               |
+| ------ | ---- | ----------------------------------------- |
+| POST   | `/`  | Verify Google ID token, login/create user |
 
 **`POST /` logic:**
+
 1. Receive `{ idToken }` from client
 2. Verify with `google-auth-library` `verifyIdToken()` against allowed audience array (`[GOOGLE_CLIENT_ID, GOOGLE_IOS_CLIENT_ID]`)
 3. Extract `sub`, `email`, `name`, `picture`, `email_verified` from payload
@@ -329,15 +343,16 @@ Mounted at `/api/auth/google`
 ```javascript
 import { createHmac } from 'crypto';
 function hashCode(code) {
-    return createHmac('sha256', process.env.JWT_SECRET)  // reuse existing secret
-        .update(String(code))
-        .digest('hex');
+  return createHmac('sha256', process.env.JWT_SECRET) // reuse existing secret
+    .update(String(code))
+    .digest('hex');
 }
 ```
 
 #### New service: `server/src/services/email.js`
 
 Thin wrapper around Resend SDK:
+
 - `sendMagicLinkCode(email, code)` — sends the 6-digit code email
 - Plain text + simple HTML template (app name, code, expiry note)
 - Graceful error handling: log failures, return boolean success
@@ -351,14 +366,14 @@ Thin wrapper around Resend SDK:
 
 ```javascript
 await resend.emails.send({
-    from: 'AI Notecards <noreply@mail.ainotecards.com>',
-    to: email,
-    subject: `${code} is your AI Notecards code`,  // Code in subject for mobile notifications
-    headers: {
-        'X-Entity-Ref-ID': crypto.randomUUID(),  // Prevent Gmail conversation grouping
-    },
-    text: `Your verification code is: ${code}\n\nThis code expires in 10 minutes.`,
-    html: `...`,
+  from: 'AI Notecards <noreply@mail.ainotecards.com>',
+  to: email,
+  subject: `${code} is your AI Notecards code`, // Code in subject for mobile notifications
+  headers: {
+    'X-Entity-Ref-ID': crypto.randomUUID() // Prevent Gmail conversation grouping
+  },
+  text: `Your verification code is: ${code}\n\nThis code expires in 10 minutes.`,
+  html: `...`
 });
 ```
 
@@ -380,22 +395,25 @@ The DB-level `attempts` counter (max 5 per code) is the **primary** brute-force 
 ### Phase 2: iOS Client
 
 **New Swift Package dependency:**
+
 - `GoogleSignIn-iOS` (SPM: `https://github.com/google/GoogleSignIn-iOS`) — v9.0.0+
 - **Must add both `GoogleSignIn` AND `GoogleSignInSwift` products** — `GoogleSignInSwift` provides the SwiftUI `GoogleSignInButton` component
 
 ### Research Insights: GoogleSignIn-iOS SDK
 
 **Critical configuration:**
+
 - `GIDServerClientID` must be set in Info.plist — without it, the `idToken` from `signIn(withPresenting:)` will have the iOS client ID as audience instead of the web client ID, causing server-side `verifyIdToken()` to reject it
 - After `signIn(withPresenting:)`, call `result.user.refreshTokensIfNeeded()` before accessing `idToken` — the token may be expired if the user was previously signed in
 - v9.1.0 supports Swift 6 strict concurrency — use `@MainActor` annotations
 
 **SPM dependency in project.yml:**
+
 ```yaml
 packages:
   GoogleSignIn-iOS:
     url: https://github.com/google/GoogleSignIn-iOS
-    from: "9.0.0"
+    from: '9.0.0'
 targets:
   AINotecards:
     dependencies:
@@ -406,29 +424,31 @@ targets:
 ```
 
 **Info.plist additions:**
+
 - `GIDClientID` — iOS OAuth client ID
 - `GIDServerClientID` — Web OAuth client ID (so ID tokens have web audience)
 - New `CFBundleURLSchemes` entry for reversed Google client ID (e.g., `com.googleusercontent.apps.123456`)
 
 **Files to modify:**
 
-| File | Changes |
-|------|---------|
-| `ios/project.yml` | Add GoogleSignIn-iOS SPM dependency (both products) |
-| `ios/AINotecards/Info.plist` | Add Google client ID keys + URL scheme |
-| `ios/AINotecards/AINotecards.swift` | Add `GIDSignIn.sharedInstance.handle(url)` in `handleURL` |
+| File                                         | Changes                                                                                                                                                                                                                                                                |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ios/project.yml`                            | Add GoogleSignIn-iOS SPM dependency (both products)                                                                                                                                                                                                                    |
+| `ios/AINotecards/Info.plist`                 | Add Google client ID keys + URL scheme                                                                                                                                                                                                                                 |
+| `ios/AINotecards/AINotecards.swift`          | Add `GIDSignIn.sharedInstance.handle(url)` in `handleURL`                                                                                                                                                                                                              |
 | `ios/AINotecards/Services/AuthManager.swift` | Add `signInWithGoogle()`, `requestMagicLink(email:)`, `verifyMagicLink(email:code:)` methods. **Mark class `@MainActor`**. Add `isCheckingSession` state. Retrofit `signInWithApple` to use shared `isAuthenticating` guard. Add `isNewUser` to `AuthResponse` struct. |
-| `ios/AINotecards/Models/APIError.swift` | Add new error codes |
-| `ios/AINotecards/Views/Auth/LoginView.swift` | Full rewrite: Google button, Apple button, email field + magic link |
+| `ios/AINotecards/Models/APIError.swift`      | Add new error codes                                                                                                                                                                                                                                                    |
+| `ios/AINotecards/Views/Auth/LoginView.swift` | Full rewrite: Google button, Apple button, email field + magic link                                                                                                                                                                                                    |
 
 **Files to create:**
 
-| File | Purpose |
-|------|---------|
-| `ios/AINotecards/Views/Auth/MagicLinkCodeView.swift` | 6-digit code entry screen with `.textContentType(.oneTimeCode)`, `keyboardType(.numberPad)`, 60-second resend cooldown |
-| `ios/AINotecards/Views/Auth/DisplayNamePromptView.swift` | Post-signup display name entry (shown when `isNewUser: true` and `displayName` is nil) |
+| File                                                     | Purpose                                                                                                                |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `ios/AINotecards/Views/Auth/MagicLinkCodeView.swift`     | 6-digit code entry screen with `.textContentType(.oneTimeCode)`, `keyboardType(.numberPad)`, 60-second resend cooldown |
+| `ios/AINotecards/Views/Auth/DisplayNamePromptView.swift` | Post-signup display name entry (shown when `isNewUser: true` and `displayName` is nil)                                 |
 
 **Files to remove from navigation (keep files):**
+
 - `ios/AINotecards/Views/Auth/SignupView.swift` — no longer navigated to (unified sign-in/sign-up)
 
 ### Research Insights: iOS Frontend Safety
@@ -476,6 +496,7 @@ class AuthManager {
 **In LoginView:** disable all auth buttons when `authManager.isCheckingSession || authManager.isAuthenticating`.
 
 **Login flow changes:**
+
 1. LoginView shows Google button (via `GoogleSignInButton`), Apple button (existing `SignInWithAppleButton`), email field + "Continue" button
 2. Google: `GIDSignIn.sharedInstance.signIn(withPresenting:)` → `refreshTokensIfNeeded()` → send `idToken` to `POST /api/auth/google` → store JWT → dashboard
 3. Apple: existing SIWA flow (no changes)
@@ -484,25 +505,27 @@ class AuthManager {
 ### Phase 3: Web Client
 
 **New npm package:**
+
 - `@react-oauth/google` — React wrapper for Google Identity Services
 
 **Files to modify:**
 
-| File | Changes |
-|------|---------|
-| `client/src/App.jsx` | Wrap with `GoogleOAuthProvider`, add `/onboarding/display-name` route, redirect `/signup` → `/login` |
-| `client/src/pages/Login.jsx` | Full rewrite: Google button, email field + magic link. No Apple on web. |
-| `client/src/lib/AuthContext.jsx` | Add `loginWithGoogle(idToken)`, `requestMagicLink(email)`, `verifyMagicLink(email, code)` |
-| `client/src/lib/api.js` | Add `authGoogle(idToken)`, `magicLinkRequest(email)`, `magicLinkVerify(email, code)` |
+| File                             | Changes                                                                                              |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `client/src/App.jsx`             | Wrap with `GoogleOAuthProvider`, add `/onboarding/display-name` route, redirect `/signup` → `/login` |
+| `client/src/pages/Login.jsx`     | Full rewrite: Google button, email field + magic link. No Apple on web.                              |
+| `client/src/lib/AuthContext.jsx` | Add `loginWithGoogle(idToken)`, `requestMagicLink(email)`, `verifyMagicLink(email, code)`            |
+| `client/src/lib/api.js`          | Add `authGoogle(idToken)`, `magicLinkRequest(email)`, `magicLinkVerify(email, code)`                 |
 
 **Files to create:**
 
-| File | Purpose |
-|------|---------|
-| `client/src/pages/MagicLinkCode.jsx` | Code entry page: 6-digit input, auto-submit on 6 digits, 60-second resend cooldown |
-| `client/src/pages/DisplayNamePrompt.jsx` | Post-signup display name entry |
+| File                                     | Purpose                                                                            |
+| ---------------------------------------- | ---------------------------------------------------------------------------------- |
+| `client/src/pages/MagicLinkCode.jsx`     | Code entry page: 6-digit input, auto-submit on 6 digits, 60-second resend cooldown |
+| `client/src/pages/DisplayNamePrompt.jsx` | Post-signup display name entry                                                     |
 
 **Files to remove from routing (keep files):**
+
 - `client/src/pages/Signup.jsx` — redirect `/signup` to `/login`
 
 ### Research Insights: Web Frontend Race Conditions
@@ -513,16 +536,16 @@ class AuthManager {
 const submittingRef = useRef(false);
 const [isSubmitting, setIsSubmitting] = useState(false);
 
-const handleChange = (value) => {
-    setCode(value);
-    if (value.length === 6 && !submittingRef.current) {
-        submittingRef.current = true;
-        setIsSubmitting(true);  // for UI disabling
-        verifyCode(value).finally(() => {
-            submittingRef.current = false;
-            setIsSubmitting(false);
-        });
-    }
+const handleChange = value => {
+  setCode(value);
+  if (value.length === 6 && !submittingRef.current) {
+    submittingRef.current = true;
+    setIsSubmitting(true); // for UI disabling
+    verifyCode(value).finally(() => {
+      submittingRef.current = false;
+      setIsSubmitting(false);
+    });
+  }
 };
 ```
 
@@ -540,6 +563,7 @@ if (!email) return <Navigate to="/login" />;
 ```
 
 **Web login flow:**
+
 1. Login page shows Google button (`GoogleLogin` component), divider, email field + "Continue with Email" button
 2. Google: `onSuccess` callback receives credential → `POST /api/auth/google` → set cookie → dashboard
 3. Email: `POST /api/auth/magic-link/request` → navigate to `/magic-link/verify` (email in state) → user enters code → `POST /api/auth/magic-link/verify` → if `isNewUser`: redirect to `/onboarding/display-name` → dashboard
@@ -639,18 +663,19 @@ if (!email) return <Navigate to="/login" />;
 
 ## Dependencies & Risks
 
-| Risk | Mitigation |
-|------|------------|
-| Resend free tier limit (100/day) | Sufficient for launch; upgrade to $20/mo at ~100 daily active users |
-| Google OAuth client IDs expire if unused for 6 months | Document in ops runbook; set calendar reminder |
-| Apple rejects app if Google button is more prominent than Apple | Both buttons identical size/weight, Google only gets position advantage |
-| Resend domain verification delays | Set up DNS records early (SPF, DKIM for `mail.ainotecards.com`) before starting code work |
-| `google-auth-library` repo archived (Nov 2025) | npm package still published and maintained in monorepo; `verifyIdToken` API unchanged |
-| In-memory rate limiting resets on restart | Acceptable for indie scale; document as known limitation |
+| Risk                                                            | Mitigation                                                                                |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Resend free tier limit (100/day)                                | Sufficient for launch; upgrade to $20/mo at ~100 daily active users                       |
+| Google OAuth client IDs expire if unused for 6 months           | Document in ops runbook; set calendar reminder                                            |
+| Apple rejects app if Google button is more prominent than Apple | Both buttons identical size/weight, Google only gets position advantage                   |
+| Resend domain verification delays                               | Set up DNS records early (SPF, DKIM for `mail.ainotecards.com`) before starting code work |
+| `google-auth-library` repo archived (Nov 2025)                  | npm package still published and maintained in monorepo; `verifyIdToken` API unchanged     |
+| In-memory rate limiting resets on restart                       | Acceptable for indie scale; document as known limitation                                  |
 
 ## Google Cloud Console Setup Required
 
 Before implementation:
+
 1. Create Google Cloud project (or use existing)
 2. Configure OAuth consent screen (External, scopes: `email`, `profile`, `openid`)
 3. Create **iOS OAuth client** (Bundle ID: `com.ainotecards.app`)
@@ -661,6 +686,7 @@ Before implementation:
 ## Resend Setup Required
 
 Before implementation:
+
 1. Create Resend account at resend.com
 2. Add and verify subdomain `mail.ainotecards.com` (SPF + DKIM DNS records)
 3. Generate API key

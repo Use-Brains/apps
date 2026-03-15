@@ -35,7 +35,7 @@
       },
       "payments": {
         "subscriptions": "Stripe Checkout",
-        "marketplace_payouts": "Stripe Connect Express (destination charges, 70/30 split)",
+        "marketplace_payouts": "Stripe Connect Express (destination charges, 50/50 split)",
         "webhooks": "Platform + Connect (separate signing secrets)"
       },
       "storage": {
@@ -103,8 +103,13 @@
         },
         {
           "name": "Study Sessions",
-          "description": "Flip-card study mode with correct/incorrect tracking",
-          "details": "CSS card flip (perspective + rotateY), session persisted to DB, increments study_score on completion, upserts deck_stats (times_completed, best_accuracy)"
+          "description": "Multi-mode study with correct/incorrect tracking",
+          "details": "4 modes: flip (CSS perspective + rotateY), multiple choice (4 options, min 4 cards), type-the-answer (Levenshtein similarity, 85% threshold), match (memory-style grid, 6 pairs). Mode stored on session record. Session persisted to DB, increments study_score on completion, upserts deck_stats (times_completed, best_accuracy)."
+        },
+        {
+          "name": "Session Recap Screen",
+          "description": "Post-study summary showing score, accuracy, and missed cards with correct answers",
+          "details": "Replaces basic results screen. Shows correct/total, accuracy %, best accuracy comparison, progress bar, and full list of missed cards with front and back displayed. Perfect score message when no misses."
         },
         {
           "name": "Study Statistics",
@@ -124,8 +129,23 @@
         },
         {
           "name": "Dashboard",
-          "description": "User's deck grid with trial banner, study score display, generation CTA",
-          "details": "Shows deck count limits for free tier, purchased deck badges"
+          "description": "User's deck grid with search, sort, trial banner, study score, streak widget, generation CTA",
+          "details": "Search bar (client-side title filter), sort dropdown (Newest/Oldest/A-Z/Most Cards/Last Studied), deck count limits for free tier, purchased deck badges, streak widget (current/longest streak, daily goal progress), streak-at-risk banner"
+        },
+        {
+          "name": "Generation Preview Before Save",
+          "description": "Preview and edit AI-generated cards before saving to deck",
+          "details": "Two-phase flow: (1) POST /api/generate/preview returns unsaved cards, (2) user edits front/back inline, deletes unwanted cards, then saves via separate endpoint. Generation count increments on save only. Regenerate button to try again."
+        },
+        {
+          "name": "Study Streaks",
+          "description": "Consecutive day tracking with dashboard widget and daily goal",
+          "details": "Atomic SQL update on session completion: checks last_study_date (today=noop, yesterday=increment, else reset to 1). Updates longest_streak if exceeded. Dashboard shows current/longest streak, daily goal progress bar. Streak-at-risk banner when active streak with no sessions today. Daily goal stored in preferences JSONB."
+        },
+        {
+          "name": "Forced Card Randomization",
+          "description": "Cards are always shuffled — sequential order removed",
+          "details": "Fisher-Yates shuffle applied when study session starts and on restart. No card_order preference option. Prevents position memorization anti-pattern."
         }
       ],
 
@@ -191,7 +211,7 @@
         {
           "name": "Purchase Flow",
           "description": "Buy decks via Stripe Checkout with idempotent fulfillment",
-          "details": "Destination charges with 70/30 split (seller/platform), webhook-driven fulfillment, deck+cards copied in transaction, ON CONFLICT DO NOTHING for idempotency"
+          "details": "Destination charges with 50/50 split (seller/platform), webhook-driven fulfillment, deck+cards copied in transaction, ON CONFLICT DO NOTHING for idempotency"
         },
         {
           "name": "Listing Tags",
@@ -353,7 +373,7 @@
         },
         {
           "name": "Versioned Migrations",
-          "description": "8 sequential SQL migrations tracked in schema_migrations table",
+          "description": "9 sequential SQL migrations tracked in schema_migrations table",
           "details": "Each runs in transaction, uses DATABASE_URL_DIRECT to bypass connection pooler"
         },
         {
@@ -589,6 +609,9 @@
           "token_revoked_at TIMESTAMPTZ",
           "seller_terms_accepted_at TIMESTAMPTZ",
           "seller_terms_version INT",
+          "current_streak INT DEFAULT 0",
+          "longest_streak INT DEFAULT 0",
+          "last_study_date DATE",
           "created_at TIMESTAMPTZ"
         ]
       },
@@ -607,14 +630,7 @@
       },
       "cards": {
         "description": "Individual flashcards within decks",
-        "columns": [
-          "id UUID PK",
-          "deck_id UUID FK→decks (CASCADE)",
-          "front TEXT NOT NULL",
-          "back TEXT NOT NULL",
-          "position INT",
-          "created_at TIMESTAMPTZ"
-        ]
+        "columns": ["id UUID PK", "deck_id UUID FK→decks (CASCADE)", "front TEXT NOT NULL", "back TEXT NOT NULL", "position INT", "created_at TIMESTAMPTZ"]
       },
       "study_sessions": {
         "description": "Study session tracking with scores",
@@ -624,6 +640,7 @@
           "deck_id UUID FK→decks (CASCADE)",
           "total_cards INT",
           "correct INT",
+          "mode TEXT (flip/multiple_choice/type_answer/match) DEFAULT flip",
           "started_at TIMESTAMPTZ",
           "completed_at TIMESTAMPTZ"
         ],
@@ -648,12 +665,7 @@
       },
       "marketplace_categories": {
         "description": "13 seeded listing categories",
-        "columns": [
-          "id UUID PK",
-          "name TEXT UNIQUE NOT NULL",
-          "slug TEXT UNIQUE NOT NULL",
-          "sort_order INT"
-        ]
+        "columns": ["id UUID PK", "name TEXT UNIQUE NOT NULL", "slug TEXT UNIQUE NOT NULL", "sort_order INT"]
       },
       "marketplace_listings": {
         "description": "Deck listings for sale on the marketplace",
@@ -683,11 +695,7 @@
       },
       "listing_tags": {
         "description": "Up to 5 tags per listing",
-        "columns": [
-          "id UUID PK",
-          "listing_id UUID FK→marketplace_listings (CASCADE)",
-          "tag TEXT NOT NULL"
-        ],
+        "columns": ["id UUID PK", "listing_id UUID FK→marketplace_listings (CASCADE)", "tag TEXT NOT NULL"],
         "constraints": ["UNIQUE(listing_id, tag)"]
       },
       "purchases": {
@@ -760,7 +768,8 @@
       "005_auth_revamp.sql — Google Sign-In, magic_link_codes, nullable password_hash",
       "006_seller_terms.sql — seller_terms_accepted_at, delisted_at",
       "007_deck_stats_and_reviews.sql — deck_stats, review_text, flag_type",
-      "008_account_settings.sql — avatar, preferences JSONB, soft-delete, token revocation, cursor pagination index"
+      "008_account_settings.sql — avatar, preferences JSONB, soft-delete, token revocation, cursor pagination index",
+      "009_study_modes_and_streaks.sql — study session mode column, user streak tracking (current_streak, longest_streak, last_study_date), last_studied covering index"
     ]
   },
 
@@ -774,40 +783,12 @@
       "POST   /api/auth/magic-link/verify",
       "POST   /api/auth/google/callback"
     ],
-    "generation": [
-      "POST   /api/generate"
-    ],
-    "decks": [
-      "GET    /api/decks",
-      "GET    /api/decks/:id",
-      "DELETE /api/decks/:id"
-    ],
-    "study": [
-      "POST   /api/study",
-      "PATCH  /api/study/:id",
-      "GET    /api/study/stats",
-      "GET    /api/study/history",
-      "GET    /api/study/deck-stats"
-    ],
-    "account": [
-      "POST   /api/account/avatar",
-      "DELETE /api/account/avatar",
-      "PATCH  /api/account/password",
-      "DELETE /api/account"
-    ],
-    "settings": [
-      "GET    /api/settings",
-      "PATCH  /api/settings",
-      "PATCH  /api/settings/preferences",
-      "GET    /api/settings/export"
-    ],
-    "marketplace": [
-      "GET    /api/marketplace",
-      "GET    /api/marketplace/categories",
-      "GET    /api/marketplace/:id",
-      "POST   /api/marketplace/:id/purchase",
-      "POST   /api/marketplace/:id/flag"
-    ],
+    "generation": ["POST   /api/generate/preview", "POST   /api/generate (save previewed cards to deck)"],
+    "decks": ["GET    /api/decks", "GET    /api/decks/:id", "DELETE /api/decks/:id"],
+    "study": ["POST   /api/study", "PATCH  /api/study/:id", "GET    /api/study/stats", "GET    /api/study/history", "GET    /api/study/deck-stats"],
+    "account": ["POST   /api/account/avatar", "DELETE /api/account/avatar", "PATCH  /api/account/password", "DELETE /api/account"],
+    "settings": ["GET    /api/settings", "PATCH  /api/settings", "PATCH  /api/settings/preferences", "GET    /api/settings/export"],
+    "marketplace": ["GET    /api/marketplace", "GET    /api/marketplace/categories", "GET    /api/marketplace/:id", "POST   /api/marketplace/:id/purchase", "POST   /api/marketplace/:id/flag"],
     "seller": [
       "POST   /api/seller/listings",
       "PATCH  /api/seller/listings/:id",
@@ -819,26 +800,11 @@
       "GET    /api/seller/onboard/refresh",
       "GET    /api/seller/onboard/return"
     ],
-    "ratings": [
-      "POST   /api/ratings",
-      "GET    /api/ratings/listing/:id"
-    ],
-    "stripe": [
-      "POST   /api/stripe/checkout",
-      "POST   /api/stripe/cancel",
-      "POST   /api/stripe/webhook"
-    ],
-    "admin": [
-      "GET    /api/admin/flags",
-      "PATCH  /api/admin/flags/:id",
-      "PATCH  /api/admin/users/:id/suspend"
-    ],
-    "webhooks": [
-      "POST   /webhooks/stripe-connect"
-    ],
-    "health": [
-      "GET    /api/health"
-    ]
+    "ratings": ["POST   /api/ratings", "GET    /api/ratings/listing/:id"],
+    "stripe": ["POST   /api/stripe/checkout", "POST   /api/stripe/cancel", "POST   /api/stripe/webhook"],
+    "admin": ["GET    /api/admin/flags", "PATCH  /api/admin/flags/:id", "PATCH  /api/admin/users/:id/suspend"],
+    "webhooks": ["POST   /webhooks/stripe-connect"],
+    "health": ["GET    /api/health"]
   },
 
   "design_system": {
@@ -862,12 +828,12 @@
   },
 
   "summary": {
-    "v1_feature_count": 43,
+    "v1_feature_count": 47,
     "v2_feature_count": 16,
     "pages": 17,
-    "api_endpoints": 38,
+    "api_endpoints": 39,
     "database_tables": 13,
-    "migrations": 8,
+    "migrations": 9,
     "status": "v1 complete and deployed"
   }
 }

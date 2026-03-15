@@ -1,8 +1,10 @@
 ---
-title: "Account & Settings Experience"
+title: 'Account & Settings Experience'
 type: feat
 date: 2026-03-14
 ---
+
+<!-- FINISHED -->
 
 # Account & Settings Experience
 
@@ -48,8 +50,11 @@ The app currently has a flat Navbar with inline links (Marketplace, Generate, De
 ## Proposed Solution
 
 ### Phase 1: Database & Backend (migration 008 + new API routes)
+
 ### Phase 2: Navbar Avatar Dropdown
+
 ### Phase 3: Profile Page (identity + study stats)
+
 ### Phase 4: Settings Page Restructure
 
 ---
@@ -158,8 +163,8 @@ const ALLOWED_PREFERENCES = {
   auto_flip_seconds: [0, 3, 5, 10],
   notifications: {
     study_reminders: 'boolean',
-    marketplace_activity: 'boolean',
-  },
+    marketplace_activity: 'boolean'
+  }
 };
 ```
 
@@ -198,7 +203,7 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     if (['image/jpeg', 'image/png'].includes(file.mimetype)) cb(null, true);
     else cb(new Error('Only JPEG and PNG allowed'));
-  },
+  }
 });
 
 // In the handler, after multer:
@@ -208,13 +213,15 @@ if (!detected || !['image/jpeg', 'image/png'].includes(detected.mime)) {
 }
 
 // Delete previous avatar if extension will change (prevent orphaned files)
-const { rows: [current] } = await pool.query('SELECT avatar_url FROM users WHERE id = $1', [req.userId]);
+const {
+  rows: [current]
+} = await pool.query('SELECT avatar_url FROM users WHERE id = $1', [req.userId]);
 const ext = detected.mime === 'image/png' ? 'png' : 'jpg';
 const storagePath = `avatars/${req.userId}.${ext}`;
 if (current.avatar_url && current.avatar_url !== storagePath) {
   await fetch(`${process.env.SUPABASE_URL}/storage/v1/object/avatars/${current.avatar_url}`, {
     method: 'DELETE',
-    headers: { Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` },
+    headers: { Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` }
   }).catch(() => {}); // best-effort cleanup
 }
 
@@ -225,9 +232,9 @@ const uploadRes = await fetch(storageUrl, {
   headers: {
     Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
     'Content-Type': detected.mime,
-    'x-upsert': 'true',
+    'x-upsert': 'true'
   },
-  body: req.file.buffer,
+  body: req.file.buffer
 });
 if (!uploadRes.ok) {
   return res.status(502).json({ error: 'Failed to upload avatar' }); // don't update DB if storage fails
@@ -270,10 +277,7 @@ router.patch('/password', authenticate, requireXHR, requireActiveUser, passwordL
     if (newPassword.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
 
     const hash = await bcrypt.hash(newPassword, SALT_ROUNDS); // SALT_ROUNDS = 12, imported from auth.js
-    await pool.query(
-      'UPDATE users SET password_hash = $1, token_revoked_at = NOW() - INTERVAL \'1 second\' WHERE id = $2',
-      [hash, req.userId]
-    );
+    await pool.query("UPDATE users SET password_hash = $1, token_revoked_at = NOW() - INTERVAL '1 second' WHERE id = $2", [hash, req.userId]);
 
     // Re-issue token so current session stays valid (1-second buffer prevents race with revocation check)
     setTokenCookie(res, req.userId);
@@ -352,17 +356,17 @@ Returns 20 items + uses the 21st to determine `nextCursor` (composite `completed
 router.get('/export', authenticate, requireXHR, requireActiveUser, exportLimiter, async (req, res) => {
   try {
     // Single joined query — avoids N+1 (one query per deck)
-    const { rows: decks } = await pool.query(
-      'SELECT id, title FROM decks WHERE user_id = $1 ORDER BY created_at LIMIT 500',
-      [req.userId]
-    );
-    const { rows: allCards } = await pool.query(`
+    const { rows: decks } = await pool.query('SELECT id, title FROM decks WHERE user_id = $1 ORDER BY created_at LIMIT 500', [req.userId]);
+    const { rows: allCards } = await pool.query(
+      `
       SELECT c.deck_id, c.front, c.back
       FROM cards c
       JOIN decks d ON d.id = c.deck_id
       WHERE d.user_id = $1
       ORDER BY c.deck_id, c.position
-    `, [req.userId]);
+    `,
+      [req.userId]
+    );
 
     // Group cards by deck_id
     const cardsByDeck = {};
@@ -372,7 +376,7 @@ router.get('/export', authenticate, requireXHR, requireActiveUser, exportLimiter
     }
 
     const exportData = {
-      decks: decks.map(d => ({ title: d.title, cards: cardsByDeck[d.id] || [] })),
+      decks: decks.map(d => ({ title: d.title, cards: cardsByDeck[d.id] || [] }))
     };
 
     res.setHeader('Content-Type', 'application/json');
@@ -403,10 +407,9 @@ router.delete('/account', authenticate, requireXHR, deleteLimiter, async (req, r
     }
 
     // Cancel Stripe subscription (best-effort — log failures, don't block deletion)
-    const { rows: [user] } = await pool.query(
-      'SELECT stripe_customer_id, plan, avatar_url FROM users WHERE id = $1',
-      [req.userId]
-    );
+    const {
+      rows: [user]
+    } = await pool.query('SELECT stripe_customer_id, plan, avatar_url FROM users WHERE id = $1', [req.userId]);
     if (user.plan === 'pro' && user.stripe_customer_id) {
       try {
         const subs = await stripe.subscriptions.list({ customer: user.stripe_customer_id, status: 'active' });
@@ -421,7 +424,8 @@ router.delete('/account', authenticate, requireXHR, deleteLimiter, async (req, r
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      await client.query(`
+      await client.query(
+        `
         UPDATE users SET
           deleted_at = NOW(),
           email = 'deleted-' || id,
@@ -438,7 +442,9 @@ router.delete('/account', authenticate, requireXHR, deleteLimiter, async (req, r
           connect_payouts_enabled = false,
           seller_terms_accepted_at = NULL
         WHERE id = $1
-      `, [req.userId]);
+      `,
+        [req.userId]
+      );
       await client.query('COMMIT');
     } catch (txErr) {
       await client.query('ROLLBACK');
@@ -452,9 +458,11 @@ router.delete('/account', authenticate, requireXHR, deleteLimiter, async (req, r
       try {
         await fetch(`${process.env.SUPABASE_URL}/storage/v1/object/avatars/${user.avatar_url}`, {
           method: 'DELETE',
-          headers: { Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` },
+          headers: { Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` }
         });
-      } catch { /* best-effort */ }
+      } catch {
+        /* best-effort */
+      }
     }
 
     res.clearCookie('token');
@@ -467,6 +475,7 @@ router.delete('/account', authenticate, requireXHR, deleteLimiter, async (req, r
 ```
 
 **Auth query updates required for soft-delete:** Add `AND deleted_at IS NULL` to:
+
 - Login query in `auth.js` (`SELECT ... FROM users WHERE email = $1 AND deleted_at IS NULL`)
 - Google OAuth lookup in `auth-google.js` (`WHERE google_user_id = $1 AND deleted_at IS NULL`)
 - Signup email uniqueness check in `auth.js` (`WHERE email = $1 AND deleted_at IS NULL`)
@@ -496,12 +505,10 @@ const STORAGE_BASE = `${process.env.SUPABASE_URL}/storage/v1/object/public`;
 function sanitizeUser(user) {
   return {
     // ... existing fields ...
-    avatar_url: user.avatar_url
-      ? `${STORAGE_BASE}/${user.avatar_url}?v=${user.updated_at ? new Date(user.updated_at).getTime() : ''}`
-      : user.google_avatar_url || null,
+    avatar_url: user.avatar_url ? `${STORAGE_BASE}/${user.avatar_url}?v=${user.updated_at ? new Date(user.updated_at).getTime() : ''}` : user.google_avatar_url || null,
     has_password: user.has_password, // from SQL alias: (password_hash IS NOT NULL) AS has_password
     google_connected: !!user.google_user_id,
-    preferences: user.preferences || {},
+    preferences: user.preferences || {}
   };
 }
 ```
@@ -511,6 +518,7 @@ Key: resolve avatar URL server-side (storage path → full URL with Google fallb
 **USER_SELECT updates:**
 
 Add to the SELECT list in `auth.js:11-14`:
+
 - `avatar_url, google_avatar_url, preferences`
 - `(password_hash IS NOT NULL) AS has_password` — SQL alias so the raw hash never leaves the database layer
 
@@ -523,10 +531,7 @@ Instead, create a separate `requireActiveUser` middleware for sensitive operatio
 ```javascript
 // server/src/middleware/auth.js — NEW middleware (do NOT modify existing authenticate)
 export async function requireActiveUser(req, res, next) {
-  const { rows } = await pool.query(
-    'SELECT deleted_at, token_revoked_at FROM users WHERE id = $1',
-    [req.userId]
-  );
+  const { rows } = await pool.query('SELECT deleted_at, token_revoked_at FROM users WHERE id = $1', [req.userId]);
   if (!rows[0] || rows[0].deleted_at) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -538,6 +543,7 @@ export async function requireActiveUser(req, res, next) {
 ```
 
 Apply `requireActiveUser` to:
+
 - `PATCH /api/settings/password`
 - `DELETE /api/settings/account`
 - `GET /api/settings/export`
@@ -601,7 +607,7 @@ Using `click` for outside detection causes a race condition: clicking the avatar
 ```javascript
 useEffect(() => {
   if (!open) return;
-  const handler = (e) => {
+  const handler = e => {
     if (menuRef.current?.contains(e.target)) return;
     if (buttonRef.current?.contains(e.target)) return; // prevent toggle-bounce
     setOpen(false);
@@ -614,21 +620,22 @@ useEffect(() => {
 **ARIA menu pattern:**
 
 ```jsx
-<button
-  ref={buttonRef}
-  aria-haspopup="true"
-  aria-expanded={open}
-  onClick={() => setOpen(!open)}
->
+<button ref={buttonRef} aria-haspopup="true" aria-expanded={open} onClick={() => setOpen(!open)}>
   {/* avatar */}
-</button>
-{open && (
-  <div role="menu" aria-label="Account menu" ref={menuRef}>
-    <Link role="menuitem" to="/profile">Profile</Link>
-    <Link role="menuitem" to="/settings">Settings</Link>
-    {/* ... */}
-  </div>
-)}
+</button>;
+{
+  open && (
+    <div role="menu" aria-label="Account menu" ref={menuRef}>
+      <Link role="menuitem" to="/profile">
+        Profile
+      </Link>
+      <Link role="menuitem" to="/settings">
+        Settings
+      </Link>
+      {/* ... */}
+    </div>
+  );
+}
 ```
 
 **Escape key handling:**
@@ -636,7 +643,7 @@ useEffect(() => {
 ```javascript
 useEffect(() => {
   if (!open) return;
-  const handler = (e) => {
+  const handler = e => {
     if (e.key === 'Escape') {
       setOpen(false);
       buttonRef.current?.focus(); // return focus to trigger
@@ -712,19 +719,17 @@ useEffect(() => {
 useEffect(() => {
   const controller = new AbortController();
 
-  Promise.allSettled([
-    api.getStats({ signal: controller.signal }),
-    api.getStudyHistory({ signal: controller.signal }),
-    api.getDeckStats({ signal: controller.signal }),
-  ]).then(([statsResult, historyResult, deckStatsResult]) => {
-    if (statsResult.status === 'fulfilled') setStats(statsResult.value);
-    if (historyResult.status === 'fulfilled') {
-      setHistory(historyResult.value.sessions);
-      setHistoryCursor(historyResult.value.nextCursor);
+  Promise.allSettled([api.getStats({ signal: controller.signal }), api.getStudyHistory({ signal: controller.signal }), api.getDeckStats({ signal: controller.signal })]).then(
+    ([statsResult, historyResult, deckStatsResult]) => {
+      if (statsResult.status === 'fulfilled') setStats(statsResult.value);
+      if (historyResult.status === 'fulfilled') {
+        setHistory(historyResult.value.sessions);
+        setHistoryCursor(historyResult.value.nextCursor);
+      }
+      if (deckStatsResult.status === 'fulfilled') setDeckStats(deckStatsResult.value);
+      setLoading(false);
     }
-    if (deckStatsResult.status === 'fulfilled') setDeckStats(deckStatsResult.value);
-    setLoading(false);
-  });
+  );
 
   return () => controller.abort();
 }, []);
@@ -853,7 +858,7 @@ async function handleExport() {
   try {
     const res = await fetch('/api/settings/export', {
       credentials: 'include',
-      headers: { 'X-Requested-With': 'XMLHttpRequest' }, // required by requireXHR middleware
+      headers: { 'X-Requested-With': 'XMLHttpRequest' } // required by requireXHR middleware
     });
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
@@ -936,6 +941,7 @@ This ensures: Google photo is captured automatically, but a manually uploaded av
 ## Acceptance Criteria
 
 ### Phase 1: Database & Backend
+
 - [x] Migration 008 adds `avatar_url`, `google_avatar_url`, `preferences`, `deleted_at`, `token_revoked_at` columns to users
 - [x] Migration 008 adds composite index on `study_sessions (user_id, completed_at DESC, id DESC)`
 - [x] Extract `requireXHR` from `generate.js` to `middleware/csrf.js` as shared middleware
@@ -958,6 +964,7 @@ This ensures: Google photo is captured automatically, but a manually uploaded av
 - [x] Success responses without data use `{ ok: true }` (not `{ message }`)
 
 ### Phase 2: Navbar Avatar Dropdown
+
 - [x] Avatar circle (32px) in top-right of Navbar replaces flat links when logged in
 - [x] Shows user's avatar image, or Google avatar fallback, or initials on colored background
 - [x] Click opens dropdown with: Profile, Settings, Seller Dashboard (conditional), divider, Log out
@@ -966,6 +973,7 @@ This ensures: Google photo is captured automatically, but a manually uploaded av
 - [x] Dropdown uses ARIA menu pattern (role="menu", aria-haspopup, aria-expanded)
 
 ### Phase 3: Profile Page
+
 - [x] Accessible at `/profile` (authenticated only)
 - [x] Shows avatar (clickable to change), display name (editable inline), email (read-only), plan badge
 - [x] Study stats grid: study score, total sessions, cards studied, overall accuracy
@@ -976,6 +984,7 @@ This ensures: Google photo is captured automatically, but a manually uploaded av
 - [x] AbortController cleanup on unmount
 
 ### Phase 4: Settings Restructure
+
 - [x] Profile section removed (display name editing moved to Profile page)
 - [x] Security section: change password form (hidden for Google-only users), Google connected status
 - [x] Study Preferences section: card order toggle, auto-flip select — auto-saves with debounce
@@ -1015,18 +1024,18 @@ ALTER TABLE users ADD CONSTRAINT preferences_size
 
 **Backend files to modify/create:**
 
-| File | Changes |
-|------|---------|
-| `server/src/db/migrations/008_account_settings.sql` | New migration |
-| `server/src/middleware/csrf.js` | **New** — extract `requireXHR` from `generate.js` as shared middleware |
-| `server/src/middleware/auth.js` | **New** `requireActiveUser` middleware (DB check for `deleted_at`, `token_revoked_at`) |
-| `server/src/services/storage.js` | **New** — `uploadAvatar(userId, buffer, mime)`, `deleteAvatar(storagePath)` encapsulating Supabase REST calls |
-| `server/src/routes/settings.js` | Preferences update, export (configuration endpoints) |
-| `server/src/routes/account.js` | **New** — password change, avatar upload/delete, account deletion (identity/security endpoints). Mounted at `/api/account` |
-| `server/src/routes/study.js` | Add `/history` and `/deck-stats` endpoints |
-| `server/src/routes/auth.js` | Update `USER_SELECT` (add `avatar_url`, `google_avatar_url`, `preferences`, `has_password` alias), update `sanitizeUser`, Google OAuth handler, add `AND deleted_at IS NULL` to login/signup queries |
-| `server/src/routes/auth-google.js` | Add `AND deleted_at IS NULL` to Google OAuth user lookup |
-| `server/src/routes/generate.js` | Import `requireXHR` from `middleware/csrf.js` instead of local definition |
+| File                                                | Changes                                                                                                                                                                                              |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/src/db/migrations/008_account_settings.sql` | New migration                                                                                                                                                                                        |
+| `server/src/middleware/csrf.js`                     | **New** — extract `requireXHR` from `generate.js` as shared middleware                                                                                                                               |
+| `server/src/middleware/auth.js`                     | **New** `requireActiveUser` middleware (DB check for `deleted_at`, `token_revoked_at`)                                                                                                               |
+| `server/src/services/storage.js`                    | **New** — `uploadAvatar(userId, buffer, mime)`, `deleteAvatar(storagePath)` encapsulating Supabase REST calls                                                                                        |
+| `server/src/routes/settings.js`                     | Preferences update, export (configuration endpoints)                                                                                                                                                 |
+| `server/src/routes/account.js`                      | **New** — password change, avatar upload/delete, account deletion (identity/security endpoints). Mounted at `/api/account`                                                                           |
+| `server/src/routes/study.js`                        | Add `/history` and `/deck-stats` endpoints                                                                                                                                                           |
+| `server/src/routes/auth.js`                         | Update `USER_SELECT` (add `avatar_url`, `google_avatar_url`, `preferences`, `has_password` alias), update `sanitizeUser`, Google OAuth handler, add `AND deleted_at IS NULL` to login/signup queries |
+| `server/src/routes/auth-google.js`                  | Add `AND deleted_at IS NULL` to Google OAuth user lookup                                                                                                                                             |
+| `server/src/routes/generate.js`                     | Import `requireXHR` from `middleware/csrf.js` instead of local definition                                                                                                                            |
 
 **Supabase Storage setup:**
 
@@ -1049,56 +1058,56 @@ New env vars: `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (add to `.env.examp
 
 **Files to modify:**
 
-| File | Changes |
-|------|---------|
+| File                               | Changes                                                  |
+| ---------------------------------- | -------------------------------------------------------- |
 | `client/src/components/Navbar.jsx` | Replace flat logged-in nav with AvatarDropdown component |
-| `client/src/lib/AuthContext.jsx` | No changes (already provides user with needed fields) |
+| `client/src/lib/AuthContext.jsx`   | No changes (already provides user with needed fields)    |
 
 ### Phase 3: Profile Page
 
 **Files to create/modify:**
 
-| File | Changes |
-|------|---------|
-| `client/src/pages/Profile.jsx` | New page component |
-| `client/src/App.jsx` | Add `/profile` route |
-| `client/src/lib/api.js` | Add `getStudyHistory`, `getDeckStats`, `uploadAvatar`, `deleteAvatar` methods |
+| File                           | Changes                                                                       |
+| ------------------------------ | ----------------------------------------------------------------------------- |
+| `client/src/pages/Profile.jsx` | New page component                                                            |
+| `client/src/App.jsx`           | Add `/profile` route                                                          |
+| `client/src/lib/api.js`        | Add `getStudyHistory`, `getDeckStats`, `uploadAvatar`, `deleteAvatar` methods |
 
 ### Phase 4: Settings Restructure
 
 **Files to modify:**
 
-| File | Changes |
-|------|---------|
+| File                            | Changes                                                                                   |
+| ------------------------------- | ----------------------------------------------------------------------------------------- |
 | `client/src/pages/Settings.jsx` | Remove profile section, add Security, Preferences, Notifications, Data & Privacy sections |
-| `client/src/lib/api.js` | Add `changePassword`, `updatePreferences`, `exportDecks`, `deleteAccount` methods |
+| `client/src/lib/api.js`         | Add `changePassword`, `updatePreferences`, `exportDecks`, `deleteAccount` methods         |
 
 ---
 
 ## Dependencies & Risks
 
-| Risk | Mitigation |
-|------|-----------|
-| **BLOCKER: purchases FK prevents hard-delete** | Use soft-delete (`deleted_at` column) — scrub PII but preserve row for FK integrity |
-| Supabase Storage not set up | Create `avatars` bucket in dashboard before deployment. Can test locally with mock |
-| Google-only users can't change password | Show "no password set" message; password reset via magic link is future work |
-| Delete account with active Stripe sub | Force cancel subscription before soft-delete; check in the endpoint |
-| Unlinking Google could lock out user | Defer link/unlink — show read-only status for MVP |
-| Dark mode scope creep | Explicitly deferred; not in this plan |
-| Notification emails not sent | Toggles are persisted; delivery infrastructure (Resend) is separate work |
-| Avatar file stored permanently | Supabase Storage handles lifecycle; old avatar overwritten on re-upload (same key) |
-| 7-day JWT stays valid after password change | Set `token_revoked_at` (with 1s buffer) and check via `requireActiveUser` middleware on sensitive endpoints |
-| Spoofable mimetype on avatar upload | Validate magic bytes via `fileTypeFromBuffer`, return 422 (matching generate.js pattern) |
-| Concurrent preference saves from rapid toggles | Debounce (300ms) + serialize (queue pending saves) |
-| Export memory for users with many decks | Single joined query with 500-deck cap (not N+1 streaming) |
-| Avatar extension change orphans old file | Delete old avatar before uploading new one if path differs |
-| `token_revoked_at` column missing | Added to migration 008 (was designed but never migrated) |
-| `req.user.id` vs `req.userId` | All code uses `req.userId` (set by authenticate middleware) |
-| bcrypt salt rounds inconsistency | Import `SALT_ROUNDS` (12) from auth.js, not hardcoded |
-| PII scrub incomplete on deletion | Scrub ALL identity columns: google_user_id, stripe IDs, seller terms |
-| JSONB shallow merge loses nested keys | Deep-merge in application code, not `||` operator |
-| settings.js growing too large | Split into `settings.js` (config) + `account.js` (identity/security) |
-| Supabase Storage upload may fail silently | Check `response.ok` before updating DB; return 502 on failure |
+| Risk                                           | Mitigation                                                                                                  |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | --- | ---------- |
+| **BLOCKER: purchases FK prevents hard-delete** | Use soft-delete (`deleted_at` column) — scrub PII but preserve row for FK integrity                         |
+| Supabase Storage not set up                    | Create `avatars` bucket in dashboard before deployment. Can test locally with mock                          |
+| Google-only users can't change password        | Show "no password set" message; password reset via magic link is future work                                |
+| Delete account with active Stripe sub          | Force cancel subscription before soft-delete; check in the endpoint                                         |
+| Unlinking Google could lock out user           | Defer link/unlink — show read-only status for MVP                                                           |
+| Dark mode scope creep                          | Explicitly deferred; not in this plan                                                                       |
+| Notification emails not sent                   | Toggles are persisted; delivery infrastructure (Resend) is separate work                                    |
+| Avatar file stored permanently                 | Supabase Storage handles lifecycle; old avatar overwritten on re-upload (same key)                          |
+| 7-day JWT stays valid after password change    | Set `token_revoked_at` (with 1s buffer) and check via `requireActiveUser` middleware on sensitive endpoints |
+| Spoofable mimetype on avatar upload            | Validate magic bytes via `fileTypeFromBuffer`, return 422 (matching generate.js pattern)                    |
+| Concurrent preference saves from rapid toggles | Debounce (300ms) + serialize (queue pending saves)                                                          |
+| Export memory for users with many decks        | Single joined query with 500-deck cap (not N+1 streaming)                                                   |
+| Avatar extension change orphans old file       | Delete old avatar before uploading new one if path differs                                                  |
+| `token_revoked_at` column missing              | Added to migration 008 (was designed but never migrated)                                                    |
+| `req.user.id` vs `req.userId`                  | All code uses `req.userId` (set by authenticate middleware)                                                 |
+| bcrypt salt rounds inconsistency               | Import `SALT_ROUNDS` (12) from auth.js, not hardcoded                                                       |
+| PII scrub incomplete on deletion               | Scrub ALL identity columns: google_user_id, stripe IDs, seller terms                                        |
+| JSONB shallow merge loses nested keys          | Deep-merge in application code, not `                                                                       |     | ` operator |
+| settings.js growing too large                  | Split into `settings.js` (config) + `account.js` (identity/security)                                        |
+| Supabase Storage upload may fail silently      | Check `response.ok` before updating DB; return 502 on failure                                               |
 
 ## Success Metrics
 

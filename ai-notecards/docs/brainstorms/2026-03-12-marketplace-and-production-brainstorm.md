@@ -3,6 +3,8 @@ date: 2026-03-12
 topic: marketplace-production-readiness
 ---
 
+<!-- FINISHED -->
+
 # Deck Marketplace + Production Readiness
 
 ## What We're Building
@@ -15,11 +17,11 @@ Three interconnected changes to make AI Notecards production-ready and revenue-g
 
 ## Tier Structure
 
-| Tier | Price | AI Generations | Marketplace | API Keys |
-|------|-------|---------------|-------------|----------|
-| Free | $0 | 1/day | Buy only | Our keys |
-| Pro (BYOK) | $5/mo | As many as your keys support | Buy + Sell | User's keys |
-| Pro (No BYOK) | $10/mo | 10/day | Buy + Sell | Our keys |
+| Tier          | Price  | AI Generations               | Marketplace | API Keys    |
+| ------------- | ------ | ---------------------------- | ----------- | ----------- |
+| Free          | $0     | 1/day                        | Buy only    | Our keys    |
+| Pro (BYOK)    | $5/mo  | As many as your keys support | Buy + Sell  | User's keys |
+| Pro (No BYOK) | $10/mo | 10/day                       | Buy + Sell  | Our keys    |
 
 - Free tier uses our Groq/Gemini keys with 1 generation/day limit
 - Pro BYOK users paste their own Groq and/or Gemini API keys in a settings page
@@ -61,9 +63,9 @@ Three interconnected changes to make AI Notecards production-ready and revenue-g
 
 Pro users can list paid decks immediately. No prerequisites.
 
-| Badge | Requirements | Benefits |
-|-------|-------------|----------|
-| **New Seller** | Pro account | Can list paid decks, standard placement |
+| Badge               | Requirements                                    | Benefits                                     |
+| ------------------- | ----------------------------------------------- | -------------------------------------------- |
+| **New Seller**      | Pro account                                     | Can list paid decks, standard placement      |
 | **Verified Seller** | 30+ days active, 5+ paid sales, 0 content flags | Trust badge, boosted search/browse placement |
 
 - Revenue split: 70% seller / 30% platform from the first sale
@@ -114,6 +116,7 @@ No subcategories at launch. Sellers add up to 5 tags for granularity. Popular ta
 ### Moderation & Content Filtration
 
 **On deck submission (real-time, programmatic only — no AI):**
+
 - Minimum 5 cards
 - No empty front/back fields
 - Duplicate title detection
@@ -122,6 +125,7 @@ No subcategories at launch. Sellers add up to 5 tags for granularity. Popular ta
 - Fail → rejected with reason
 
 **On user flag (post-publish):**
+
 1. Re-run programmatic filter (may catch things missed on first pass)
 2. Save flagged record to review queue with flag reason
 3. AI reviews queue later — adhoc, manually triggered by admin to control token usage

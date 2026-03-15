@@ -1,8 +1,10 @@
 ---
-title: "Seller Onboarding Flow & Dashboard Marketplace Listing"
+title: 'Seller Onboarding Flow & Dashboard Marketplace Listing'
 type: feat
 date: 2026-03-13
 ---
+
+<!-- FINISHED -->
 
 # Seller Onboarding Flow & Dashboard Marketplace Listing
 
@@ -11,6 +13,7 @@ date: 2026-03-13
 Build a complete seller journey: explicit opt-in to become a seller (separate from Pro), a content liability/terms acceptance step, and a visible way to list decks directly from the Dashboard. Currently the `ListDeck` page exists at `/sell/:deckId` but is unreachable — no UI links to it.
 
 Three connected features:
+
 1. **Seller opt-in flow** with dual entry points (post-checkout prompt + Settings)
 2. **Seller terms/liability agreement** modal before Stripe Connect onboarding
 3. **Status-aware sell icon** on each Dashboard deck card
@@ -45,12 +48,12 @@ Pro Checkout Success
 
 ### Dashboard Sell Icon States
 
-| Deck State | Icon | Behavior |
-|---|---|---|
-| Eligible (generated, 10+ cards, not listed, user is seller) | "Sell" | Clickable → `/sell/:deckId` |
-| Ineligible (purchased, <10 cards, or not a seller) | Greyed icon | Not clickable |
-| Active listing | "View" | Clickable → `/marketplace/:listingId` |
-| Delisted listing | "Relist" | Clickable → calls relist endpoint |
+| Deck State                                                  | Icon        | Behavior                              |
+| ----------------------------------------------------------- | ----------- | ------------------------------------- |
+| Eligible (generated, 10+ cards, not listed, user is seller) | "Sell"      | Clickable → `/sell/:deckId`           |
+| Ineligible (purchased, <10 cards, or not a seller)          | Greyed icon | Not clickable                         |
+| Active listing                                              | "View"      | Clickable → `/marketplace/:listingId` |
+| Delisted listing                                            | "Relist"    | Clickable → calls relist endpoint     |
 
 ## Technical Approach
 
@@ -97,6 +100,7 @@ erDiagram
 **Migration 006** — Add seller terms columns to `users` table and `delisted_at` to `marketplace_listings`.
 
 `server/src/db/migrations/006_seller_terms.sql`:
+
 ```sql
 ALTER TABLE users
   ADD COLUMN seller_terms_accepted_at TIMESTAMPTZ,
@@ -107,10 +111,12 @@ ALTER TABLE marketplace_listings
 ```
 
 Notes:
+
 - `seller_terms_version` is nullable — `NULL` means never accepted, a value (e.g. `1`) means accepted that version. Only set alongside `seller_terms_accepted_at` via the accept-terms endpoint.
 - `delisted_at` tracks when a listing was delisted, separate from `updated_at` which changes on any modification (price, description, etc.).
 
 **New endpoint: `POST /api/seller/accept-terms`** in `server/src/routes/seller.js`:
+
 - Middleware chain: `authenticate → checkTrialExpiry → requirePlan('pro')`
 - Sets `seller_terms_accepted_at = NOW()`, `seller_terms_version = 1`
 - Idempotent: if already set, returns 200 with existing timestamp
@@ -125,11 +131,9 @@ Add a terms-acceptance check to three endpoints in `server/src/routes/seller.js`
 3. **`POST /api/seller/listings/:id/relist`** (relist) — same 403 check. Currently only gates on `connect_charges_enabled` (line 217-221); add `seller_terms_accepted_at` to the query and check both.
 
 Pattern for all three:
+
 ```javascript
-const { rows: userRows } = await pool.query(
-  'SELECT connect_charges_enabled, seller_terms_accepted_at FROM users WHERE id = $1',
-  [req.userId]
-);
+const { rows: userRows } = await pool.query('SELECT connect_charges_enabled, seller_terms_accepted_at FROM users WHERE id = $1', [req.userId]);
 if (!userRows[0].seller_terms_accepted_at) {
   return res.status(403).json({ error: 'terms_required', message: 'You must accept seller terms first.' });
 }
@@ -139,6 +143,7 @@ if (!userRows[0].connect_charges_enabled) {
 ```
 
 **Update `GET /api/decks`** in `server/src/routes/decks.js`:
+
 - LEFT JOIN `marketplace_listings` on `deck_id` to return `listing_id` and `listing_status` per deck
 - Query change:
 
@@ -154,17 +159,21 @@ ORDER BY d.created_at DESC
 ```
 
 **Update `sanitizeUser` and `USER_SELECT`** in `server/src/routes/auth.js`:
+
 - Add `seller_terms_accepted_at` and `connect_payouts_enabled` to both so the client knows full seller status
 - `connect_payouts_enabled` is needed by Settings (Phase 4) to distinguish "Finish Stripe Setup" from "Active Seller" states
 
 **Update delist endpoint** in `server/src/routes/seller.js`:
+
 - `DELETE /api/seller/listings/:id` (line 196-212) — set `delisted_at = NOW()` alongside `status = 'delisted'`:
+
 ```sql
 UPDATE marketplace_listings SET status = 'delisted', delisted_at = NOW(), updated_at = NOW()
 WHERE id = $1 AND seller_id = $2 AND status = 'active'
 ```
 
 **Files:**
+
 - `server/src/db/migrations/006_seller_terms.sql` (new)
 - `server/src/routes/seller.js` — new accept-terms endpoint, terms gate on onboard/create/relist, delist sets `delisted_at`
 - `server/src/routes/decks.js` — LEFT JOIN for listing data
@@ -179,6 +188,7 @@ WHERE id = $1 AND seller_id = $2 AND status = 'active'
 Props: `{ onAccept, onClose }`
 
 Content:
+
 - Title: "Become a Seller"
 - Subtitle: "Before you start selling, please review and accept the following:"
 - Bullet points:
@@ -190,12 +200,14 @@ Content:
 - Buttons: "Continue" (disabled until checked) / "Cancel"
 
 On accept:
+
 1. Call `POST /api/seller/accept-terms`
 2. Call `refreshUser()` to update AuthContext
 3. Call `api.startSellerOnboarding()` to get Stripe Connect URL
 4. Redirect to Stripe Connect
 
 **API client additions** in `client/src/lib/api.js`:
+
 ```javascript
 acceptSellerTerms: () => request('/seller/accept-terms', { method: 'POST' }),
 relistListing: (id) => request(`/seller/listings/${id}/relist`, { method: 'POST' }),
@@ -204,10 +216,12 @@ relistListing: (id) => request(`/seller/listings/${id}/relist`, { method: 'POST'
 Note: `relistListing` is needed by Phase 5 (Dashboard sell icons) for the "Relist" action. Adding it here alongside `acceptSellerTerms` keeps all new API methods in one phase.
 
 **Modal styling** — follow established pattern:
+
 - Overlay: `fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4`
 - Dialog: `bg-white rounded-2xl p-6 max-w-md w-full` (slightly wider than ReportModal for readability)
 
 **Files:**
+
 - `client/src/pages/Dashboard.jsx` — add SellerTermsModal component
 - `client/src/lib/api.js` — add `acceptSellerTerms` method
 
@@ -230,12 +244,14 @@ Design: similar to the existing trial banner but with seller CTA.
 ```
 
 **Behavior:**
+
 - "Become a Seller" → opens SellerTermsModal
 - "Skip for now" → dismisses banner
 - Clean URL after showing: `window.history.replaceState({}, '', '/dashboard')` to prevent re-display on refresh
 - Only render when `user.plan === 'pro'` (handles webhook delay — if plan isn't updated yet, user gets the toast but not the seller prompt; they can use Settings later)
 
 **Files:**
+
 - `client/src/pages/Dashboard.jsx` — new banner component + state management
 
 ---
@@ -246,14 +262,15 @@ Add a third `<section>` block in Settings.jsx after the Subscription section.
 
 **Visibility logic:**
 
-| User State | Section Shows |
-|---|---|
-| Not Pro | Hidden |
-| Pro, not a seller (`seller_terms_accepted_at` null, `connect_charges_enabled` false) | "Become a Seller" CTA |
-| Pro, terms accepted but Connect incomplete | "Finish Stripe Setup" CTA |
-| Pro, active seller | "Active Seller" status + link to `/seller` |
+| User State                                                                           | Section Shows                              |
+| ------------------------------------------------------------------------------------ | ------------------------------------------ |
+| Not Pro                                                                              | Hidden                                     |
+| Pro, not a seller (`seller_terms_accepted_at` null, `connect_charges_enabled` false) | "Become a Seller" CTA                      |
+| Pro, terms accepted but Connect incomplete                                           | "Finish Stripe Setup" CTA                  |
+| Pro, active seller                                                                   | "Active Seller" status + link to `/seller` |
 
 **"Become a Seller" CTA:**
+
 - Brief description: "Earn money by selling your flashcard decks on the marketplace."
 - Button: "Become a Seller" → opens SellerTermsModal
 - Note: same modal component defined in Dashboard.jsx — extract to a shared inline pattern or duplicate (both follow codebase convention of inline modals)
@@ -261,6 +278,7 @@ Add a third `<section>` block in Settings.jsx after the Subscription section.
 Since the app uses inline modal components per page (not shared components), the SellerTermsModal will be duplicated in Settings.jsx. This follows the established ReportModal/RatingModal pattern.
 
 **Files:**
+
 - `client/src/pages/Settings.jsx` — new seller section + SellerTermsModal copy
 
 ---
@@ -270,12 +288,14 @@ Since the app uses inline modal components per page (not shared components), the
 Add a status-aware icon/badge in the **top-right corner** of each deck card in Dashboard.jsx.
 
 **Data required per deck** (from updated GET `/api/decks`):
+
 - `origin` — already returned
 - `card_count` — already returned
 - `listing_id` — new (from LEFT JOIN)
 - `listing_status` — new (from LEFT JOIN)
 
 **User data required:**
+
 - `connect_charges_enabled` — already in AuthContext
 - `seller_terms_accepted_at` — new (added in Phase 1)
 
@@ -296,16 +316,17 @@ function getDeckSellState(deck, user) {
 
 **Rendering:**
 
-| State | Visual | Click Action |
-|---|---|---|
-| `sell` | Green price-tag icon + "Sell" text | Navigate to `/sell/${deck.id}` |
-| `view` | Green price-tag icon + "View" text | Navigate to `/marketplace/${deck.listing_id}` |
-| `relist` | Green price-tag icon + "Relist" text | Call `api.relistListing(deck.listing_id)`, refresh decks |
-| `disabled` | Grey price-tag icon, no text | Not clickable, `cursor-not-allowed opacity-40` |
+| State      | Visual                               | Click Action                                             |
+| ---------- | ------------------------------------ | -------------------------------------------------------- |
+| `sell`     | Green price-tag icon + "Sell" text   | Navigate to `/sell/${deck.id}`                           |
+| `view`     | Green price-tag icon + "View" text   | Navigate to `/marketplace/${deck.listing_id}`            |
+| `relist`   | Green price-tag icon + "Relist" text | Call `api.relistListing(deck.listing_id)`, refresh decks |
+| `disabled` | Grey price-tag icon, no text         | Not clickable, `cursor-not-allowed opacity-40`           |
 
 Icon placement: `absolute top-3 right-3` inside the deck card (card needs `relative` positioning).
 
 **Files:**
+
 - `client/src/pages/Dashboard.jsx` — sell icon rendering + state logic
 
 ---
@@ -313,6 +334,7 @@ Icon placement: `absolute top-3 right-3` inside the deck card (card needs `relat
 #### Phase 6: Bug Fixes & Cleanup
 
 **6a. Fix `account.application.deauthorized` webhook bug** in `server/src/index.js`:
+
 - Current code (lines 101-116) nullifies `stripe_connect_account_id` THEN tries to delist by that ID (finds zero rows because the subquery `SELECT id FROM users WHERE stripe_connect_account_id = $1` returns nothing)
 - Fix: use a single CTE query that delists first, then nullifies — both in one atomic operation
 
@@ -328,6 +350,7 @@ WHERE stripe_connect_account_id = $1;
 ```
 
 **6b. Fix fee split discrepancy:**
+
 - SellerDashboard.jsx line 83 says "50% of every sale"
 - ListDeck.jsx line 58 calculates 30% platform fee (seller gets 70%)
 - purchase.js line 69 calculates `Math.round(listing.price_cents * 0.3)` as `application_fee_amount`
@@ -337,19 +360,24 @@ WHERE stripe_connect_account_id = $1;
   - SellerDashboard.jsx text is already correct
 
 **6c. Add client-side guard to ListDeck.jsx:**
+
 - On mount, check `user.connect_charges_enabled` and `user.seller_terms_accepted_at`
 - If not eligible, redirect to `/seller` with toast: "Complete seller setup to list decks"
 
 **6d. Handle `connect=refresh` in SellerDashboard.jsx:**
+
 - Currently ignored. Add handler: when `connect=refresh` is detected, show toast "Your Stripe link expired. Click below to try again." and ensure the CTA is visible.
 
 **6e. Dashboard delete warning for listed decks:**
+
 - Update `handleDelete` confirm message: if deck has `listing_id`, warn "This deck has an active marketplace listing. Deleting it will also remove the listing and sales history."
 
 **6f. Remove dead code in `server/src/services/purchase.js`:**
+
 - Lines 178-182 build a batch insert `values` array that is never used (individual inserts follow on lines 184-189). Remove the dead `values` variable.
 
 **Files:**
+
 - `server/src/index.js` — webhook fix (CTE)
 - `server/src/services/purchase.js` — fee split (if changing to 50/50) + dead code cleanup
 - `client/src/pages/ListDeck.jsx` — fee calc + seller guard
@@ -403,17 +431,18 @@ WHERE stripe_connect_account_id = $1;
 
 ## Risk Analysis & Mitigation
 
-| Risk | Impact | Mitigation |
-|---|---|---|
+| Risk                                                               | Impact                     | Mitigation                                                               |
+| ------------------------------------------------------------------ | -------------------------- | ------------------------------------------------------------------------ |
 | Webhook delay after checkout — user arrives before plan is updated | Seller prompt doesn't show | Only show prompt when `user.plan === 'pro'` confirmed; Settings fallback |
-| User accepts terms but abandons Stripe Connect | Stuck in limbo state | Settings shows "Finish Stripe Setup" CTA; no data loss |
-| Concurrent onboarding from two tabs | Duplicate Stripe accounts | Server reuses existing `stripe_connect_account_id` — already handled |
-| Fee split confusion between 50/50 and 70/30 | Incorrect payouts | Resolve before implementation; update all references atomically |
-| Terms change in the future | Compliance gap | `seller_terms_version` column allows tracking which version was accepted |
+| User accepts terms but abandons Stripe Connect                     | Stuck in limbo state       | Settings shows "Finish Stripe Setup" CTA; no data loss                   |
+| Concurrent onboarding from two tabs                                | Duplicate Stripe accounts  | Server reuses existing `stripe_connect_account_id` — already handled     |
+| Fee split confusion between 50/50 and 70/30                        | Incorrect payouts          | Resolve before implementation; update all references atomically          |
+| Terms change in the future                                         | Compliance gap             | `seller_terms_version` column allows tracking which version was accepted |
 
 ## References & Research
 
 ### Internal References
+
 - Brainstorm: `docs/brainstorms/2026-03-13-seller-flow-brainstorm.md`
 - Marketplace plan: `docs/plans/2026-03-12-feat-marketplace-production-readiness-plan.md`
 - Auth guide: `docs/solutions/auth-implementation-guide.md`

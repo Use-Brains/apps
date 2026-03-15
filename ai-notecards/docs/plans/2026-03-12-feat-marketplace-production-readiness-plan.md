@@ -1,11 +1,13 @@
 ---
-title: "feat: Deck Marketplace, Tier Restructure, and Production Readiness"
+title: 'feat: Deck Marketplace, Tier Restructure, and Production Readiness'
 type: feat
 status: completed
 date: 2026-03-12
 origin: docs/brainstorms/2026-03-12-marketplace-and-production-brainstorm.md
 deepened: 2026-03-12
 ---
+
+<!-- FINISHED -->
 
 # Deck Marketplace, Tier Restructure, and Production Readiness
 
@@ -46,17 +48,17 @@ deepened: 2026-03-12
 
 The following simplifications are applied for v1. The original deep-dive research is preserved in this document as reference for v2.
 
-| Decision | v1 (this plan) | v2 (future) |
-|---|---|---|
-| **Tiers** | Two tiers: Free ($0, 1 gen/day, 10 decks) + Pro ($9/mo, 10 gen/day, unlimited decks) | Add BYOK tier ($5/mo, unlimited gen with user's own API keys) |
-| **Content moderation** | Simple "Report" button + `suspended` boolean on users. Manual review via admin page. | 3-layer pipeline: `obscenity` → `decancer` → OpenAI Moderation API with category-aware allowlists |
-| **Seller badges** | Deferred | New → Verified badge system |
-| **Flag abuse prevention** | Simple one-flag-per-user-per-listing | False-flag penalties, 30-day bans |
-| **Rating revision** | One-time rating after first completion | Revise on subsequent completions |
-| **Webhook processing** | Direct idempotent handlers (no Redis/BullMQ) | Queue-based single-writer via BullMQ if scale requires |
-| **Email service** | Deferred — TODO placeholders in code | Trial reminders, dunning emails, email verification via SendGrid/Resend |
-| **BYOK encryption** | Deferred — no `encryption.js`, no key columns on users | AES-256-GCM with versioned keyring, HMAC blind index |
-| **Supabase** | Project exists (upgrade to Pro before launch). Connection strings in `server/.env`. | Same |
+| Decision                  | v1 (this plan)                                                                       | v2 (future)                                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| **Tiers**                 | Two tiers: Free ($0, 1 gen/day, 10 decks) + Pro ($9/mo, 10 gen/day, unlimited decks) | Add BYOK tier ($5/mo, unlimited gen with user's own API keys)                                     |
+| **Content moderation**    | Simple "Report" button + `suspended` boolean on users. Manual review via admin page. | 3-layer pipeline: `obscenity` → `decancer` → OpenAI Moderation API with category-aware allowlists |
+| **Seller badges**         | Deferred                                                                             | New → Verified badge system                                                                       |
+| **Flag abuse prevention** | Simple one-flag-per-user-per-listing                                                 | False-flag penalties, 30-day bans                                                                 |
+| **Rating revision**       | One-time rating after first completion                                               | Revise on subsequent completions                                                                  |
+| **Webhook processing**    | Direct idempotent handlers (no Redis/BullMQ)                                         | Queue-based single-writer via BullMQ if scale requires                                            |
+| **Email service**         | Deferred — TODO placeholders in code                                                 | Trial reminders, dunning emails, email verification via SendGrid/Resend                           |
+| **BYOK encryption**       | Deferred — no `encryption.js`, no key columns on users                               | AES-256-GCM with versioned keyring, HMAC blind index                                              |
+| **Supabase**              | Project exists (upgrade to Pro before launch). Connection strings in `server/.env`.  | Same                                                                                              |
 
 **Estimated file count with simplifications: ~80 files** (down from ~112).
 
@@ -107,58 +109,58 @@ The app currently runs on localhost with a local PostgreSQL database — it cann
 
 The following critical questions were surfaced during flow analysis and are resolved here:
 
-| # | Question | Resolution |
-|---|----------|------------|
-| Q1 | Who absorbs Stripe fees on $1 sales? | Platform absorbs from its 30% cut. At $1 the platform loses ~$0.03 per sale — acceptable at low volume as user acquisition cost. Revisit if $1 sales exceed 30% of transactions. |
-| Q2 | How is trial tracked/enforced? | `trial_ends_at` column on `users`. Checked on every authenticated request (no cron — request-time check auto-downgrades). Trial users cannot sell, so no listing delist needed on expiry. |
-| Q3 | Can trial users sell? | **No.** Selling requires a paid Pro subscription. Trial users get marketplace buy access and full Pro generation limits, but cannot list decks. Prevents free-rider exploit. |
-| Q4 | Free-tier 10-deck limit vs purchased decks? | **Purchased decks are exempt** from the 10-deck limit. The limit only applies to generated/manually-created decks. Free users can buy unlimited marketplace decks. |
-| Q5 | What fields are copied on purchase? | Copy: `title`, all `cards` (front, back, position). Exclude: `source_text`, `description`, `category`, `tags`. Set `origin = 'purchased'`, `purchased_from_listing_id`. |
-| Q6 | Is marketplace listing live or frozen? | **Live view** — listing reflects current deck state. v1: re-run basic validation on edits. _v2: re-run automated moderation filter on significant edits._ |
-| Q7 | Can buyers purchase same deck twice? | **No.** Block with "You already own this deck" message. Show link to their existing copy. |
-| Q8 | Can users update their rating? | v1: **No** — one-time rating after first completion. _v2: allow revision on subsequent completions._ |
-| Q9 | BYOK key failure handling? | _Deferred to v2._ Show clear error: "Your [Provider] API key is no longer valid" with link to Settings. Fall back to platform keys with no-BYOK limits (10/day) until key is fixed. |
-| Q10 | Profanity filter vs medical/science terms? | _Deferred to v2 (automated moderation)._ Category-aware allowlists will relax filters for Medical, Science categories. |
-| Q11 | Repeated content flags consequences? | v1: admin manually suspends sellers based on reports. _v2: automated thresholds (3 upheld = review, 5 upheld = auto-suspend)._ |
-| Q12 | Seller dashboard scope? | Minimal: total earnings, per-deck breakdown, last 30 days trend, payout status from Stripe. |
-| Q13 | Forced rating or encouraged? | **Strongly encouraged** — prominent modal after deck completion, small "Skip" link. Avoids app store rejection risk. |
-| Q14 | Default marketplace sort? | "Most Popular" (purchase count) default. Alternatives: Newest, Highest Rated, Price Low/High. |
-| Q15 | Empty category handling? | Show all 13 categories. Empty ones display "Be the first to publish in [Category]" prompt. |
-| Q16 | Listing mutability + moderation? | Listings are live. v1: re-run basic validation on edits. _v2: re-run programmatic filter on edits; auto-delist if filter fails._ |
-| Q17 | Pro downgrade + BYOK keys? | _Deferred to v2._ On downgrade: BYOK keys retained but inactive. On re-subscribe to BYOK tier, keys reactivate. No deletion. |
-| Q18 | Duplicate title detection scope? | **Per-category**, not global. Multiple sellers can have "Biology 101" but not two from the same seller in the same category. |
-| Q19 | Flag abuse prevention? | v1: each user can flag each listing once (UNIQUE constraint). _v2: rate limit (5/day/user), false-flag penalty (3+ dismissed = 30-day flagging ban)._ |
-| Q20 | Email verification? | _Deferred to v2 (requires email service)._ Will be required before Stripe Connect onboarding. v1: rely on Stripe's own KYC during Connect onboarding. |
+| #   | Question                                    | Resolution                                                                                                                                                                                |
+| --- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1  | Who absorbs Stripe fees on $1 sales?        | Platform absorbs from its 30% cut. At $1 the platform loses ~$0.03 per sale — acceptable at low volume as user acquisition cost. Revisit if $1 sales exceed 30% of transactions.          |
+| Q2  | How is trial tracked/enforced?              | `trial_ends_at` column on `users`. Checked on every authenticated request (no cron — request-time check auto-downgrades). Trial users cannot sell, so no listing delist needed on expiry. |
+| Q3  | Can trial users sell?                       | **No.** Selling requires a paid Pro subscription. Trial users get marketplace buy access and full Pro generation limits, but cannot list decks. Prevents free-rider exploit.              |
+| Q4  | Free-tier 10-deck limit vs purchased decks? | **Purchased decks are exempt** from the 10-deck limit. The limit only applies to generated/manually-created decks. Free users can buy unlimited marketplace decks.                        |
+| Q5  | What fields are copied on purchase?         | Copy: `title`, all `cards` (front, back, position). Exclude: `source_text`, `description`, `category`, `tags`. Set `origin = 'purchased'`, `purchased_from_listing_id`.                   |
+| Q6  | Is marketplace listing live or frozen?      | **Live view** — listing reflects current deck state. v1: re-run basic validation on edits. _v2: re-run automated moderation filter on significant edits._                                 |
+| Q7  | Can buyers purchase same deck twice?        | **No.** Block with "You already own this deck" message. Show link to their existing copy.                                                                                                 |
+| Q8  | Can users update their rating?              | v1: **No** — one-time rating after first completion. _v2: allow revision on subsequent completions._                                                                                      |
+| Q9  | BYOK key failure handling?                  | _Deferred to v2._ Show clear error: "Your [Provider] API key is no longer valid" with link to Settings. Fall back to platform keys with no-BYOK limits (10/day) until key is fixed.       |
+| Q10 | Profanity filter vs medical/science terms?  | _Deferred to v2 (automated moderation)._ Category-aware allowlists will relax filters for Medical, Science categories.                                                                    |
+| Q11 | Repeated content flags consequences?        | v1: admin manually suspends sellers based on reports. _v2: automated thresholds (3 upheld = review, 5 upheld = auto-suspend)._                                                            |
+| Q12 | Seller dashboard scope?                     | Minimal: total earnings, per-deck breakdown, last 30 days trend, payout status from Stripe.                                                                                               |
+| Q13 | Forced rating or encouraged?                | **Strongly encouraged** — prominent modal after deck completion, small "Skip" link. Avoids app store rejection risk.                                                                      |
+| Q14 | Default marketplace sort?                   | "Most Popular" (purchase count) default. Alternatives: Newest, Highest Rated, Price Low/High.                                                                                             |
+| Q15 | Empty category handling?                    | Show all 13 categories. Empty ones display "Be the first to publish in [Category]" prompt.                                                                                                |
+| Q16 | Listing mutability + moderation?            | Listings are live. v1: re-run basic validation on edits. _v2: re-run programmatic filter on edits; auto-delist if filter fails._                                                          |
+| Q17 | Pro downgrade + BYOK keys?                  | _Deferred to v2._ On downgrade: BYOK keys retained but inactive. On re-subscribe to BYOK tier, keys reactivate. No deletion.                                                              |
+| Q18 | Duplicate title detection scope?            | **Per-category**, not global. Multiple sellers can have "Biology 101" but not two from the same seller in the same category.                                                              |
+| Q19 | Flag abuse prevention?                      | v1: each user can flag each listing once (UNIQUE constraint). _v2: rate limit (5/day/user), false-flag penalty (3+ dismissed = 30-day flagging ban)._                                     |
+| Q20 | Email verification?                         | _Deferred to v2 (requires email service)._ Will be required before Stripe Connect onboarding. v1: rely on Stripe's own KYC during Connect onboarding.                                     |
 
 ### Research Insights: Additional Spec Gaps Discovered
 
 **Critical gaps requiring resolution before implementation:**
 
-| # | Gap | Recommended Resolution |
-|---|-----|----------------------|
+| #   | Gap                                                                                                                                  | Recommended Resolution                                                                                                                                                                                                                     |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Q21 | **Q5 vs Q6 contradiction**: Q5 says purchase creates a copy, Q6 says listing is a live view. These are architecturally incompatible. | **Clarification:** Purchase creates a **snapshot copy** (Q5 governs buyer's deck). The "live view" in Q6 applies only to the **marketplace listing preview page** — not to owned copies. Buyers get a frozen snapshot at time of purchase. |
-| Q22 | **Can free-tier users purchase from the marketplace?** | **Yes.** Free users can browse and purchase. Purchased decks are exempt from the 10-deck limit (Q4). This maximizes marketplace liquidity. |
-| Q23 | **Can free/trial users rate and flag?** | **Yes.** Any user who has purchased and completed a deck can rate it. Any authenticated user can flag content. |
-| Q24 | **What happens to decks exceeding free-tier limit on downgrade?** | Excess decks become **read-only** (viewable and studyable but not editable or generatable). No deletion. |
-| Q25 | **What constitutes "completing" a deck for the rating prompt?** | All cards seen at least once in a study session (i.e., `completed_at IS NOT NULL` on `study_sessions`). |
-| Q26 | **Which cards are shown in the 10% preview?** | **First N cards in deck order** (by position). Not random, not seller-chosen. Buyers can judge content progression. |
-| Q27 | **Is the subscription downgrade immediate or at billing period end?** | **End of billing period** (Stripe default). User retains Pro features for the remainder of their paid period. |
-| Q28 | **Refund policy statement** | "No refunds" must be explicitly stated and agreed to at checkout. Add a checkbox or notice before Stripe redirect: "Digital purchases are non-refundable." Required for legal defensibility. |
-| Q29 | **Trial expiry timing** | Trial ends at the **exact signup timestamp + 7 days**, not at midnight. Checked at request time. |
-| Q30 | **Maximum listings per seller** | **50 active listings** to prevent marketplace flooding. |
-| Q31 | **Minimum card count for listing** | **10 cards minimum** (raised from 5) to ensure buyer value at $1-$5 price points. |
+| Q22 | **Can free-tier users purchase from the marketplace?**                                                                               | **Yes.** Free users can browse and purchase. Purchased decks are exempt from the 10-deck limit (Q4). This maximizes marketplace liquidity.                                                                                                 |
+| Q23 | **Can free/trial users rate and flag?**                                                                                              | **Yes.** Any user who has purchased and completed a deck can rate it. Any authenticated user can flag content.                                                                                                                             |
+| Q24 | **What happens to decks exceeding free-tier limit on downgrade?**                                                                    | Excess decks become **read-only** (viewable and studyable but not editable or generatable). No deletion.                                                                                                                                   |
+| Q25 | **What constitutes "completing" a deck for the rating prompt?**                                                                      | All cards seen at least once in a study session (i.e., `completed_at IS NOT NULL` on `study_sessions`).                                                                                                                                    |
+| Q26 | **Which cards are shown in the 10% preview?**                                                                                        | **First N cards in deck order** (by position). Not random, not seller-chosen. Buyers can judge content progression.                                                                                                                        |
+| Q27 | **Is the subscription downgrade immediate or at billing period end?**                                                                | **End of billing period** (Stripe default). User retains Pro features for the remainder of their paid period.                                                                                                                              |
+| Q28 | **Refund policy statement**                                                                                                          | "No refunds" must be explicitly stated and agreed to at checkout. Add a checkbox or notice before Stripe redirect: "Digital purchases are non-refundable." Required for legal defensibility.                                               |
+| Q29 | **Trial expiry timing**                                                                                                              | Trial ends at the **exact signup timestamp + 7 days**, not at midnight. Checked at request time.                                                                                                                                           |
+| Q30 | **Maximum listings per seller**                                                                                                      | **50 active listings** to prevent marketplace flooding.                                                                                                                                                                                    |
+| Q31 | **Minimum card count for listing**                                                                                                   | **10 cards minimum** (raised from 5) to ensure buyer value at $1-$5 price points.                                                                                                                                                          |
 
 ### Research Insights: User Flow Permissions Matrix (v1 — 2-tier)
 
-| Capability | Free | Trial | Pro |
-|---|---|---|---|
-| Browse marketplace | Yes | Yes | Yes |
-| Purchase decks | Yes | Yes | Yes |
-| Generate (platform keys) | 1/day | 10/day | 10/day |
-| Deck storage limit | 10 (excl. purchased) | Unlimited | Unlimited |
-| List decks for sale | No | No | Yes (if Stripe Connect) |
-| Rate purchased decks | Yes | Yes | Yes |
-| Report content | Yes | Yes | Yes |
+| Capability               | Free                 | Trial     | Pro                     |
+| ------------------------ | -------------------- | --------- | ----------------------- |
+| Browse marketplace       | Yes                  | Yes       | Yes                     |
+| Purchase decks           | Yes                  | Yes       | Yes                     |
+| Generate (platform keys) | 1/day                | 10/day    | 10/day                  |
+| Deck storage limit       | 10 (excl. purchased) | Unlimited | Unlimited               |
+| List decks for sale      | No                   | No        | Yes (if Stripe Connect) |
+| Rate purchased decks     | Yes                  | Yes       | Yes                     |
+| Report content           | Yes                  | Yes       | Yes                     |
 
 _v2 adds: Pro BYOK tier with unlimited generation via user's own API keys, BYOK key management page._
 
@@ -169,6 +171,7 @@ _v2 adds: Pro BYOK tier with unlimited generation via user's own API keys, BYOK 
 The marketplace extends the existing Express + React architecture. No new services — all new functionality is additional Express routes, React pages, and Postgres tables.
 
 **New server modules:**
+
 - `server/src/routes/marketplace.js` — browse, search, list, delist, purchase
 - `server/src/routes/seller.js` — Stripe Connect onboarding, earnings dashboard
 - `server/src/routes/settings.js` — profile editing _(v2: BYOK key management)_
@@ -180,6 +183,7 @@ The marketplace extends the existing Express + React architecture. No new servic
 - _(v2: `server/src/services/encryption.js` — AES-256-GCM encrypt/decrypt for BYOK keys)_
 
 **New client pages:**
+
 - `client/src/pages/Marketplace.jsx` — category grid, search, browse
 - `client/src/pages/MarketplaceDeck.jsx` — preview page with sample cards, buy button
 - `client/src/pages/SellerDashboard.jsx` — earnings, listings management
@@ -187,6 +191,7 @@ The marketplace extends the existing Express + React architecture. No new servic
 - `client/src/pages/ListDeck.jsx` — listing form (category, tags, description, price)
 
 **Modified files:**
+
 - `server/src/db/migrate.js` — replaced by versioned migration runner (`migrator.js`)
 - `server/src/routes/generate.js` — updated limits (1/day free, 10/day pro), use `plan.js` middleware
 - `server/src/routes/stripe.js` — Connect onboarding, marketplace payments, additional webhooks
@@ -215,6 +220,7 @@ The marketplace extends the existing Express + React architecture. No new servic
 4. **Retrofit `generate.js` to use `plan.js` middleware.** The current inline tier-checking logic in `generate.js` (lines 16-42) must be replaced by the new `plan.js` middleware. Do not leave two parallel tier-enforcement mechanisms.
 
 5. **Build Stripe webhook handler as a dispatcher.** The current webhook handler handles one event type. Connect adds 4-6 more. Use a dispatcher pattern:
+
    ```
    stripe.js (entry point) → handlers/checkout.js, handlers/connect.js
    ```
@@ -224,6 +230,7 @@ The marketplace extends the existing Express + React architecture. No new servic
    - Connect webhooks: `POST /webhooks/stripe-connect` (e.g., `account.updated`, `account.application.deauthorized`)
 
 7. **Raw body parser for webhooks must come BEFORE JSON parser.** Express.js's `express.json()` breaks Stripe signature verification. Apply `express.raw({ type: 'application/json' })` on webhook routes, excluding them from global JSON parsing:
+
    ```javascript
    app.use((req, res, next) => {
      if (req.originalUrl.startsWith('/webhooks/')) {
@@ -389,11 +396,13 @@ erDiagram
 **Critical fixes (implement in migration):**
 
 1. **Change `average_rating` from `float` to `NUMERIC(3,2)`.** Floating-point introduces cumulative rounding errors. After hundreds of ratings, the displayed average drifts from the true value. Use exact decimal arithmetic:
+
    ```sql
    average_rating NUMERIC(3,2) DEFAULT 0.00
    ```
 
 2. **Add full-text search via generated `tsvector` column on `marketplace_listings`:**
+
    ```sql
    ALTER TABLE marketplace_listings
      ADD COLUMN search_vector tsvector
@@ -403,9 +412,11 @@ erDiagram
      ) STORED;
    CREATE INDEX idx_listings_search ON marketplace_listings USING GIN (search_vector);
    ```
-   Tags can be folded into the vector via a trigger (concatenate tag names weighted as 'C'). Do not use `ILIKE` across a joined tag table — that is O(listings * tags).
+
+   Tags can be folded into the vector via a trigger (concatenate tag names weighted as 'C'). Do not use `ILIKE` across a joined tag table — that is O(listings \* tags).
 
 3. **Use atomic SQL updates for denormalized counters** to prevent lost updates under concurrent access:
+
    ```sql
    -- On new rating:
    UPDATE marketplace_listings
@@ -418,6 +429,7 @@ erDiagram
    SET purchase_count = purchase_count + 1
    WHERE id = $listing_id;
    ```
+
    Never use read-modify-write patterns on these columns.
 
 4. **Add NOT NULL constraints** to all critical columns:
@@ -428,6 +440,7 @@ erDiagram
    - `listing_tags`: `tag`
 
 5. **Add CHECK constraints** for business rules:
+
    ```sql
    ALTER TABLE marketplace_listings
      ADD CONSTRAINT chk_price_range CHECK (price_cents BETWEEN 100 AND 500),
@@ -443,6 +456,7 @@ erDiagram
    - `UNIQUE(buyer_id, listing_id)` on `purchases` — prevents double-purchase at DB level (defense in depth beyond app-level check)
 
 7. **Add composite partial indexes** for common query patterns:
+
    ```sql
    CREATE INDEX idx_listings_cat_popular ON marketplace_listings (category_id, purchase_count DESC) WHERE status = 'active';
    CREATE INDEX idx_listings_cat_newest ON marketplace_listings (category_id, created_at DESC) WHERE status = 'active';
@@ -452,6 +466,7 @@ erDiagram
    CREATE INDEX idx_ratings_listing ON ratings (listing_id);
    CREATE INDEX idx_flags_pending ON content_flags (listing_id, status) WHERE status = 'pending';
    ```
+
    Start with the top 4; add others based on actual query analytics from `pg_stat_user_indexes`.
 
 8. **Origin column migration strategy**: Adding `origin DEFAULT 'generated'` will retroactively label all existing decks. If all existing decks are truly generated, this is fine. Otherwise, use a two-step migration: (1) add column as nullable, (2) backfill, (3) add NOT NULL + default.
@@ -469,10 +484,12 @@ erDiagram
 3. **Always verify the 16-byte auth tag on decryption** — without this, GCM is effectively reduced to AES-CTR with no integrity protection.
 
 4. **Use a versioned keyring pattern** for key rotation readiness from day one:
+
    ```
    ENCRYPTION_KEYS="1:base64key1,2:base64key2"  # highest version is current
    HMAC_SECRET="base64secret"
    ```
+
    Store `key_version` alongside encrypted data. New encryptions use the latest version. Old data remains readable with old key versions in the keyring.
 
 5. **Use separate keys for encryption and HMAC** — compromise of one does not compromise the other.
@@ -494,6 +511,7 @@ erDiagram
 **Before any other work, replace the single-script migration with versioned migrations.**
 
 **Tasks:**
+
 - [x] Create `server/src/db/migrations/` directory
 - [x] Convert existing `migrate.js` schema to `001_initial.sql`
 - [x] Build a simple sequential migration runner that tracks applied migrations in a `schema_migrations` table
@@ -507,6 +525,7 @@ erDiagram
 Foundation work. No marketplace yet — just get the app production-ready with correct tiers (2-tier: Free + Pro).
 
 **Tasks:**
+
 - [x] Configure Supabase connection: update `server/.env` with `DATABASE_URL` (session mode, port 5432) and `DATABASE_URL_DIRECT` (direct connection for migrations). Get connection strings from Supabase dashboard.
 - [x] **Upgrade Supabase to Pro ($25/mo) before launch** — free tier pauses after 7 days of inactivity
 - [x] Configure connection pooling: use Supavisor session mode (port 5432), cap Express pool to 12 connections, add `ssl: { rejectUnauthorized: false }`
@@ -530,6 +549,7 @@ Foundation work. No marketplace yet — just get the app production-ready with c
 - [ ] <!-- TODO: Email service — trial reminder emails (Day 1, 4, 6, 7), email verification flow. Research email provider (SendGrid/Resend) separately. -->
 
 **Success criteria:**
+
 - App connects to Supabase in production via session mode pooler (port 5432)
 - Two tiers enforced correctly (free 1/day, pro 10/day)
 - Trial auto-expires after 7 days (exact timestamp check on each request)
@@ -544,6 +564,7 @@ Foundation work. No marketplace yet — just get the app production-ready with c
 Build the marketplace browsing and purchasing flow. Sellers can list, buyers can browse and buy.
 
 **Tasks:**
+
 - [x] Write migration v3: create `marketplace_categories` (seed 13 rows), `marketplace_listings` (with `search_vector` generated column, `NUMERIC(3,2)` for `average_rating`, NOT NULL + CHECK constraints), `listing_tags` (with `UNIQUE(listing_id, tag)`), `purchases` (with `UNIQUE(buyer_id, listing_id)`) tables
 - [x] Add composite partial indexes for browse queries (category+popular, category+newest — start with these two)
 - [x] Create `server/src/routes/marketplace.js` (read-only operations):
@@ -583,6 +604,7 @@ Build the marketplace browsing and purchasing flow. Sellers can list, buyers can
 - [x] Update `client/src/pages/Dashboard.jsx` — show `origin` badge on decks (generated vs purchased), "List on Marketplace" button on eligible generated decks
 
 **Success criteria:**
+
 - Sellers can list generated decks with category, tags, description, price (min 10 cards, max 50 listings)
 - Basic listing validation (required fields, min cards, duplicate title check)
 - Buyers can browse by category, full-text search, filter, sort
@@ -600,6 +622,7 @@ Build the marketplace browsing and purchasing flow. Sellers can list, buyers can
 Enable seller payouts via Stripe Connect and build the seller-facing dashboard.
 
 **Tasks:**
+
 - [x] Create `server/src/routes/seller.js` (extend if already created in Phase 2):
   - `POST /api/seller/onboard` — create Stripe Connect Express account (prefill email, business_url BEFORE first Account Link), generate account link with `collection_options: { fields: 'eventually_due' }`, return URL
   - `GET /api/seller/onboard/refresh` — regenerate expired account link (Account Links are single-use)
@@ -625,6 +648,7 @@ Enable seller payouts via Stripe Connect and build the seller-facing dashboard.
 - [x] Add `seller_id` index on `purchases` table for dashboard query performance
 
 **Success criteria:**
+
 - Sellers can onboard with Stripe Connect Express
 - Account Links regenerate on expiry/revisit (refresh URL works)
 - Payouts flow automatically on purchase (destination charges)
@@ -648,6 +672,7 @@ Enable seller payouts via Stripe Connect and build the seller-facing dashboard.
 4. **Skipped transfers** — if a connected account loses capabilities after a charge succeeds, Stripe silently skips the transfer. Monitor `charge.updated` to detect this (check if `transfer_data` exists but `transfer` is null).
 
 5. **Testing** — use Stripe CLI with `--forward-connect-to` flag to test both platform and Connect webhooks simultaneously:
+
    ```bash
    stripe listen \
      --forward-to localhost:3000/webhooks/stripe \
@@ -661,6 +686,7 @@ Enable seller payouts via Stripe Connect and build the seller-facing dashboard.
 **v1 approach:** Simple Report button + `suspended` boolean on users + admin review page. No automated content filtering. _v2: 3-layer pipeline (obscenity → decancer → OpenAI Moderation API) with category-aware allowlists. See "Content Moderation Architecture" section below for full v2 design._
 
 **Tasks:**
+
 - [x] Write migration `004_ratings_and_flags.sql`: create `ratings` (with `UNIQUE(user_id, listing_id)`, `CHECK(stars BETWEEN 1 AND 5)`) and `content_flags` (with `CHECK(status IN ('pending', 'upheld', 'dismissed'))`, `UNIQUE(listing_id, reporter_id)`) tables
 - [x] Create `server/src/routes/ratings.js`:
   - `POST /api/ratings` — submit rating (1-5 stars, must have completed the deck via `study_sessions`, one per user per listing). One-time only for v1. _v2: allow revision on subsequent completions._
@@ -685,6 +711,7 @@ Enable seller payouts via Stripe Connect and build the seller-facing dashboard.
 - [ ] <!-- TODO v2: Flag abuse prevention — false-flag penalties (3+ dismissed = 30-day ban), rate limits (5 flags/day/user) -->
 
 **Success criteria:**
+
 - Users can rate purchased decks after first completion (one-time)
 - Ratings update listing averages via atomic SQL (no lost updates)
 - Users can report listings with reason categories
@@ -696,6 +723,7 @@ Enable seller payouts via Stripe Connect and build the seller-facing dashboard.
 #### Phase 5: Polish, Edge Cases, and Launch Prep
 
 **Tasks:**
+
 - [x] Update AI system prompt in `server/src/services/ai.js` with 25/30 card limits:
   - "Generate a maximum of 25 cards. If the content warrants more, split into multiple focused decks of ~15 cards each, naming them as Part 1, Part 2, etc."
   - Backend validation: reject/split any AI response exceeding 30 cards
@@ -720,6 +748,7 @@ Enable seller payouts via Stripe Connect and build the seller-facing dashboard.
 - [x] Update `README.md` with marketplace setup instructions
 
 **Success criteria:**
+
 - All edge cases from SpecFlow analysis handled
 - Cursor-based pagination on marketplace browse
 - Mobile-responsive marketplace with sticky buy bar
@@ -809,21 +838,21 @@ Rate limit: 1000 RPM (more than sufficient for marketplace moderation)
 
 **13 harm categories with custom thresholds (stricter than defaults for family-friendly):**
 
-| Category | Default Threshold | Our Threshold | Rationale |
-|---|---|---|---|
-| `sexual` | 0.5 | **0.3** | Zero tolerance for sexual content |
-| `sexual/minors` | 0.5 | **0.05** | Near-zero tolerance — legal obligation |
-| `harassment` | 0.5 | **0.4** | Catch bullying in educational context |
-| `harassment/threatening` | 0.5 | **0.3** | Lower bar for threats |
-| `hate` | 0.5 | **0.3** | Racism, sexism, homophobia |
-| `hate/threatening` | 0.5 | **0.2** | Very low tolerance |
-| `illicit` | 0.5 | **0.4** | Illegal activity promotion |
-| `illicit/violent` | 0.5 | **0.2** | Violence + illegality |
-| `self-harm` | 0.5 | **0.3** | Protect vulnerable users |
-| `self-harm/intent` | 0.5 | **0.2** | Very low tolerance |
-| `self-harm/instructions` | 0.5 | **0.2** | Very low tolerance |
-| `violence` | 0.5 | **0.4** | Allow historical context, block graphic |
-| `violence/graphic` | 0.5 | **0.2** | Near-zero tolerance for gore |
+| Category                 | Default Threshold | Our Threshold | Rationale                               |
+| ------------------------ | ----------------- | ------------- | --------------------------------------- |
+| `sexual`                 | 0.5               | **0.3**       | Zero tolerance for sexual content       |
+| `sexual/minors`          | 0.5               | **0.05**      | Near-zero tolerance — legal obligation  |
+| `harassment`             | 0.5               | **0.4**       | Catch bullying in educational context   |
+| `harassment/threatening` | 0.5               | **0.3**       | Lower bar for threats                   |
+| `hate`                   | 0.5               | **0.3**       | Racism, sexism, homophobia              |
+| `hate/threatening`       | 0.5               | **0.2**       | Very low tolerance                      |
+| `illicit`                | 0.5               | **0.4**       | Illegal activity promotion              |
+| `illicit/violent`        | 0.5               | **0.2**       | Violence + illegality                   |
+| `self-harm`              | 0.5               | **0.3**       | Protect vulnerable users                |
+| `self-harm/intent`       | 0.5               | **0.2**       | Very low tolerance                      |
+| `self-harm/instructions` | 0.5               | **0.2**       | Very low tolerance                      |
+| `violence`               | 0.5               | **0.4**       | Allow historical context, block graphic |
+| `violence/graphic`       | 0.5               | **0.2**       | Near-zero tolerance for gore            |
 
 **Implementation pattern:**
 
@@ -834,15 +863,15 @@ const { RegExpMatcher, englishDataset, englishRecommendedTransformers } = requir
 
 const matcher = new RegExpMatcher({
   ...englishDataset.build(),
-  ...englishRecommendedTransformers,
+  ...englishRecommendedTransformers
 });
 
 const THRESHOLDS = {
-  'sexual': 0.3,
+  sexual: 0.3,
   'sexual/minors': 0.05,
-  'hate': 0.3,
+  hate: 0.3,
   'hate/threatening': 0.2,
-  'violence/graphic': 0.2,
+  'violence/graphic': 0.2
   // ... all 13 categories
 };
 
@@ -863,10 +892,10 @@ async function moderateContent(text, category) {
   const response = await fetch('https://api.openai.com/v1/moderations', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-      'Content-Type': 'application/json',
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ model: 'omni-moderation-latest', input: normalized }),
+    body: JSON.stringify({ model: 'omni-moderation-latest', input: normalized })
   });
 
   const result = await response.json();
@@ -887,25 +916,25 @@ async function moderateContent(text, category) {
 
 Educational content legitimately contains terms that trigger filters. Allowlists are scoped by marketplace category:
 
-| Category | Allowlisted Terms (examples) |
-|---|---|
-| Medical / Health | anatomical terms, disease names, drug names (pharmaceutical), symptoms |
-| Science | chemical compounds, biological processes, genetic terminology |
-| History | historical violence terminology (in educational context), war terminology |
-| Languages | foreign words that phonetically match English profanity |
-| Psychology | clinical terms for conditions, behavioral terminology |
+| Category         | Allowlisted Terms (examples)                                              |
+| ---------------- | ------------------------------------------------------------------------- |
+| Medical / Health | anatomical terms, disease names, drug names (pharmaceutical), symptoms    |
+| Science          | chemical compounds, biological processes, genetic terminology             |
+| History          | historical violence terminology (in educational context), war terminology |
+| Languages        | foreign words that phonetically match English profanity                   |
+| Psychology       | clinical terms for conditions, behavioral terminology                     |
 
 **Implementation:** Allowlist is a `Map<category, Set<string>>` loaded from a JSON config file. When Layer 1 finds a match, check if all matched terms appear in the allowlist for the deck's category. If so, skip to Layer 3 (which understands context).
 
 ### Moderation Lifecycle Points
 
-| Event | What's Moderated | Action on Failure |
-|---|---|---|
-| Deck generation (AI output) | All card fronts + backs | Re-generate with stricter prompt (one retry), then fail with error |
-| List for sale (initial) | Title, description, all cards, tags | Block listing, show specific rejection reason |
-| Edit listed deck | Changed fields only (title, description, added/modified cards) | Auto-delist, notify seller with reason, seller can fix and relist |
-| User-reported content | Full deck re-scan | Queue for human review if automated check passes |
-| Periodic sweep (weekly cron) | All active listings | Flag for review if thresholds have been updated |
+| Event                        | What's Moderated                                               | Action on Failure                                                  |
+| ---------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Deck generation (AI output)  | All card fronts + backs                                        | Re-generate with stricter prompt (one retry), then fail with error |
+| List for sale (initial)      | Title, description, all cards, tags                            | Block listing, show specific rejection reason                      |
+| Edit listed deck             | Changed fields only (title, description, added/modified cards) | Auto-delist, notify seller with reason, seller can fix and relist  |
+| User-reported content        | Full deck re-scan                                              | Queue for human review if automated check passes                   |
+| Periodic sweep (weekly cron) | All active listings                                            | Flag for review if thresholds have been updated                    |
 
 ### Human Review Queue
 
@@ -919,6 +948,7 @@ For content that automated systems are uncertain about (scores near thresholds) 
 ### Legal Requirements
 
 **CSAM (Child Sexual Abuse Material):**
+
 - Detection is a legal obligation under US law (18 U.S.C. § 2258A)
 - If CSAM is detected or reported, you are legally required to report to NCMEC (National Center for Missing & Exploited Children) via their CyberTipline
 - Do NOT delete the content before reporting — preserve evidence
@@ -926,11 +956,13 @@ For content that automated systems are uncertain about (scores near thresholds) 
 - Register as an Electronic Service Provider with NCMEC before launch
 
 **DMCA:**
+
 - Register a DMCA agent with the US Copyright Office ($6 fee)
 - Add DMCA takedown contact to Terms of Service
 - Implement takedown-and-notice procedure: remove content on valid notice, notify seller, allow counter-notice
 
 **Apple App Store (if future iOS app):**
+
 - Guideline 1.2 requires UGC apps to have: content filtering, offensive content reporting mechanism, ability to block abusive users
 - All three are covered by this architecture
 
@@ -1007,7 +1039,7 @@ For content that automated systems are uncertain about (scores near thresholds) 
 // On user registration — create Stripe customer, NO subscription yet
 const customer = await stripe.customers.create({
   email: user.email,
-  metadata: { user_id: user.id },
+  metadata: { user_id: user.id }
 });
 
 // Store in DB
@@ -1028,15 +1060,16 @@ const session = await stripe.checkout.sessions.create({
   subscription_data: {
     trial_end: Math.floor(user.trialEndsAt.getTime() / 1000), // Honor remaining trial
     trial_settings: {
-      end_behavior: { missing_payment_method: 'cancel' }, // Auto-cancel if no card
-    },
+      end_behavior: { missing_payment_method: 'cancel' } // Auto-cancel if no card
+    }
   },
   success_url: `${BASE_URL}/settings?subscription=success`,
-  cancel_url: `${BASE_URL}/pricing`,
+  cancel_url: `${BASE_URL}/pricing`
 });
 ```
 
 **Key Stripe fields:**
+
 - `trial_end`: Unix timestamp — exact to the second, not midnight
 - `missing_payment_method: 'cancel'`: auto-cancels when trial ends without payment method
 - `cancel_at_period_end: true`: for voluntary cancellation (preserves access through billing period)
@@ -1045,14 +1078,14 @@ const session = await stripe.checkout.sessions.create({
 
 **Critical subscription webhooks (platform endpoint):**
 
-| Event | Handler Action |
-|---|---|
-| `checkout.session.completed` | Set user `plan = 'pro'`, store `stripe_subscription_id`, clear `trial_ends_at` |
-| `customer.subscription.updated` | Sync plan tier. _v2: handle BYOK ↔ no-BYOK tier switches._ |
-| `customer.subscription.deleted` | Set `plan = 'free'`, delist marketplace listings |
-| `invoice.payment_succeeded` | Clear any `payment_failed_at` flag |
-| `invoice.payment_failed` | Set `payment_failed_at`. _v2: trigger dunning email sequence._ |
-| `customer.subscription.trial_will_end` | _v2: send reminder email (3 days before trial ends). v1: log only._ |
+| Event                                  | Handler Action                                                                 |
+| -------------------------------------- | ------------------------------------------------------------------------------ |
+| `checkout.session.completed`           | Set user `plan = 'pro'`, store `stripe_subscription_id`, clear `trial_ends_at` |
+| `customer.subscription.updated`        | Sync plan tier. _v2: handle BYOK ↔ no-BYOK tier switches._                     |
+| `customer.subscription.deleted`        | Set `plan = 'free'`, delist marketplace listings                               |
+| `invoice.payment_succeeded`            | Clear any `payment_failed_at` flag                                             |
+| `invoice.payment_failed`               | Set `payment_failed_at`. _v2: trigger dunning email sequence._                 |
+| `customer.subscription.trial_will_end` | _v2: send reminder email (3 days before trial ends). v1: log only._            |
 
 **Webhook processing pattern — direct idempotent handlers (v1):**
 
@@ -1107,6 +1140,7 @@ When `invoice.payment_failed` fires (v2 email flow):
 During the 7-day grace period, user retains full Pro access. This is Stripe's default retry behavior with Smart Retries.
 
 **DB columns for tracking:**
+
 - `payment_failed_at TIMESTAMPTZ` — set on first failure, cleared on success
 - `payment_retry_count INTEGER DEFAULT 0` — track for email sequence
 
@@ -1114,14 +1148,14 @@ During the 7-day grace period, user retains full Pro access. This is Stripe's de
 
 When a user downgrades from Pro to Free (voluntary or involuntary):
 
-| Resource | Action |
-|---|---|
-| Marketplace listings | Auto-delisted (hidden, not deleted). Status → `'delisted'` |
-| Excess decks (>10) | Become **read-only**: viewable and studyable, but not editable. No deletion. |
-| Generation limit | Drops to 1/day |
-| Purchased decks | **Unaffected** — purchases are permanent regardless of tier |
-| Seller earnings | Pending payouts still process. Stripe Connect account remains active. |
-| _v2: BYOK API keys_ | _Retained but frozen. Reactivate on re-subscription to BYOK tier._ |
+| Resource             | Action                                                                       |
+| -------------------- | ---------------------------------------------------------------------------- |
+| Marketplace listings | Auto-delisted (hidden, not deleted). Status → `'delisted'`                   |
+| Excess decks (>10)   | Become **read-only**: viewable and studyable, but not editable. No deletion. |
+| Generation limit     | Drops to 1/day                                                               |
+| Purchased decks      | **Unaffected** — purchases are permanent regardless of tier                  |
+| Seller earnings      | Pending payouts still process. Stripe Connect account remains active.        |
+| _v2: BYOK API keys_  | _Retained but frozen. Reactivate on re-subscription to BYOK tier._           |
 
 ### Re-subscription
 
@@ -1133,11 +1167,13 @@ When a user downgrades from Pro to Free (voluntary or involuntary):
 ### Trial Abuse Prevention
 
 **v1 (no email service):**
+
 - **Disposable email blocking**: Use `disposable-email-domains` npm package (maintained list of ~3000 disposable domains). Block at signup.
 - **Rate limit signups by IP**: Max 3 accounts per IP per 24 hours (express-rate-limit on `/auth/register`)
 - **Stripe customer deduplication**: Before creating a Stripe customer, check if email already has a customer record (`stripe.customers.list({ email })`). If so, link to existing customer (prevents multiple trials via re-registration).
 
 **v2 (requires email service — TODO):**
+
 - **Email verification**: Required before trial starts generating. Unverified users see: "Verify your email to start your free trial."
 - **Trial reminder emails**: Day 1 welcome, Day 4 mid-trial, Day 6 reminder (via `trial_will_end` webhook), Day 7 expiry notice.
 - **Dunning emails**: Payment failure → 3 emails over 7-day grace period before involuntary cancellation.
@@ -1160,7 +1196,7 @@ function requirePlan(...allowedPlans) {
       return res.status(403).json({
         error: 'upgrade_required',
         message: `This feature requires a ${allowedPlans.join(' or ')} plan`,
-        current_plan: user.plan,
+        current_plan: user.plan
       });
     }
 
@@ -1224,13 +1260,12 @@ async function migrate(pool) {
   `);
 
   // Get already-applied versions
-  const { rows: applied } = await pool.query(
-    'SELECT version FROM schema_migrations ORDER BY version'
-  );
+  const { rows: applied } = await pool.query('SELECT version FROM schema_migrations ORDER BY version');
   const appliedVersions = new Set(applied.map(r => r.version));
 
   // Read migration files (format: 001_initial.sql, 002_marketplace.sql, etc.)
-  const files = fs.readdirSync(MIGRATIONS_DIR)
+  const files = fs
+    .readdirSync(MIGRATIONS_DIR)
     .filter(f => f.endsWith('.sql'))
     .sort();
 
@@ -1243,10 +1278,7 @@ async function migrate(pool) {
     try {
       await client.query('BEGIN');
       await client.query(sql);
-      await client.query(
-        'INSERT INTO schema_migrations (version, filename) VALUES ($1, $2)',
-        [version, file]
-      );
+      await client.query('INSERT INTO schema_migrations (version, filename) VALUES ($1, $2)', [version, file]);
       await client.query('COMMIT');
       console.log(`Applied migration: ${file}`);
     } catch (err) {
@@ -1278,11 +1310,11 @@ server/src/db/migrations/
 
 **Supabase provides three connection modes:**
 
-| Mode | Port | Use Case | Supports Transactions | Supports SET |
-|---|---|---|---|---|
-| **Session mode** (Supavisor) | 5432 | Application queries | Yes | Yes |
-| **Transaction mode** (Supavisor) | 6543 | High-concurrency reads | Yes | **No** |
-| **Direct connection** | (from dashboard) | Migrations, admin | Yes | Yes |
+| Mode                             | Port             | Use Case               | Supports Transactions | Supports SET |
+| -------------------------------- | ---------------- | ---------------------- | --------------------- | ------------ |
+| **Session mode** (Supavisor)     | 5432             | Application queries    | Yes                   | Yes          |
+| **Transaction mode** (Supavisor) | 6543             | High-concurrency reads | Yes                   | **No**       |
+| **Direct connection**            | (from dashboard) | Migrations, admin      | Yes                   | Yes          |
 
 **Recommendation for this app:**
 
@@ -1299,7 +1331,7 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }, // Required for Supabase
   max: 12, // Cap pool size (Supabase free: ~60 connections, Pro: ~200)
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
+  connectionTimeoutMillis: 5000
 });
 
 module.exports = pool;
@@ -1340,15 +1372,15 @@ DATABASE_URL_DIRECT=postgresql://postgres:[password]@db.[project-ref].supabase.c
 
 **Estimated monthly cost:**
 
-| Service | Tier | Cost |
-|---|---|---|
-| Cloudflare Pages | Free | $0 |
-| Railway | Hobby | $5 |
-| Supabase | Free (dev) → Pro (launch) | $0 → $25 |
-| Stripe | Pay-as-you-go | 2.9% + $0.30/txn |
-| _v2: OpenAI Moderation API_ | _Free_ | _$0_ |
-| **Total (dev)** | | **~$5/mo** |
-| **Total (launch)** | | **~$30/mo** |
+| Service                     | Tier                      | Cost             |
+| --------------------------- | ------------------------- | ---------------- |
+| Cloudflare Pages            | Free                      | $0               |
+| Railway                     | Hobby                     | $5               |
+| Supabase                    | Free (dev) → Pro (launch) | $0 → $25         |
+| Stripe                      | Pay-as-you-go             | 2.9% + $0.30/txn |
+| _v2: OpenAI Moderation API_ | _Free_                    | _$0_             |
+| **Total (dev)**             |                           | **~$5/mo**       |
+| **Total (launch)**          |                           | **~$30/mo**      |
 
 ### Railway Deployment Setup
 
@@ -1433,6 +1465,7 @@ Connect the GitHub repo → Cloudflare auto-deploys on push to `main`.
 **Aesthetic: Editorial Luxury** — a curated bookshop meets a premium digital storefront. Clean but warm, with deliberate typographic hierarchy, muted earthy tones punctuated by a single bold accent, and generous whitespace.
 
 **Typography (Google Fonts):**
+
 - **Display/Headings**: `DM Serif Display` — elegant, high-contrast serif for page titles, deck names, price tags
 - **Body/UI**: `Outfit` — modern geometric sans-serif for descriptions, buttons, labels, navigation
 - **Mono/Accent**: `JetBrains Mono` — for prices, stats, code-like values
@@ -1451,11 +1484,13 @@ Connect the GitHub repo → Cloudflare auto-deploys on push to `main`.
 | `--color-error` | `#C0392B` | Errors, warnings |
 
 **Motion Principles:**
+
 - Card hover: `translateY(-4px)` + shadow bloom + subtle 0.5-degree rotation (CSS transitions, 250ms ease-out)
 - Page load: staggered fade-up on card grids (50ms delay increments)
 - Buttons: `scale(0.98)` on `:active`
 
 **Key UI Patterns:**
+
 - Category pills: horizontal scroll with gradient fade on overflow, emoji prefixes (e.g., "🧬 Science")
 - Listing cards: white surface with colored category accent bar (2px top), price in `JetBrains Mono`, star ratings in gold
 - Card previews: paper-like texture overlay, flip animation on click (`rotateY(180deg)` with `perspective(800px)`)
@@ -1506,6 +1541,7 @@ Connect the GitHub repo → Cloudflare auto-deploys on push to `main`.
 - [ ] "Non-refundable digital purchase" notice displayed before Stripe redirect
 
 **Deferred to v2:**
+
 - [ ] BYOK tier ($5/mo, unlimited gen with user's own API keys) + encryption service
 - [ ] 3-layer automated content moderation pipeline (obscenity → decancer → OpenAI Moderation API)
 - [ ] Trial reminder emails, dunning emails, email verification (requires email service)
@@ -1537,6 +1573,7 @@ Connect the GitHub repo → Cloudflare auto-deploys on push to `main`.
 - [ ] Health endpoint (`GET /api/health`) with DB connection check
 
 **Deferred non-functional (v2):**
+
 - [ ] BYOK keys encrypted at rest with AES-256-GCM
 - [ ] BullMQ queue-based webhook processing (if scale requires)
 - [ ] Email verification before Stripe Connect onboarding
@@ -1545,21 +1582,21 @@ Connect the GitHub repo → Cloudflare auto-deploys on push to `main`.
 
 ## Dependencies & Risks
 
-| Risk | Impact | Mitigation | v1/v2 |
-|------|--------|------------|-------|
-| Stripe Connect onboarding complexity | High — most complex integration | Follow Express account pattern exactly, prefill KYC before Account Link, test with Stripe CLI, start with test mode | v1 |
-| $1 sales losing money | Low at launch volume | Log per-sale economics, revisit pricing floor if losses exceed threshold | v1 |
-| Cold start marketplace | High — empty marketplace kills conversion | Bootstrap 20-30 quality decks across top 5-6 categories before launch | v1 |
-| Supabase connection limits | Medium — pauses after 7 days inactivity | Upgrade to Pro ($25/mo), session mode pooler, cap pool to 12 | v1 |
-| Webhook signature verification bypass | Critical — forged webhooks = free purchases | Mandate `constructEvent()` on every handler, reject unsigned requests | v1 |
-| Concurrent rating/purchase lost updates | High — silent data corruption | Atomic SQL updates, DB-level unique constraints, optimistic locking | v1 |
-| Trial abuse via disposable emails | Medium — perpetual free Pro access | Block disposable domains, rate limit signups by IP (3/24hr), deduplicate Stripe customers | v1 |
-| Express raw body parsing for webhooks | Medium — breaks all payment processing | Exclude webhook routes from global `express.json()`, use `express.raw()` | v1 |
-| Migration versioning | High — blocks all schema changes | Implement versioned migration runner (Phase 0) before any feature work | v1 |
-| No automated content moderation at launch | Medium — harmful content could be listed | Manual review via admin page + Report button. Monitor closely at launch. Add automated pipeline in v2. | v1 risk, v2 fix |
-| BYOK key management security | High — storing third-party credentials | _Deferred to v2._ Will require AES-256-GCM + versioned keyring + HMAC blind index. | v2 |
-| CSAM legal liability | Critical — federal reporting obligation | _v2: Register as NCMEC ESP before enabling automated moderation._ v1: manual review + immediate takedown on report. | v2 |
-| Webhook race conditions | Medium — state corruption on rapid events | v1: optimistic locking via WHERE clause. v2: BullMQ queue if scale requires. | v1 partial, v2 full |
+| Risk                                      | Impact                                      | Mitigation                                                                                                          | v1/v2               |
+| ----------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| Stripe Connect onboarding complexity      | High — most complex integration             | Follow Express account pattern exactly, prefill KYC before Account Link, test with Stripe CLI, start with test mode | v1                  |
+| $1 sales losing money                     | Low at launch volume                        | Log per-sale economics, revisit pricing floor if losses exceed threshold                                            | v1                  |
+| Cold start marketplace                    | High — empty marketplace kills conversion   | Bootstrap 20-30 quality decks across top 5-6 categories before launch                                               | v1                  |
+| Supabase connection limits                | Medium — pauses after 7 days inactivity     | Upgrade to Pro ($25/mo), session mode pooler, cap pool to 12                                                        | v1                  |
+| Webhook signature verification bypass     | Critical — forged webhooks = free purchases | Mandate `constructEvent()` on every handler, reject unsigned requests                                               | v1                  |
+| Concurrent rating/purchase lost updates   | High — silent data corruption               | Atomic SQL updates, DB-level unique constraints, optimistic locking                                                 | v1                  |
+| Trial abuse via disposable emails         | Medium — perpetual free Pro access          | Block disposable domains, rate limit signups by IP (3/24hr), deduplicate Stripe customers                           | v1                  |
+| Express raw body parsing for webhooks     | Medium — breaks all payment processing      | Exclude webhook routes from global `express.json()`, use `express.raw()`                                            | v1                  |
+| Migration versioning                      | High — blocks all schema changes            | Implement versioned migration runner (Phase 0) before any feature work                                              | v1                  |
+| No automated content moderation at launch | Medium — harmful content could be listed    | Manual review via admin page + Report button. Monitor closely at launch. Add automated pipeline in v2.              | v1 risk, v2 fix     |
+| BYOK key management security              | High — storing third-party credentials      | _Deferred to v2._ Will require AES-256-GCM + versioned keyring + HMAC blind index.                                  | v2                  |
+| CSAM legal liability                      | Critical — federal reporting obligation     | _v2: Register as NCMEC ESP before enabling automated moderation._ v1: manual review + immediate takedown on report. | v2                  |
+| Webhook race conditions                   | Medium — state corruption on rapid events   | v1: optimistic locking via WHERE clause. v2: BullMQ queue if scale requires.                                        | v1 partial, v2 full |
 
 ## Sources & References
 
