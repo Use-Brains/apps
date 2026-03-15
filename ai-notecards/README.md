@@ -144,7 +144,7 @@ stripe listen --forward-to localhost:3001/webhooks/stripe-connect --connect
 
 **Key flows:**
 
-- **Purchase:** Buyer clicks Buy -> Stripe Checkout (destination charge, 70/30 split) -> `payment_intent.succeeded` webhook -> idempotent copy-on-purchase (deck + cards copied in transaction)
+- **Purchase:** Buyer clicks Buy -> Stripe Checkout (destination charge, 50/50 split) -> `payment_intent.succeeded` webhook -> idempotent copy-on-purchase (deck + cards copied in transaction)
 - **Rating:** Complete study session on purchased deck -> rating modal -> atomic SQL average update
 - **Trial:** Signup sets `trial_ends_at = NOW() + 7 days` -> `checkTrialExpiry` middleware auto-downgrades on every authenticated request (no cron needed)
 

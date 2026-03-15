@@ -4,6 +4,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import type { AuthSessionResponse, User } from '@/types/api';
 import { api, clearSessionTokens, hasStoredRefreshToken, refreshSession, setSessionTokens } from './api';
 import { storage } from './mmkv';
+import { initializeSubscriptionIdentity, resetSubscriptionIdentity } from './subscriptions';
 
 const USER_CACHE_KEY = 'cached-user';
 const BIOMETRIC_ENABLED_KEY = 'biometric-enabled';
@@ -245,6 +246,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [refreshUser]);
 
+  useEffect(() => {
+    if (state.user?.id) {
+      void initializeSubscriptionIdentity(state.user.id);
+      return;
+    }
+
+    void resetSubscriptionIdentity();
+  }, [state.user?.id]);
+
   const login = useCallback(async (email: string, password: string) => {
     const session = await api.login(email, password);
     return applySession(session);
@@ -304,6 +314,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await api.logout();
     } finally {
+      await resetSubscriptionIdentity();
       await clearSessionTokens();
       persistUser(null);
       setState((current) => ({

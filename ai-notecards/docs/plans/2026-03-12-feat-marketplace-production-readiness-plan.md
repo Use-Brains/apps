@@ -72,14 +72,14 @@ This plan carries forward decisions from the [brainstorm](docs/brainstorms/2026-
 
 ## Problem Statement / Motivation
 
-The app currently runs on localhost with a local PostgreSQL database — it cannot serve real users. There is no way for users to share or monetize the decks they create. These changes unlock the app's core revenue model: subscriptions (Free/Pro tiers) + marketplace commission (70/30 split via Stripe Connect).
+The app currently runs on localhost with a local PostgreSQL database — it cannot serve real users. There is no way for users to share or monetize the decks they create. These changes unlock the app's core revenue model: subscriptions (Free/Pro tiers) + marketplace commission (50/50 split via Stripe Connect).
 
 ## Key Decisions Carried Forward from Brainstorm
 
 1. **Supabase** for production Postgres (connection string swap, no code changes)
 2. **Two tiers (v1)**: Free ($0, 1 gen/day, 10 decks) + Pro ($9/mo, 10 gen/day, unlimited). _BYOK tier deferred to v2._
 3. **7-day Pro trial** for all signups
-4. **Stripe Connect Express** for seller payouts — 70/30 split, immediate payouts
+4. **Stripe Connect Express** for seller payouts — 50/50 split, immediate payouts
 5. **Copy-on-purchase** — buyer gets a snapshot, can edit freely, cannot resell
 6. **13 categories + free-text tags** — no subcategories at launch
 7. **Encouraged rating** after completing a purchased deck (1-5 stars, skippable)
@@ -597,7 +597,7 @@ Build the marketplace browsing and purchasing flow. Sellers can list, buyers can
 - [x] Add "non-refundable digital purchase" notice before Stripe redirect
 - [x] Create `client/src/pages/Marketplace.jsx` — horizontal scrollable category pills, search bar (prominent, full-width), listing cards with category accent bar/price/rating/card count, skeleton loading states
 - [x] Create `client/src/pages/MarketplaceDeck.jsx` — preview page: flippable sample cards (CSS `rotateY(180deg)` with `perspective(800px)`), seller profile (Study Score), buy button (or sticky bottom bar on mobile), "You already own this" state, "Owned" badge in search results
-- [x] Create `client/src/pages/ListDeck.jsx` — form: select generated deck, choose category, add tags (chip-style input, max 5), write description (500 char max with counter), set price ($1-$5 dropdown), real-time earnings preview ("You earn $X.XX after 30% platform fee")
+- [x] Create `client/src/pages/ListDeck.jsx` — form: select generated deck, choose category, add tags (chip-style input, max 5), write description (500 char max with counter), set price ($1-$5 dropdown), real-time earnings preview ("You earn $X.XX after 50% platform fee")
 - [x] Update `client/src/components/Navbar.jsx` — add "Marketplace" link
 - [x] Update `client/src/lib/api.js` — marketplace API methods
 - [x] Update `client/src/App.jsx` — new routes for marketplace pages
@@ -610,7 +610,7 @@ Build the marketplace browsing and purchasing flow. Sellers can list, buyers can
 - Buyers can browse by category, full-text search, filter, sort
 - Preview page shows first 10% of cards (rounded up) as flippable cards
 - Purchase creates a copy in buyer's library via idempotent webhook handler
-- Stripe payment processed with correct 70/30 split via destination charges
+- Stripe payment processed with correct 50/50 split via destination charges
 - Duplicate purchase blocked at both app and DB level
 - Cursor-based pagination on browse results
 - Skeleton loading states on browse and preview pages
@@ -1531,7 +1531,7 @@ Connect the GitHub repo → Cloudflare auto-deploys on push to `main`.
 - [ ] Preview page shows first 10% of cards (rounded up) as flippable cards, seller info, rating, Study Score
 - [ ] Purchase creates a copy in buyer's library (origin: purchased), buyer can edit freely
 - [ ] Duplicate purchase blocked at app and DB level
-- [ ] Stripe Connect Express onboarding for sellers, destination charges with 70/30 split
+- [ ] Stripe Connect Express onboarding for sellers, destination charges with 50/50 split
 - [ ] Seller dashboard shows earnings (gross + net), per-deck stats, payout status
 - [ ] Rating prompt appears after completing purchased deck (skippable, one-time), 1-5 stars, atomic average updates
 - [ ] Content reporting with reason categories, admin review page, seller suspension
@@ -1602,7 +1602,7 @@ Connect the GitHub repo → Cloudflare auto-deploys on push to `main`.
 
 ### Origin
 
-- **Brainstorm document:** [docs/brainstorms/2026-03-12-marketplace-and-production-brainstorm.md](docs/brainstorms/2026-03-12-marketplace-and-production-brainstorm.md) — Key decisions: 2-tier model (v1, BYOK deferred), 70/30 Stripe Connect payouts, copy-on-purchase, 13 categories + tags, manual moderation (v1), Study Score = decks completed
+- **Brainstorm document:** [docs/brainstorms/2026-03-12-marketplace-and-production-brainstorm.md](docs/brainstorms/2026-03-12-marketplace-and-production-brainstorm.md) — Key decisions: 2-tier model (v1, BYOK deferred), 50/50 Stripe Connect payouts, copy-on-purchase, 13 categories + tags, manual moderation (v1), Study Score = decks completed
 
 ### Internal References
 

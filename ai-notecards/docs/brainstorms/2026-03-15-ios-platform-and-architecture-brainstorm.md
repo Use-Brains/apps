@@ -3,6 +3,8 @@ date: 2026-03-15
 topic: ios-platform-and-architecture
 ---
 
+<!-- FINISHED -->
+
 # iOS Platform & Architecture Strategy
 
 ## What We're Building
@@ -61,12 +63,14 @@ apps/ai-notecards/
 **Approach:** Tab bar with 4 tabs + stack navigation within each tab. Matches trade-journal's `(tabs)/_layout.tsx` pattern.
 
 **Tabs:**
+
 - **Home** -- Dashboard (decks list, search, sort, streaks, study score)
 - **Generate** -- AI flashcard generation (text + photo input, preview flow)
 - **Marketplace** -- Browse, search, filter, purchase
 - **Profile** -- Settings, preferences, subscription, seller section
 
 **Stack screens (pushed on top of tabs):**
+
 - Deck detail (`/decks/[id]`)
 - Study session (`/study/[deckId]`) -- presented as a full-screen modal
 - Marketplace listing detail (`/marketplace/[id]`)
@@ -103,12 +107,14 @@ apps/ai-notecards/
 **Approach:** Share types and validation logic, nothing else. UI components, navigation, and platform APIs are too different to share between React DOM and React Native.
 
 **What gets shared (manually copied + adapted):**
+
 - API endpoint paths and request/response shapes (the web `api.js` becomes a typed `api.ts`)
 - Zod validation schemas for forms (generate input, listing creation, profile updates)
 - Business logic constants (tier limits, pricing, category list, study mode definitions)
 - Utility functions (shuffle algorithm for study modes, score calculations)
 
 **What stays separate:**
+
 - All UI components (React DOM elements vs React Native Views)
 - Navigation (react-router-dom vs Expo Router)
 - Auth flow (cookies vs Bearer tokens)
@@ -126,6 +132,7 @@ apps/ai-notecards/
 **Theme system:** A `theme.ts` file exporting color tokens, spacing scale, and typography. No dark mode in v1 (the web app doesn't have it either). Light mode only, matching the parchment aesthetic.
 
 **Platform adaptations:**
+
 - Use iOS-native tab bar styling (not custom) with brand colors for active/inactive tints
 - Cards and surfaces use `#FFFFFF` with subtle shadows (iOS convention) rather than the web's flat parchment cards
 - Study mode uses full-screen presentation with the dark gradient background (`#0d4a3d`), matching web
@@ -137,22 +144,22 @@ apps/ai-notecards/
 
 ## Key Decisions
 
-| Decision | Choice | Reasoning |
-|----------|--------|-----------|
-| Framework | Expo SDK 55 (managed) | Same as trade-journal; shared toolchain, EAS builds, proven stack |
-| Language | TypeScript | Type safety for API integration; trade-journal is TS |
-| Project location | `apps/ai-notecards/mobile/` | Sibling to `client/` and `server/`, standalone Expo project |
-| Navigation | 4-tab bar + stacks | Maps cleanly to web routes; matches trade-journal pattern |
-| Server state | TanStack Query v5 | Caching, persistence, background refetch; same as trade-journal |
-| Auth state | React context | Simple, matches web app's AuthContext pattern |
-| Client store | None (YAGNI) | TanStack Query + local state covers everything |
-| Token storage | expo-secure-store | Encrypted storage for JWT; MMKV for non-sensitive data |
-| API auth | Bearer token | Cookies don't work well on native; one-line backend change |
-| Code sharing | Manual copy of types/utils | No shared package overhead; ~10 files max |
-| Design system | Brand colors + iOS conventions | Parchment palette is the brand; adapt layout patterns to iOS |
-| Component library | None (build from scratch) | Fewer dependencies, full control; matches trade-journal approach |
-| Dark mode | Not in v1 | Web doesn't have it; ship without, add later |
-| Payments | RevenueCat | Required for iOS subscriptions (Apple mandates IAP); trade-journal uses it |
+| Decision          | Choice                         | Reasoning                                                                  |
+| ----------------- | ------------------------------ | -------------------------------------------------------------------------- |
+| Framework         | Expo SDK 55 (managed)          | Same as trade-journal; shared toolchain, EAS builds, proven stack          |
+| Language          | TypeScript                     | Type safety for API integration; trade-journal is TS                       |
+| Project location  | `apps/ai-notecards/mobile/`    | Sibling to `client/` and `server/`, standalone Expo project                |
+| Navigation        | 4-tab bar + stacks             | Maps cleanly to web routes; matches trade-journal pattern                  |
+| Server state      | TanStack Query v5              | Caching, persistence, background refetch; same as trade-journal            |
+| Auth state        | React context                  | Simple, matches web app's AuthContext pattern                              |
+| Client store      | None (YAGNI)                   | TanStack Query + local state covers everything                             |
+| Token storage     | expo-secure-store              | Encrypted storage for JWT; MMKV for non-sensitive data                     |
+| API auth          | Bearer token                   | Cookies don't work well on native; one-line backend change                 |
+| Code sharing      | Manual copy of types/utils     | No shared package overhead; ~10 files max                                  |
+| Design system     | Brand colors + iOS conventions | Parchment palette is the brand; adapt layout patterns to iOS               |
+| Component library | None (build from scratch)      | Fewer dependencies, full control; matches trade-journal approach           |
+| Dark mode         | Not in v1                      | Web doesn't have it; ship without, add later                               |
+| Payments          | RevenueCat                     | Required for iOS subscriptions (Apple mandates IAP); trade-journal uses it |
 
 ## Open Questions
 
@@ -177,6 +184,7 @@ apps/ai-notecards/
 **In scope:** Framework decision, project structure, navigation model, state management, API integration strategy, code sharing approach, design system translation plan.
 
 **Out of scope:**
+
 - Offline/sync strategy (brainstorm #4)
 - Auth/onboarding native UX details (brainstorm #2)
 - Study mode gesture and animation specifics (brainstorm #3)

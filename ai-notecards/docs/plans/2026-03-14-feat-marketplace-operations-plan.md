@@ -48,11 +48,11 @@ Sellers don't know when they make a sale. Buyers can't share what they bought. O
 
 ### 1. Revenue Split Discrepancy
 
-> **CRITICAL:** The brainstorm specifies a 70/30 split (seller/platform), but `server/src/services/purchase.js` calculates `Math.round(listing.price_cents * 0.5)` — a 50/50 split — in **two places**: line 69 (`createPurchaseCheckout` → Stripe `application_fee_amount`) and line 139 (`fulfillPurchase` → `platform_fee_cents` stored in `purchases` table). If you fix one and not the other, Stripe collects one fee while the database records a different one, and `SellerDashboard` earnings (`seller.js:271` computes `SUM(price_cents - platform_fee_cents)`) will be wrong.
+> **CRITICAL:** The seller/platform split must stay aligned everywhere it appears. `server/src/services/purchase.js` calculates the platform fee in both `createPurchaseCheckout` and `fulfillPurchase`; if one path uses a different configured rate than the other, Stripe collects one fee while the database records another, and `SellerDashboard` earnings (`seller.js:271` computes `SUM(price_cents - platform_fee_cents)`) will be wrong.
 >
 > **Fix:** Extract the fee rate to a shared constant in `purchase.js` and use it in both locations:
 > ```javascript
-> const PLATFORM_FEE_RATE = 0.3; // 70/30 seller/platform split
+> const PLATFORM_FEE_RATE = 0.5; // 50/50 seller/platform split
 > const platformFee = Math.round(priceCents * PLATFORM_FEE_RATE);
 > ```
 > Decide which split is correct, update both sites, and verify against any existing Stripe transactions. This must be resolved before Phase 4 emails, which surface the earnings number to sellers.

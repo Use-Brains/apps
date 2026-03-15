@@ -207,6 +207,30 @@ Every ErrorBoundary must include an `isRecovering` guard. Test: trigger a determ
 
 Any component that conditionally renders a 404 must first confirm auth loading is complete. Otherwise authenticated users see false 404s during hydration.
 
+### 7. App Store Review Notes Must Be Prepared Before Submission
+
+For iOS subscription launches, prepare reviewer-facing notes as part of the pre-launch checklist, not as a last-minute App Store Connect text box.
+
+**Required reviewer notes checklist for AI Notecards iOS monetization:**
+
+- State that **Pro subscriptions are available in-app through Apple IAP / StoreKit** and identify the screen where reviewers can find them.
+- Explain that **existing web subscribers can sign in and retain access** because entitlement is server-owned and valid across platforms.
+- Explain that the **marketplace uses browser handoff for creator-to-buyer commerce**, not for unlocking Pro, and that the iOS fallback is browse-only if required for review.
+- Include a **demo account** or explicit test-account instructions, with enough detail for login and purchase-surface navigation.
+- Identify the **Restore Purchases** affordance and the **Manage Subscription** behavior for Apple subscribers.
+- Note any **feature flags** or review-time switches that may affect marketplace purchase availability on iOS.
+
+**Suggested review-note template:**
+
+> AI Notecards offers Pro subscriptions through Apple In-App Purchase in the Profile tab. Reviewers can sign in with the demo account below, open Profile, and view monthly / annual subscription options plus Restore Purchases. Existing subscribers from the web may sign in and retain access because subscription entitlement is synced server-side. Marketplace deck purchases use a browser checkout flow for creator marketplace transactions; if required for review, marketplace purchasing can be disabled while browsing remains available.
+
+**Operational checklist before submission:**
+
+- Confirm the demo account works on the current build.
+- Confirm the subscription products shown in-app match App Store Connect configuration.
+- Confirm Restore Purchases and Manage in Apple are visible for the correct account state.
+- Confirm the current `IOS_MARKETPLACE_WEB_PURCHASES_ENABLED` value matches the reviewer notes.
+
 ---
 
 ## Related Documentation

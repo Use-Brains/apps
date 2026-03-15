@@ -7,8 +7,7 @@ import { sendTransactionalEmail } from '../services/email.js';
 import { getStripe } from '../services/stripe.js';
 import pool from '../db/pool.js';
 import { trackServerEvent } from '../services/analytics.js';
-
-const PLATFORM_FEE_RATE = 0.5;
+import { calculateSellerEarningsCents, getStripePriceIdForPeriod, reconcileUserBillingState } from '../services/billing.js';
 
 const router = Router();
 
@@ -23,6 +22,7 @@ const portalLimiter = rateLimit({
 router.post('/checkout', requireXHR, authenticate, requireActiveUser, async (req, res) => {
   try {
     const stripe = getStripe();
+    const billingPeriod = req.body?.billingPeriod === 'annual' ? 'annual' : 'monthly';
 
     const { rows } = await pool.query(
       'SELECT email, stripe_customer_id, plan, trial_ends_at FROM users WHERE id = $1',
@@ -43,11 +43,11 @@ router.post('/checkout', requireXHR, authenticate, requireActiveUser, async (req
     const sessionParams = {
       customer: customerId,
       payment_method_types: ['card'],
-      line_items: [{ price: process.env.STRIPE_PRO_PRICE_ID, quantity: 1 }],
+      line_items: [{ price: getStripePriceIdForPeriod(billingPeriod), quantity: 1 }],
       mode: 'subscription',
       success_url: `${process.env.CLIENT_URL}/dashboard?upgraded=true`,
       cancel_url: `${process.env.CLIENT_URL}/pricing`,
-      metadata: { userId: req.userId },
+      metadata: { userId: req.userId, billingPeriod },
     };
 
     // If user is on trial, honor remaining trial time
@@ -77,10 +77,13 @@ router.post('/cancel', requireXHR, authenticate, requireActiveUser, async (req, 
     const stripe = getStripe();
 
     const { rows } = await pool.query(
-      'SELECT stripe_subscription_id FROM users WHERE id = $1',
+      'SELECT stripe_subscription_id, subscription_platform FROM users WHERE id = $1',
       [req.userId]
     );
     const subId = rows[0]?.stripe_subscription_id;
+    if (rows[0]?.subscription_platform === 'apple') {
+      return res.status(409).json({ error: 'Manage this subscription through Apple' });
+    }
     if (!subId) {
       return res.status(400).json({ error: 'No active subscription' });
     }
@@ -98,9 +101,12 @@ router.post('/portal', requireXHR, authenticate, requireActiveUser, portalLimite
   try {
     const stripe = getStripe();
     const { rows } = await pool.query(
-      'SELECT stripe_customer_id FROM users WHERE id = $1',
+      'SELECT stripe_customer_id, subscription_platform FROM users WHERE id = $1',
       [req.userId]
     );
+    if (rows[0]?.subscription_platform === 'apple') {
+      return res.status(409).json({ error: 'Manage this subscription through Apple' });
+    }
     if (!rows[0]?.stripe_customer_id) {
       return res.status(400).json({ error: 'No billing account found' });
     }
@@ -134,12 +140,28 @@ router.post('/webhook', async (req, res) => {
         const session = event.data.object;
         const userId = session.metadata?.userId;
         if (userId && session.mode === 'subscription') {
-          const { rows: [updatedUser] } = await pool.query(
-            `UPDATE users SET plan = 'pro', stripe_subscription_id = $1, trial_ends_at = NULL,
-             cancel_at_period_end = false, cancel_at = NULL
-             WHERE id = $2 RETURNING email`,
-            [session.subscription, userId]
-          );
+          const client = await pool.connect();
+          let updatedUser;
+          try {
+            await client.query('BEGIN');
+            const result = await client.query(
+              `UPDATE users
+               SET stripe_subscription_id = $1,
+                   stripe_cancel_at_period_end = false,
+                   stripe_cancel_at = NULL
+               WHERE id = $2
+               RETURNING email`,
+              [session.subscription, userId]
+            );
+            updatedUser = result.rows[0];
+            await reconcileUserBillingState(client, userId);
+            await client.query('COMMIT');
+          } catch (err) {
+            await client.query('ROLLBACK');
+            throw err;
+          } finally {
+            client.release();
+          }
           console.log(`User ${userId} upgraded to pro`);
           trackServerEvent(userId, 'subscription_started');
           res.json({ received: true });
@@ -156,11 +178,29 @@ router.post('/webhook', async (req, res) => {
         const customerId = subscription.customer;
         if (subscription.cancel_at_period_end) {
           const cancelAt = new Date(subscription.cancel_at * 1000);
-          const { rows: [cancelledUser] } = await pool.query(
-            `UPDATE users SET cancel_at_period_end = true, cancel_at = $1
-             WHERE stripe_customer_id = $2 RETURNING id, email`,
-            [cancelAt.toISOString(), customerId]
-          );
+          const client = await pool.connect();
+          let cancelledUser;
+          try {
+            await client.query('BEGIN');
+            const result = await client.query(
+              `UPDATE users
+               SET stripe_cancel_at_period_end = true,
+                   stripe_cancel_at = $1
+               WHERE stripe_customer_id = $2
+               RETURNING id, email`,
+              [cancelAt.toISOString(), customerId]
+            );
+            cancelledUser = result.rows[0];
+            if (cancelledUser?.id) {
+              await reconcileUserBillingState(client, cancelledUser.id);
+            }
+            await client.query('COMMIT');
+          } catch (err) {
+            await client.query('ROLLBACK');
+            throw err;
+          } finally {
+            client.release();
+          }
           if (cancelledUser?.id) {
             trackServerEvent(cancelledUser.id, 'subscription_cancelled');
           }
@@ -172,12 +212,28 @@ router.post('/webhook', async (req, res) => {
           }
           return;
         } else if (subscription.status === 'active') {
-          await pool.query(
-            `UPDATE users SET plan = 'pro', stripe_subscription_id = $1,
-             cancel_at_period_end = false, cancel_at = NULL
-             WHERE stripe_customer_id = $2`,
-            [subscription.id, customerId]
-          );
+          const client = await pool.connect();
+          try {
+            await client.query('BEGIN');
+            const { rows: [user] } = await client.query(
+              `UPDATE users
+               SET stripe_subscription_id = $1,
+                   stripe_cancel_at_period_end = false,
+                   stripe_cancel_at = NULL
+               WHERE stripe_customer_id = $2
+               RETURNING id`,
+              [subscription.id, customerId]
+            );
+            if (user?.id) {
+              await reconcileUserBillingState(client, user.id);
+            }
+            await client.query('COMMIT');
+          } catch (err) {
+            await client.query('ROLLBACK');
+            throw err;
+          } finally {
+            client.release();
+          }
         }
         break;
       }
@@ -190,17 +246,16 @@ router.post('/webhook', async (req, res) => {
         try {
           await client.query('BEGIN');
           const { rows } = await client.query(
-            `UPDATE users SET plan = 'free', stripe_subscription_id = NULL,
-             cancel_at_period_end = false, cancel_at = NULL
-             WHERE stripe_customer_id = $1 RETURNING id`,
+            `UPDATE users
+             SET stripe_subscription_id = NULL,
+                 stripe_cancel_at_period_end = false,
+                 stripe_cancel_at = NULL
+             WHERE stripe_customer_id = $1
+             RETURNING id`,
             [customerId]
           );
           if (rows[0]) {
-            await client.query(
-              `UPDATE marketplace_listings SET status = 'delisted', updated_at = NOW()
-               WHERE seller_id = $1 AND status IN ('active', 'pending_review')`,
-              [rows[0].id]
-            );
+            await reconcileUserBillingState(client, rows[0].id);
           }
           await client.query('COMMIT');
         } catch (err) {
@@ -240,7 +295,7 @@ router.post('/webhook', async (req, res) => {
             `, [result.purchaseId]);
 
             if (emailData) {
-              const earnings = Math.round(emailData.price_cents * (1 - PLATFORM_FEE_RATE));
+              const earnings = calculateSellerEarningsCents(emailData.price_cents);
               Promise.allSettled([
                 sendTransactionalEmail('sale_notification', emailData.seller_email, {
                   title: emailData.title,

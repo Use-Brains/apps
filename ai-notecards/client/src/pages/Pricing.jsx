@@ -23,10 +23,11 @@ const PRO_FEATURES = [
 
 export default function Pricing() {
   const { user } = useAuth();
+  const annualPrice = '$79.99';
 
-  const handleUpgrade = async () => {
+  const handleUpgrade = async (billingPeriod = 'monthly') => {
     try {
-      const data = await api.createCheckout();
+      const data = await api.createCheckout(billingPeriod);
       if (data.url) {
         window.location.href = data.url;
       }
@@ -133,12 +134,20 @@ export default function Pricing() {
                 Current plan
               </div>
             ) : (
-              <button
-                onClick={handleUpgrade}
-                className="mt-8 w-full px-6 py-3 bg-white text-[#1B6B5A] rounded-xl font-semibold hover:bg-[#E8F5F0] transition-colors"
-              >
-                {isTrialActive ? 'Subscribe to Pro' : 'Upgrade to Pro — $9/mo'}
-              </button>
+              <div className="mt-8 space-y-3">
+                <button
+                  onClick={() => void handleUpgrade('monthly')}
+                  className="w-full px-6 py-3 bg-white text-[#1B6B5A] rounded-xl font-semibold hover:bg-[#E8F5F0] transition-colors"
+                >
+                  {isTrialActive ? 'Subscribe to Pro — $9/mo' : 'Upgrade to Pro — $9/mo'}
+                </button>
+                <button
+                  onClick={() => void handleUpgrade('annual')}
+                  className="w-full px-6 py-3 bg-white/15 text-white rounded-xl font-semibold hover:bg-white/20 transition-colors border border-white/20"
+                >
+                  Upgrade to Pro — {annualPrice}/yr
+                </button>
+              </div>
             )}
           </div>
         </div>

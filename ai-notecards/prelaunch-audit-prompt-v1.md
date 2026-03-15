@@ -26,7 +26,7 @@ Current stack from PRD:
 - Backend: Node.js ES modules, Express 4, bcrypt + JWT via httpOnly cookies, multer memory storage, express-rate-limit, file-type validation
 - Database: PostgreSQL on Supabase, custom migrations
 - AI: Groq (llama-3.3-70b-versatile) primary, Google Gemini fallback, Gemini vision for photo-to-flashcard
-- Payments: Stripe Checkout, Stripe Connect Express, destination charges, 70/30 split, platform + connect webhooks
+- Payments: Stripe Checkout, Stripe Connect Express, destination charges, 50/50 split, platform + connect webhooks
 - Storage: Supabase Storage
 - Email: Resend for passwordless auth / magic link codes
 - Deployment: Vercel frontend, Railway backend, Supabase PostgreSQL/storage, Sentry, Resend

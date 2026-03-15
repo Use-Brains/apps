@@ -7,6 +7,8 @@ deepened: 2026-03-15
 reviewed: 2026-03-15
 ---
 
+<!-- FINISHED -->
+
 # iOS Auth & Apple Sign-In
 
 ## Enhancement Summary
@@ -19,6 +21,7 @@ reviewed: 2026-03-15
 **Skills applied:** `deepen-plan`, `security-review`, `tdd-workflow`, `spec-flow-analyzer`, `framework-docs-researcher`, `security-sentinel`
 
 ### Key Planning Findings
+
 1. **Native auth contract is the blocking gap** — `mobile/src/lib/auth.tsx` already expects token-based auth, but `server/src/routes/auth.js`, `server/src/routes/auth-google.js`, and `server/src/routes/auth-magic.js` still return cookie-oriented responses.
 2. **This is a security-sensitive feature** — refresh tokens, Keychain storage, Apple identity verification, and biometric gating all require explicit contracts and revocation behavior.
 3. **Apple Sign-In needs real Expo config, not just UI** — Expo SDK 55 requires `npx expo install expo-apple-authentication`, the plugin in `app.json`, and `ios.usesAppleSignIn: true` for iOS capability setup.
@@ -27,6 +30,7 @@ reviewed: 2026-03-15
 6. **Session sprawl needs a hard bound** — the brainstorm decision to cap active refresh tokens at 5 devices should be implemented in the token issuance path, not deferred.
 
 ### New Considerations Discovered
+
 - **Google Sign-In Expo config needs an iOS URL scheme** when using the `@react-native-google-signin/google-signin` plugin without Firebase config files.
 - **Refresh retry logic must be single-flight** or concurrent 401s will race into multiple refresh requests and revoke each other.
 - **Mobile/native route branching should be explicit** rather than inferred from `User-Agent`; use an intentional request signal or dedicated response helper.
@@ -107,22 +111,26 @@ Add a dedicated native token contract without breaking web auth.
 ### Research Insights
 
 **Best Practices:**
+
 - Centralize session issuance in one helper so `signup`, `login`, `google`, `magic-link`, and `apple` cannot drift on token shape or revocation behavior.
 - Keep web and mobile branching at the response layer only; identity lookup, suspension checks, and `sanitizeUser()` should stay shared.
 - Use opaque refresh tokens generated from secure random bytes, then hash before persistence.
 
 **Implementation Details:**
+
 - Add a helper such as `respondWithSession(req, res, { user, isNewUser })` that issues a cookie for web callers and `{ accessToken, refreshToken, user }` for native callers.
 - Store `device_info` in a strict structured shape such as `{ platform, deviceName, osVersion, appVersion }`.
 - Use `X-Client-Platform: ios-native` as the required request signal for native auth responses instead of guessing from headers or route usage.
 
 **Security Considerations:**
+
 - Refresh-token queries must always enforce deleted-user and suspended-user checks before issuing new access tokens.
 - Logout should revoke only the presented mobile session by default unless a global sign-out is explicitly designed later.
 - Keep raw refresh tokens out of logs, error payloads, analytics, and database rows.
 - Add rate limiting to `POST /api/auth/refresh` and the new Apple auth endpoint to match the rest of the auth surface.
 
 **Edge Cases:**
+
 - App receives a refreshed token pair but crashes before persisting both values.
 - A second refresh request arrives after the first rotates the token but before the client updates storage.
 - A legacy web response accidentally reaches the mobile client and clears a session due to missing `accessToken`.
@@ -144,21 +152,25 @@ Add App Store-compliant Apple auth to the active auth surface.
 ### Research Insights
 
 **Best Practices:**
+
 - Treat Apple email as optional on subsequent logins; only the first credential response may contain it.
 - Fail closed on missing `identityToken` or unverifiable token signatures.
 - Use the Apple `sub` claim as the stable account key; never key Apple users by email alone.
 
 **Implementation Details:**
+
 - Reuse relay-email detection patterns already present around Google auto-link safety instead of introducing separate regex logic.
 - Add a clear response distinction for Apple credential cancellation vs invalid Apple credential so the mobile UI can avoid showing a generic error on user cancel.
 - If a legacy `auth-apple` route exists outside the active router, migrate or retire it instead of leaving two Apple implementations with different rules.
 
 **Security Considerations:**
+
 - Verify `aud`, `iss`, expiry, and other required claims for the configured Apple app identifier.
 - Do not auto-link relay emails to existing accounts even if the string collides.
 - Sanitize `fullName` length and shape before persisting.
 
 **Edge Cases:**
+
 - Apple returns no email and no `fullName` on a repeat login.
 - An existing soft-deleted row still holds `apple_user_id` or a relay email.
 - Apple verification succeeds but the database write fails before the session response is committed.
@@ -185,21 +197,25 @@ Refactor the mobile auth shell around access + refresh tokens.
 ### Research Insights
 
 **Best Practices:**
+
 - Keep refresh orchestration inside the API layer, not scattered across screens and hooks.
 - Use a single in-memory refresh promise so all callers await the same refresh attempt.
 - Persist tokens before updating React auth state to avoid a UI that believes it is authenticated with missing storage.
 
 **Implementation Details:**
+
 - Replace `setToken()` / `clearToken()` in `mobile/src/lib/api.ts` with pair-aware helpers such as `setSessionTokens()` and `clearSessionTokens()`.
 - Update `mobile/CLAUDE.md` after implementation so the documented storage contract matches the new token-pair design.
 - Keep user cache in MMKV and tokens in SecureStore only; never mix them.
 - Persist the new refresh token and new access token successfully before committing authenticated React state after a refresh response. If either write fails, clear both tokens and force full re-auth.
 
 **Performance Considerations:**
+
 - Avoid calling `/auth/me` redundantly after every login if the auth route already returns a complete `user` payload.
 - Decode JWT expiry locally for proactive refresh checks instead of forcing a request to learn the token expired.
 
 **Edge Cases:**
+
 - SecureStore write for one token succeeds while the other fails.
 - User opens the app offline with a cached user and an expired access token; preserve cached read-only access until connectivity returns, but clear immediately on authoritative refresh rejection.
 - Hydration completes while a background refresh is still running and the auth gate renders the wrong screen.
@@ -226,11 +242,13 @@ Implement the native auth screens and flows defined in the brainstorm.
 ### Research Insights
 
 **Best Practices:**
+
 - Use native provider buttons where required and avoid styling Apple’s internal label or glyph.
 - Keep one shared `isAuthenticating` guard across Apple, Google, magic-link verify, and password fallback to prevent double-submits.
 - Make cancellation paths silent and reversible; users cancel provider modals frequently and that is not an error state.
 
 **Implementation Details:**
+
 - Expo docs require adding the `expo-apple-authentication` plugin and `ios.usesAppleSignIn: true` in `mobile/app.json`.
 - Google Sign-In docs require the `@react-native-google-signin/google-signin` plugin and an `iosUrlScheme` when not relying on Firebase plist setup.
 - Configure Google Sign-In with the web client ID when the backend needs an `idToken`, and set the iOS client ID explicitly if not deriving it from plist configuration.
@@ -238,10 +256,12 @@ Implement the native auth screens and flows defined in the brainstorm.
 - Plan native auth testing around an Expo dev client / simulator build, not Expo Go alone, for Apple and Google SDK verification.
 
 **Accessibility Considerations:**
+
 - Ensure the login chooser remains usable with VoiceOver and large text.
 - Keep code-entry inputs compatible with iOS one-time-code autofill and paste workflows.
 
 **Edge Cases:**
+
 - User taps Google then Apple rapidly.
 - Provider modal is dismissed and the login screen remains in a disabled/loading state.
 - `isNewUser` routing stacks the welcome screen on top of auth instead of replacing it cleanly.
@@ -261,16 +281,19 @@ Add optional Face ID / Touch ID gating for stored mobile sessions.
 ### Research Insights
 
 **Best Practices:**
+
 - Prompt for biometrics only after the user has seen value from login, not during the first provider handshake.
 - Separate “biometric unavailable,” “biometric failed,” and “biometric canceled” in UI handling.
 - Keep biometric preference device-local and revocable from settings later.
 
 **Implementation Details:**
+
 - Gate display of cached user data until biometric success when biometric lock is enabled; only the locked gate or splash screen may render first.
 - Prefer a short-lived unlock session in memory for the current app session rather than re-prompting on every screen transition.
 - Re-check token freshness after biometric success, not before.
 
 **Edge Cases:**
+
 - Device has biometrics enrolled off, then the user disables Face ID in Settings.
 - App resumes from background repeatedly and prompts too aggressively.
 - Tokens are valid but biometric hardware is temporarily unavailable.

@@ -37,13 +37,16 @@ function normalizeUser(user: ApiUser): User {
     email: user.email,
     displayName: user.display_name,
     plan: user.plan,
+    subscriptionPlatform: user.subscription_platform,
     avatarUrl: user.avatar_url,
     studyScore: user.study_score,
     currentStreak: user.current_streak,
     longestStreak: user.longest_streak,
     trialEndsAt: user.trial_ends_at,
+    cancelAtPeriodEnd: !!user.cancel_at_period_end,
+    cancelAt: user.cancel_at,
+    hasSellerPayoutAccount: !!user.has_seller_payout_account,
     sellerTermsAccepted: !!user.seller_terms_accepted_at,
-    stripeConnectId: user.stripe_connect_account_id,
     stripeConnectOnboarded: !!user.connect_payouts_enabled,
     createdAt: user.created_at,
   };
@@ -267,6 +270,17 @@ export const api = {
     const payload = await request<Record<string, unknown>>('/auth/me', { skipAuthRetry: true });
     return normalizeMeResponse(payload);
   },
+  reconcileRevenueCat: async (): Promise<AuthMeResponse> => {
+    const payload = await request<Record<string, unknown>>('/revenuecat/reconcile', {
+      method: 'POST',
+      skipAuthRetry: true,
+    });
+    return normalizeMeResponse(payload);
+  },
+  createStripeCheckout: (billingPeriod: 'monthly' | 'annual' = 'monthly') =>
+    request<{ url: string }>('/stripe/checkout', { method: 'POST', body: JSON.stringify({ billingPeriod }) }),
+  createBillingPortal: () =>
+    request<{ url: string }>('/stripe/portal', { method: 'POST' }),
 
   generate: (input: string, title?: string) =>
     request('/generate', { method: 'POST', body: JSON.stringify({ input, title }) }),
@@ -308,7 +322,7 @@ export const api = {
   getCategories: () => request('/marketplace/categories'),
   getListing: (id: string) => request(`/marketplace/${id}`),
   createPurchase: (listingId: string) =>
-    request(`/marketplace/${listingId}/purchase`, { method: 'POST' }),
+    request<{ url: string }>(`/marketplace/${listingId}/purchase`, { method: 'POST' }),
   flagListing: (listingId: string, reason: string, flagType = 'listing', ratingId?: string) =>
     request(`/marketplace/${listingId}/flag`, {
       method: 'POST',
