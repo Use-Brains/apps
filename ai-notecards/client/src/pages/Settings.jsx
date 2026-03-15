@@ -146,7 +146,7 @@ export default function Settings() {
   const [changingPassword, setChangingPassword] = useState(false);
 
   // Preferences state
-  const [prefs, setPrefs] = useState({ card_order: 'shuffle', auto_flip_seconds: 0, notifications: { study_reminders: true, marketplace_activity: true } });
+  const [prefs, setPrefs] = useState({ auto_flip_seconds: 0, notifications: { study_reminders: true, marketplace_activity: true } });
   const saveTimerRef = useRef(null);
   const savingRef = useRef(false);
   const pendingRef = useRef(null);
@@ -386,23 +386,6 @@ export default function Settings() {
         <section className="bg-white rounded-2xl p-6 border border-gray-100 mb-6">
           <h2 className="text-lg font-semibold text-[#1A1614] mb-4">Study Preferences</h2>
           <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-[#1A1614] mb-2">Card Order</label>
-              <div className="flex gap-3">
-                {['shuffle', 'sequential'].map((order) => (
-                  <label key={order} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="card_order"
-                      checked={prefs.card_order === order}
-                      onChange={() => updatePref('card_order', order)}
-                      className="w-4 h-4 text-[#1B6B5A] focus:ring-[#1B6B5A]"
-                    />
-                    <span className="text-sm text-[#1A1614] capitalize">{order}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
             <div>
               <label className="block text-sm font-medium text-[#1A1614] mb-2">Auto-flip Timer</label>
               <select

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { api } from '../lib/api.js';
+import shuffle from '../lib/shuffle.js';
 
 export default function Study() {
   const { deckId } = useParams();
@@ -37,7 +38,7 @@ export default function Study() {
     Promise.all([api.getDeck(deckId), api.startSession(deckId)])
       .then(([deckData, sessionData]) => {
         setDeck(deckData.deck);
-        const shuffled = [...deckData.cards].sort(() => Math.random() - 0.5);
+        const shuffled = shuffle(deckData.cards);
         setCards(shuffled);
         setSessionId(sessionData.session.id);
         setPhase('studying');
@@ -126,7 +127,7 @@ export default function Study() {
       setCurrentIndex(0);
       setResults([]);
       setFlipped(false);
-      setCards((prev) => [...prev].sort(() => Math.random() - 0.5));
+      setCards((prev) => shuffle(prev));
       setPhase('studying');
       completingRef.current = false;
       advancingRef.current = false;
