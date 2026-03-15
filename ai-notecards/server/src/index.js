@@ -138,6 +138,11 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
+// API 404 catch-all (after all route registrations)
+app.use('/api/*', (req, res) => {
+  res.status(404).json({ error: 'Not found' });
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

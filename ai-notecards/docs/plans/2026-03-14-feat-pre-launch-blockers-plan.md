@@ -818,17 +818,17 @@ const handleSetPassword = async (e) => {
 - [x] Seller terms modal links to full Terms of Service
 
 ### Phase 3: Error Handling
-- [ ] Navigating to `/nonexistent-url` shows NotFound page with Navbar and contextual CTA
-- [ ] NotFound page shows "Go to Dashboard" for authenticated users, "Go Home" for others
-- [ ] NotFound CTA does not flash between states during auth loading
-- [ ] React component crash shows ErrorBoundary fallback UI (not white screen)
-- [ ] ErrorBoundary recovery navigates to `/` via `window.location.href` (works for both authed and unauthed)
-- [ ] ErrorBoundary has `isRecovering` guard flag — render returns `null` during navigation
-- [ ] `componentDidCatch` console.error is dev-only (`import.meta.env.DEV`)
-- [ ] `React.StrictMode` is preserved in `main.jsx`
-- [ ] `createRoot` error hooks are configured (`onUncaughtError`, `onRecoverableError`)
-- [ ] Navbar is NOT added to App.jsx — stays in individual page components (Option 2)
-- [ ] `GET /api/nonexistent` returns `{ "error": "Not found" }` with 404 status (not HTML)
+- [x] Navigating to `/nonexistent-url` shows NotFound page with Navbar and contextual CTA
+- [x] NotFound page shows "Go to Dashboard" for authenticated users, "Go Home" for others
+- [x] NotFound CTA does not flash between states during auth loading
+- [x] React component crash shows ErrorBoundary fallback UI (not white screen)
+- [x] ErrorBoundary recovery navigates to `/` via `window.location.href` (works for both authed and unauthed)
+- [x] ErrorBoundary has `isRecovering` guard flag — render returns `null` during navigation
+- [x] `componentDidCatch` console.error is dev-only (`import.meta.env.DEV`)
+- [x] `React.StrictMode` is preserved in `main.jsx`
+- [x] `createRoot` error hooks are configured (`onUncaughtError`, `onRecoverableError`)
+- [x] Navbar is NOT added to App.jsx — stays in individual page components (Option 2)
+- [x] `GET /api/nonexistent` returns `{ "error": "Not found" }` with 404 status (not HTML)
 
 ### Phase 4: Sentry
 - [ ] Client errors are captured in Sentry with source-mapped stack traces

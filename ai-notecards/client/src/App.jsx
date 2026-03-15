@@ -20,6 +20,8 @@ import Profile from './pages/Profile.jsx';
 import Admin from './pages/Admin.jsx';
 import Terms from './pages/Terms.jsx';
 import Privacy from './pages/Privacy.jsx';
+import NotFound from './pages/NotFound.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -54,27 +56,30 @@ export default function App() {
             style: { background: '#1A1614', color: '#fff', borderRadius: '12px' },
           }}
         />
-        <Routes>
-          <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
-          <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-          <Route path="/signup" element={<Navigate to="/login" replace />} />
-          <Route path="/verify-code" element={<PublicRoute><VerifyCode /></PublicRoute>} />
-          <Route path="/welcome" element={<ProtectedRoute><Welcome /></ProtectedRoute>} />
-          <Route path="/pricing" element={<Pricing />} />
-          <Route path="/terms" element={<Terms />} />
-          <Route path="/privacy" element={<Privacy />} />
-          <Route path="/marketplace" element={<Marketplace />} />
-          <Route path="/marketplace/:id" element={<MarketplaceDeck />} />
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/decks/:id" element={<ProtectedRoute><DeckView /></ProtectedRoute>} />
-          <Route path="/generate" element={<ProtectedRoute><Generate /></ProtectedRoute>} />
-          <Route path="/study/:deckId" element={<ProtectedRoute><Study /></ProtectedRoute>} />
-          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-          <Route path="/sell/:deckId" element={<ProtectedRoute><ListDeck /></ProtectedRoute>} />
-          <Route path="/seller" element={<ProtectedRoute><SellerDashboard /></ProtectedRoute>} />
-          <Route path="/admin/flags" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
-        </Routes>
+        <ErrorBoundary>
+          <Routes>
+            <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
+            <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+            <Route path="/signup" element={<Navigate to="/login" replace />} />
+            <Route path="/verify-code" element={<PublicRoute><VerifyCode /></PublicRoute>} />
+            <Route path="/welcome" element={<ProtectedRoute><Welcome /></ProtectedRoute>} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/marketplace" element={<Marketplace />} />
+            <Route path="/marketplace/:id" element={<MarketplaceDeck />} />
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/decks/:id" element={<ProtectedRoute><DeckView /></ProtectedRoute>} />
+            <Route path="/generate" element={<ProtectedRoute><Generate /></ProtectedRoute>} />
+            <Route path="/study/:deckId" element={<ProtectedRoute><Study /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="/sell/:deckId" element={<ProtectedRoute><ListDeck /></ProtectedRoute>} />
+            <Route path="/seller" element={<ProtectedRoute><SellerDashboard /></ProtectedRoute>} />
+            <Route path="/admin/flags" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </ErrorBoundary>
       </AuthProvider>
     </GoogleOAuthProvider>
   );
