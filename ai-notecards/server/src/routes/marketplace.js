@@ -6,8 +6,26 @@ import pool from '../db/pool.js';
 
 const router = Router();
 
+// Auto-approve listings stuck in pending_review after 60s (manual review fallback)
+let lastCleanup = 0;
+async function maybeAutoApprove() {
+  const now = Date.now();
+  if (now - lastCleanup < 30_000) return;
+  lastCleanup = now;
+  await pool.query(`
+    UPDATE marketplace_listings
+    SET status = 'active', moderation_status = 'approved',
+        moderation_reason = 'auto-approved (timeout)'
+    WHERE status = 'pending_review'
+      AND moderation_status = 'pending'
+      AND moderation_requested_at < NOW() - INTERVAL '60 seconds'
+  `);
+}
+
 // Browse/search marketplace listings
 router.get('/', async (req, res) => {
+  // Fire-and-forget auto-approve cleanup (don't block response)
+  maybeAutoApprove().catch(err => console.error('Auto-approve cleanup failed:', err));
   try {
     const { category, q, sort = 'popular', cursor, limit = '20' } = req.query;
     const pageLimit = Math.min(parseInt(limit) || 20, 50);

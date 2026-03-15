@@ -58,9 +58,9 @@ router.post('/listings', requireXHR, authenticate, requireActiveUser, checkTrial
       return res.status(409).json({ error: 'This deck is already listed' });
     }
 
-    // Check active listing count
+    // Check active + pending listing count
     const { rows: activeCount } = await pool.query(
-      "SELECT COUNT(*)::int AS count FROM marketplace_listings WHERE seller_id = $1 AND status = 'active'",
+      "SELECT COUNT(*)::int AS count FROM marketplace_listings WHERE seller_id = $1 AND status IN ('active', 'pending_review')",
       [req.userId]
     );
     if (activeCount[0].count >= MAX_ACTIVE_LISTINGS) {
@@ -81,7 +81,7 @@ router.post('/listings', requireXHR, authenticate, requireActiveUser, checkTrial
 
     // Check duplicate title in same category by same seller
     const { rows: dupeRows } = await pool.query(
-      "SELECT id FROM marketplace_listings WHERE seller_id = $1 AND category_id = $2 AND title = $3 AND status = 'active'",
+      "SELECT id FROM marketplace_listings WHERE seller_id = $1 AND category_id = $2 AND title = $3 AND status IN ('active', 'pending_review')",
       [req.userId, category_id, deckRows[0].title]
     );
     if (dupeRows.length > 0) {
@@ -94,8 +94,8 @@ router.post('/listings', requireXHR, authenticate, requireActiveUser, checkTrial
       await client.query('BEGIN');
 
       const { rows: listingRows } = await client.query(
-        `INSERT INTO marketplace_listings (deck_id, seller_id, category_id, title, description, price_cents)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO marketplace_listings (deck_id, seller_id, category_id, title, description, price_cents, status, moderation_status, moderation_requested_at)
+         VALUES ($1, $2, $3, $4, $5, $6, 'pending_review', 'pending', NOW())
          RETURNING *`,
         [deck_id, req.userId, category_id, deckRows[0].title, description, price_cents]
       );
@@ -138,47 +138,69 @@ router.patch('/listings/:id', requireXHR, authenticate, requireActiveUser, check
       return res.status(404).json({ error: 'Listing not found' });
     }
 
-    const updates = [];
-    const params = [];
-
-    if (description !== undefined) {
-      if (description.length > 500) {
-        return res.status(400).json({ error: 'Description must be 500 characters or less' });
-      }
-      params.push(description);
-      updates.push(`description = $${params.length}`);
+    if (description !== undefined && description.length > 500) {
+      return res.status(400).json({ error: 'Description must be 500 characters or less' });
+    }
+    if (price_cents !== undefined && (price_cents < 100 || price_cents > 500)) {
+      return res.status(400).json({ error: 'Price must be between $1 and $5' });
+    }
+    if (tags !== undefined && tags.length > 5) {
+      return res.status(400).json({ error: 'Maximum 5 tags allowed' });
     }
 
-    if (price_cents !== undefined) {
-      if (price_cents < 100 || price_cents > 500) {
-        return res.status(400).json({ error: 'Price must be between $1 and $5' });
-      }
-      params.push(price_cents);
-      updates.push(`price_cents = $${params.length}`);
-    }
+    const descriptionChanged = description !== undefined && description !== rows[0].description;
 
-    if (updates.length > 0) {
-      updates.push('updated_at = NOW()');
-      params.push(req.params.id);
-      await pool.query(
-        `UPDATE marketplace_listings SET ${updates.join(', ')} WHERE id = $${params.length}`,
-        params
-      );
-    }
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    if (tags !== undefined) {
-      if (tags.length > 5) {
-        return res.status(400).json({ error: 'Maximum 5 tags allowed' });
+      const updates = [];
+      const params = [];
+
+      if (description !== undefined) {
+        params.push(description);
+        updates.push(`description = $${params.length}`);
       }
-      await pool.query('DELETE FROM listing_tags WHERE listing_id = $1', [req.params.id]);
-      for (const tag of tags) {
-        if (tag.trim()) {
-          await pool.query(
-            'INSERT INTO listing_tags (listing_id, tag) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-            [req.params.id, tag.trim().toLowerCase()]
-          );
+
+      if (price_cents !== undefined) {
+        params.push(price_cents);
+        updates.push(`price_cents = $${params.length}`);
+      }
+
+      // Re-moderate on description change
+      if (descriptionChanged) {
+        updates.push(`moderation_status = 'pending'`);
+        updates.push(`moderation_requested_at = NOW()`);
+        updates.push(`status = 'pending_review'`);
+      }
+
+      if (updates.length > 0) {
+        updates.push('updated_at = NOW()');
+        params.push(req.params.id);
+        await client.query(
+          `UPDATE marketplace_listings SET ${updates.join(', ')} WHERE id = $${params.length}`,
+          params
+        );
+      }
+
+      if (tags !== undefined) {
+        await client.query('DELETE FROM listing_tags WHERE listing_id = $1', [req.params.id]);
+        for (const tag of tags) {
+          if (tag.trim()) {
+            await client.query(
+              'INSERT INTO listing_tags (listing_id, tag) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+              [req.params.id, tag.trim().toLowerCase()]
+            );
+          }
         }
       }
+
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
     }
 
     const { rows: updated } = await pool.query(
@@ -225,15 +247,33 @@ router.post('/listings/:id/relist', requireXHR, authenticate, requireActiveUser,
       return res.status(403).json({ error: 'Stripe Connect required' });
     }
 
-    const { rows } = await pool.query(
-      `UPDATE marketplace_listings SET status = 'active', updated_at = NOW()
-       WHERE id = $1 AND seller_id = $2 AND status = 'delisted'
-       RETURNING id`,
-      [req.params.id, req.userId]
+    // Check current listing state
+    const { rows: listingRows } = await pool.query(
+      'SELECT id, moderation_status FROM marketplace_listings WHERE id = $1 AND seller_id = $2 AND status = $3',
+      [req.params.id, req.userId, 'delisted']
     );
-    if (rows.length === 0) {
+    if (listingRows.length === 0) {
       return res.status(404).json({ error: 'Listing not found or not delisted' });
     }
+
+    if (listingRows[0].moderation_status === 'rejected') {
+      // Previously rejected — needs re-review, can't go directly to active
+      await pool.query(
+        `UPDATE marketplace_listings
+         SET status = 'pending_review', moderation_status = 'pending',
+             moderation_requested_at = NOW(), updated_at = NOW()
+         WHERE id = $1 AND seller_id = $2`,
+        [req.params.id, req.userId]
+      );
+    } else {
+      // Normal relist (previously approved/delisted)
+      await pool.query(
+        `UPDATE marketplace_listings SET status = 'active', updated_at = NOW()
+         WHERE id = $1 AND seller_id = $2`,
+        [req.params.id, req.userId]
+      );
+    }
+
     res.json({ ok: true });
   } catch (err) {
     console.error('Relist error:', err);

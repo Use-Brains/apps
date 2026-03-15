@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { api } from '../lib/api.js';
@@ -56,6 +56,33 @@ export default function SellerDashboard() {
       setOnboarding(false);
     }
   };
+
+  // Poll for moderation status changes when pending listings exist
+  const hasPending = useMemo(
+    () => listings.some(l => l.status === 'pending_review' && l.moderation_status === 'pending'),
+    [listings]
+  );
+
+  useEffect(() => {
+    if (!hasPending) return;
+    let delay = 3000;
+    let canceled = false;
+    let timeoutId;
+    const poll = async () => {
+      if (canceled) return;
+      try {
+        const data = await api.getSellerListings();
+        if (canceled) return;
+        setListings(data.listings);
+        if (data.listings.some(l => l.status === 'pending_review' && l.moderation_status === 'pending') && !canceled) {
+          delay = Math.min(delay * 1.5, 30000);
+          timeoutId = setTimeout(poll, delay);
+        }
+      } catch { /* swallow — stale data is better than error toasts every 3s */ }
+    };
+    timeoutId = setTimeout(poll, delay);
+    return () => { canceled = true; clearTimeout(timeoutId); };
+  }, [hasPending]);
 
   const handleDelist = async id => {
     if (!confirm('Delist this deck? Buyers can no longer find it in the marketplace.')) return;
@@ -176,13 +203,23 @@ export default function SellerDashboard() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span
-                      className={`px-2 py-0.5 text-xs font-medium rounded ${
-                        listing.status === 'active' ? 'bg-[#E8F5F0] text-[#1B6B5A]' : listing.status === 'delisted' ? 'bg-gray-100 text-[#6B635A]' : 'bg-red-50 text-red-600'
-                      }`}
-                    >
-                      {listing.status}
-                    </span>
+                    {listing.status === 'pending_review' && listing.moderation_status === 'pending' ? (
+                      <span className="px-2 py-0.5 text-xs font-medium rounded bg-amber-50 text-amber-700">
+                        Under Review
+                      </span>
+                    ) : listing.status === 'pending_review' && listing.moderation_status === 'rejected' ? (
+                      <span className="px-2 py-0.5 text-xs font-medium rounded bg-red-50 text-red-600" title={listing.moderation_reason || ''}>
+                        Rejected
+                      </span>
+                    ) : (
+                      <span
+                        className={`px-2 py-0.5 text-xs font-medium rounded ${
+                          listing.status === 'active' ? 'bg-[#E8F5F0] text-[#1B6B5A]' : listing.status === 'delisted' ? 'bg-gray-100 text-[#6B635A]' : 'bg-red-50 text-red-600'
+                        }`}
+                      >
+                        {listing.status}
+                      </span>
+                    )}
                     {listing.status === 'active' && (
                       <>
                         <SharePopover

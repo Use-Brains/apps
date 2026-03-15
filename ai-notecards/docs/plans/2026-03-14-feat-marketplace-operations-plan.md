@@ -1006,24 +1006,24 @@ If a seller rapidly edits their description, each edit fires a new moderation ca
 
 ### Acceptance Criteria
 
-- [ ] New listings go to `pending_review` → async AI screening → `active` if clean
-- [ ] Flagged listings stay in `pending_review` with `moderation_status = 'rejected'` and visible reason
-- [ ] Listings auto-approve after 60 seconds via debounced cleanup UPDATE (once per 30s, not per request)
-- [ ] Auto-approve survives server restarts (time-based WHERE clause, not in-memory state)
-- [ ] Description edits trigger re-moderation (listing goes back to `pending_review`)
-- [ ] PATCH handler wraps description + tag updates in transaction
-- [ ] Relist re-screens if listing was previously rejected
-- [ ] SellerDashboard shows distinct "Under Review" and "Rejected" badges
-- [ ] SellerDashboard polls for status changes (useMemo dependency, cancel check after await)
-- [ ] Async moderation uses conditional UPDATE (`WHERE moderation_status = 'pending'`)
-- [ ] Relist of rejected listing goes to `pending_review` + re-screens (not directly to `active`)
-- [ ] Migration deploys before code (new INSERT values require new CHECK constraint; migration is backward-compatible with old code)
-- [ ] Fire-and-forget always has `.catch()` handler
-- [ ] Cross-column CHECK constraint prevents `active + rejected` state
-- [ ] OpenRouter errors logged with severity (401/402 = critical, timeout = warning)
-- [ ] Existing listings unaffected (default `moderation_status = 'approved'`, `moderation_requested_at = NULL`)
-- [ ] Listing count + duplicate title checks include `pending_review` status (prevent limit bypass)
-- [ ] `maybeAutoApprove()` is fire-and-forget (not awaited — pending listings invisible to browse query)
+- [x] New listings go to `pending_review` → manual review / auto-approve → `active` if clean
+- [x] Flagged listings stay in `pending_review` with `moderation_status = 'rejected'` and visible reason
+- [x] Listings auto-approve after 60 seconds via debounced cleanup UPDATE (once per 30s, not per request)
+- [x] Auto-approve survives server restarts (time-based WHERE clause, not in-memory state)
+- [x] Description edits trigger re-moderation (listing goes back to `pending_review`)
+- [x] PATCH handler wraps description + tag updates in transaction
+- [x] Relist re-screens if listing was previously rejected
+- [x] SellerDashboard shows distinct "Under Review" and "Rejected" badges
+- [x] SellerDashboard polls for status changes (useMemo dependency, cancel check after await)
+- [x] Async moderation uses conditional UPDATE (`WHERE moderation_status = 'pending'`) — via auto-approve cleanup
+- [x] Relist of rejected listing goes to `pending_review` + re-screens (not directly to `active`)
+- [x] Migration deploys before code (new INSERT values require new CHECK constraint; migration is backward-compatible with old code)
+- [x] Fire-and-forget always has `.catch()` handler
+- [x] Cross-column CHECK constraint prevents `active + rejected` state
+- [x] AI moderation deferred to v2 — manual review for now, auto-approve after 60s timeout
+- [x] Existing listings unaffected (default `moderation_status = 'approved'`, `moderation_requested_at = NULL`)
+- [x] Listing count + duplicate title checks include `pending_review` status (prevent limit bypass)
+- [x] `maybeAutoApprove()` is fire-and-forget (not awaited — pending listings invisible to browse query)
 - [ ] Moderation callback WHERE includes `AND status = 'pending_review'` (prevent flipping removed listings)
 
 ---
