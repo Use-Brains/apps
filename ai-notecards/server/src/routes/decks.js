@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import striptags from 'striptags';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, requireActiveUser } from '../middleware/auth.js';
 import { requireXHR } from '../middleware/csrf.js';
 import { checkTrialExpiry, PLAN_LIMITS } from '../middleware/plan.js';
 import pool from '../db/pool.js';
+import { countUserDecks } from '../db/queries.js';
 
 const router = Router();
 
@@ -16,6 +17,11 @@ const saveLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many save requests. Please try again later.' },
 });
+
+const PURCHASED_READONLY_ERROR = {
+  error: 'purchased_deck_readonly',
+  message: 'Purchased decks cannot be edited. Duplicate the deck to create an editable copy.',
+};
 
 // List all decks for the user
 router.get('/', authenticate, async (req, res) => {
@@ -105,14 +111,11 @@ router.post('/save', requireXHR, authenticate, checkTrialExpiry, saveLimiter, as
   }
 
   try {
-    // Inline deck count limit check
+    // Deck count limit check
     const limits = PLAN_LIMITS[req.userPlan] || PLAN_LIMITS.free;
     if (limits.maxDecks !== Infinity) {
-      const { rows: countRows } = await pool.query(
-        "SELECT COUNT(*)::int AS count FROM decks WHERE user_id = $1 AND origin = 'generated'",
-        [req.userId]
-      );
-      if (countRows[0].count >= limits.maxDecks) {
+      const deckCount = await countUserDecks(req.userId);
+      if (deckCount >= limits.maxDecks) {
         return res.status(429).json({
           error: `Maximum deck limit reached (${limits.maxDecks}). Upgrade to Pro for unlimited decks.`,
           limit: true,
@@ -161,8 +164,94 @@ router.post('/save', requireXHR, authenticate, checkTrialExpiry, saveLimiter, as
   }
 });
 
+// Duplicate a deck
+router.post('/:id/duplicate', requireXHR, authenticate, requireActiveUser, checkTrialExpiry, saveLimiter, async (req, res) => {
+  try {
+    // 1. Verify ownership (MUST include user_id to prevent IDOR)
+    const sourceResult = await pool.query(
+      'SELECT id, title, source_text, origin FROM decks WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.userId]
+    );
+    if (sourceResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Deck not found' });
+    }
+    const sourceDeck = sourceResult.rows[0];
+
+    // 2. Check deck limits
+    const limits = PLAN_LIMITS[req.userPlan] || PLAN_LIMITS.free;
+    if (limits.maxDecks !== Infinity) {
+      const deckCount = await countUserDecks(req.userId);
+      if (deckCount >= limits.maxDecks) {
+        return res.status(429).json({
+          error: `Maximum deck limit reached (${limits.maxDecks}). Upgrade to Pro for unlimited decks.`,
+          limit: true,
+        });
+      }
+    }
+
+    // 3. Read source cards OUTSIDE transaction (follows purchase.js pattern)
+    const { rows: sourceCards } = await pool.query(
+      'SELECT front, back, position FROM cards WHERE deck_id = $1 ORDER BY position',
+      [sourceDeck.id]
+    );
+
+    // 4. Sanitize title — striptags + trim + Unicode-safe truncation
+    let title = striptags(sourceDeck.title).trim();
+    if (!title) title = 'Untitled';
+    const chars = Array.from(title);
+    if (chars.length > 193) title = chars.slice(0, 193).join('');
+    title += ' (Copy)';
+
+    // 5. Transaction
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const deckResult = await client.query(
+        `INSERT INTO decks (user_id, title, source_text, origin, duplicated_from_deck_id)
+         VALUES ($1, $2, $3, 'duplicated', $4) RETURNING *`,
+        [req.userId, title, sourceDeck.source_text, sourceDeck.id]
+      );
+      const newDeck = deckResult.rows[0];
+
+      // Bulk INSERT cards (guard empty decks)
+      if (sourceCards.length > 0) {
+        const values = [];
+        const placeholders = [];
+        sourceCards.forEach((card, i) => {
+          const offset = i * 4;
+          placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4})`);
+          values.push(newDeck.id, card.front, card.back, card.position);
+        });
+
+        await client.query(
+          `INSERT INTO cards (deck_id, front, back, position) VALUES ${placeholders.join(', ')}`,
+          values
+        );
+      }
+
+      await client.query('COMMIT');
+
+      res.status(201).json({ deck: { ...newDeck, card_count: sourceCards.length } });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      // FK violation — source deck deleted mid-operation
+      if (err.code === '23503') {
+        return res.status(404).json({ error: 'Source deck no longer exists' });
+      }
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    if (err.code === '23503') return; // already handled
+    console.error('Duplicate deck error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Rename a deck
-router.patch('/:id', requireXHR, authenticate, async (req, res) => {
+router.patch('/:id', requireXHR, authenticate, requireActiveUser, async (req, res) => {
   const { title } = req.body;
   if (!title) {
     return res.status(400).json({ error: 'Title is required' });
@@ -171,13 +260,22 @@ router.patch('/:id', requireXHR, authenticate, async (req, res) => {
     return res.status(400).json({ error: 'Title is too long. Maximum 200 characters.' });
   }
   try {
-    const result = await pool.query(
-      'UPDATE decks SET title = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3 RETURNING *',
-      [title, req.params.id, req.userId]
+    // Check ownership and origin
+    const deckCheck = await pool.query(
+      'SELECT origin FROM decks WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.userId]
     );
-    if (result.rows.length === 0) {
+    if (deckCheck.rows.length === 0) {
       return res.status(404).json({ error: 'Deck not found' });
     }
+    if (deckCheck.rows[0].origin === 'purchased') {
+      return res.status(403).json(PURCHASED_READONLY_ERROR);
+    }
+
+    const result = await pool.query(
+      'UPDATE decks SET title = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3 RETURNING *',
+      [striptags(title), req.params.id, req.userId]
+    );
     res.json({ deck: result.rows[0] });
   } catch (err) {
     console.error('Update deck error:', err);
@@ -186,7 +284,7 @@ router.patch('/:id', requireXHR, authenticate, async (req, res) => {
 });
 
 // Delete a deck
-router.delete('/:id', requireXHR, authenticate, async (req, res) => {
+router.delete('/:id', requireXHR, authenticate, requireActiveUser, async (req, res) => {
   try {
     const result = await pool.query(
       'DELETE FROM decks WHERE id = $1 AND user_id = $2 RETURNING id',
@@ -203,7 +301,7 @@ router.delete('/:id', requireXHR, authenticate, async (req, res) => {
 });
 
 // Add a card to a deck
-router.post('/:id/cards', requireXHR, authenticate, async (req, res) => {
+router.post('/:id/cards', requireXHR, authenticate, requireActiveUser, async (req, res) => {
   const { front, back } = req.body;
   if (!front || !back) {
     return res.status(400).json({ error: 'Front and back are required' });
@@ -215,10 +313,13 @@ router.post('/:id/cards', requireXHR, authenticate, async (req, res) => {
     return res.status(400).json({ error: 'Card back text is too long. Maximum 5,000 characters.' });
   }
   try {
-    // Verify ownership
-    const deck = await pool.query('SELECT id FROM decks WHERE id = $1 AND user_id = $2', [req.params.id, req.userId]);
+    // Verify ownership and check origin
+    const deck = await pool.query('SELECT id, origin FROM decks WHERE id = $1 AND user_id = $2', [req.params.id, req.userId]);
     if (deck.rows.length === 0) {
       return res.status(404).json({ error: 'Deck not found' });
+    }
+    if (deck.rows[0].origin === 'purchased') {
+      return res.status(403).json(PURCHASED_READONLY_ERROR);
     }
 
     const maxPos = await pool.query('SELECT COALESCE(MAX(position), -1) AS max_pos FROM cards WHERE deck_id = $1', [req.params.id]);
@@ -234,7 +335,7 @@ router.post('/:id/cards', requireXHR, authenticate, async (req, res) => {
 });
 
 // Update a card
-router.patch('/:deckId/cards/:cardId', requireXHR, authenticate, async (req, res) => {
+router.patch('/:deckId/cards/:cardId', requireXHR, authenticate, requireActiveUser, async (req, res) => {
   const { front, back } = req.body;
   if (front !== undefined && front.length > 2000) {
     return res.status(400).json({ error: 'Card front text is too long. Maximum 2,000 characters.' });
@@ -243,9 +344,12 @@ router.patch('/:deckId/cards/:cardId', requireXHR, authenticate, async (req, res
     return res.status(400).json({ error: 'Card back text is too long. Maximum 5,000 characters.' });
   }
   try {
-    const deck = await pool.query('SELECT id FROM decks WHERE id = $1 AND user_id = $2', [req.params.deckId, req.userId]);
+    const deck = await pool.query('SELECT id, origin FROM decks WHERE id = $1 AND user_id = $2', [req.params.deckId, req.userId]);
     if (deck.rows.length === 0) {
       return res.status(404).json({ error: 'Deck not found' });
+    }
+    if (deck.rows[0].origin === 'purchased') {
+      return res.status(403).json(PURCHASED_READONLY_ERROR);
     }
 
     const result = await pool.query(
@@ -263,11 +367,14 @@ router.patch('/:deckId/cards/:cardId', requireXHR, authenticate, async (req, res
 });
 
 // Delete a card
-router.delete('/:deckId/cards/:cardId', requireXHR, authenticate, async (req, res) => {
+router.delete('/:deckId/cards/:cardId', requireXHR, authenticate, requireActiveUser, async (req, res) => {
   try {
-    const deck = await pool.query('SELECT id FROM decks WHERE id = $1 AND user_id = $2', [req.params.deckId, req.userId]);
+    const deck = await pool.query('SELECT id, origin FROM decks WHERE id = $1 AND user_id = $2', [req.params.deckId, req.userId]);
     if (deck.rows.length === 0) {
       return res.status(404).json({ error: 'Deck not found' });
+    }
+    if (deck.rows[0].origin === 'purchased') {
+      return res.status(403).json(PURCHASED_READONLY_ERROR);
     }
 
     const result = await pool.query(

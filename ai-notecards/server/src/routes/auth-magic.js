@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
 import pool from '../db/pool.js';
 import { USER_SELECT, setTokenCookie, sanitizeUser } from './auth.js';
+import { trackServerEvent } from '../services/analytics.js';
 import { sendMagicLinkCode } from '../services/email.js';
 
 const router = Router();
@@ -141,6 +142,7 @@ router.post('/verify', verifyLimiter, async (req, res) => {
       );
       user = newUserResult.rows[0];
       isNewUser = true;
+      trackServerEvent(user.id, 'signup_completed', { method: 'magic_link' });
     }
 
     setTokenCookie(res, user.id);

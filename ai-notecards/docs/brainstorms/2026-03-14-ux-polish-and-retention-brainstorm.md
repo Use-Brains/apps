@@ -7,88 +7,56 @@ topic: ux-polish-and-retention
 
 ## What We're Building
 
-Five features that make users stay, come back, and get more value from the product: card editing after save, deck duplication, keyboard shortcuts in study mode, a guided onboarding flow, and analytics integration. These aren't launch blockers — they're the difference between users who try the app once and users who build it into their study routine.
+Three features that make users stay, come back, and get more value from the product: deck duplication, a guided onboarding flow, and analytics integration. These aren't launch blockers — they're the difference between users who try the app once and users who build it into their study routine.
+
+Card editing and keyboard shortcuts were part of the original brainstorm but have been implemented. Card editing (add/edit/delete) works in DeckView. Keyboard shortcuts (Space to flip, arrow keys to rate) work in flip mode study sessions.
 
 ## Why This Approach
 
-The core product works: generate cards, study them, buy/sell on the marketplace. But the experience has friction points that compound over time. A user who can't fix a typo in a generated card loses trust in the AI. A user who lands on an empty dashboard after signup doesn't know what to do. A power user studying 200 cards without keyboard shortcuts gets frustrated. These are the "death by a thousand cuts" problems that erode retention.
-
-Analytics is included here because without data, we're guessing which of these problems is worst. We need to measure before we can improve.
+The core product works: generate cards, study them, buy/sell on the marketplace. But the experience has friction points that compound over time. A user who lands on an empty dashboard after signup doesn't know what to do. Without data, we're guessing which problems are worst. We need to measure before we can improve.
 
 ## Feature Details
 
-### 1. Card Editing After Save
+### 1. Deck Duplication
 
-**Problem:** Generation preview lets users edit cards before saving, which is great. But once a deck is saved, cards are read-only forever. DeckView shows cards but has no edit capability. AI makes factual errors, typos, and awkward phrasing. Users will want to fix these, add context, or improve wording over time. Without editing, the only option is to delete the deck and regenerate — losing any study history attached to it.
-
-**Approach:**
-- Add edit capability to the DeckView page (`/decks/:id`)
-- Each card gets an edit icon (pencil) that toggles inline editing
-- Editing shows front and back as text inputs with save/cancel buttons
-- New endpoint: `PATCH /api/cards/:id` — updates front and/or back text
-- Validate: front and back required, reasonable max length (500 chars each)
-- Only the deck owner can edit their cards
-- Purchased decks are NOT editable (they're copies, but the content came from someone else's listing — editing would break the marketplace trust model)
-
-**Additional capabilities to consider:**
-- **Add card:** Button at the bottom of DeckView to add a new card manually. `POST /api/cards` with deck_id, front, back
-- **Delete card:** Remove individual cards from a deck. `DELETE /api/cards/:id`
-- **Reorder cards:** Drag-and-drop or move up/down buttons. Lower priority — cards are always shuffled in study mode anyway
-
-**Architecture:**
-- New route file: `server/src/routes/cards.js` with PATCH, POST, DELETE
-- Middleware: authenticate + ownership check (card → deck → user_id)
-- DeckView.jsx: toggle between view mode and edit mode per card
-- No bulk edit for v1 — one card at a time keeps it simple
-
-**Open question:** Should editing be available on purchased decks? Argument for: users might want to personalize. Argument against: if they resell (not currently possible) it would be someone else's content modified. Recommendation: no editing on purchased decks for v1. Users can duplicate the deck (feature #2) if they want a mutable copy.
-
-### 2. Deck Duplication
-
-**Problem:** Users can't copy a deck. Use cases: (1) create a subset for a specific exam, (2) make a variation with harder questions, (3) get a mutable copy of a purchased deck, (4) share a copy with a study partner (manually). The only option is to regenerate from scratch, losing the existing content.
+**Problem:** Users can't copy a deck. Use cases: (1) create a subset for a specific exam, (2) make a variation with harder questions, (3) get a mutable copy of a purchased deck so they can edit it, (4) share a copy with a study partner (manually). The only option is to regenerate from scratch, losing the existing content.
 
 **Approach:**
 - Add "Duplicate" button on DeckView page (next to Delete)
 - Creates a new deck with title "[Original Title] (copy)" and copies all cards
 - New endpoint: `POST /api/decks/:id/duplicate`
-- Duplicated deck gets origin = "generated" (it's user's own copy now)
-- Deck count limits still apply (free tier max 10 generated decks)
-- Purchased decks CAN be duplicated — the duplicate becomes a "generated" deck that the user owns and can edit
+- **Duplicated decks get `origin = 'duplicated'`** — this is NOT the same as `'generated'`. The backend must distinguish duplicated decks from truly generated ones because selling is gated to `origin = 'generated'` only
+- Deck count limits still apply (free tier max 10 generated decks — duplicated decks count toward this limit)
+- Purchased decks CAN be duplicated — the duplicate becomes a `'duplicated'` deck that the user owns and can edit
+
+**Why a separate origin matters:**
+- Selling requires `origin = 'generated'` — a duplicated deck (whether from your own deck or a purchased one) cannot be listed on the marketplace
+- This prevents someone from buying a deck, duplicating it, and reselling someone else's content
+- It also prevents a seller from duplicating their own deck and listing both copies — each listing must come from a genuinely generated deck
+- On a seller's dashboard, duplicated decks show the disabled sell icon with a tooltip: "Duplicated decks can't be sold. Only decks you generate from scratch are eligible for the marketplace."
 
 **Architecture:**
-- Single transaction: INSERT deck + INSERT cards SELECT from source
+- Single transaction: INSERT deck (with `origin = 'duplicated'`) + INSERT cards SELECT from source
+- Store `duplicated_from_deck_id` on the new deck (nullable FK) for provenance tracking
 - Check deck ownership (user_id matches)
 - Check deck limits for free tier users
 - Return the new deck object with redirect to `/decks/:newId`
+- Migration: add `'duplicated'` to any origin check constraints, add `duplicated_from_deck_id` column
 
 **Design:** Small duplicate icon (two overlapping squares) next to the delete button. Confirmation not needed — it's a non-destructive operation.
 
-### 3. Keyboard Shortcuts in Study Mode
+**Purchased deck editing — open question:**
 
-**Problem:** Multiple choice mode has keyboard support (1-4 number keys to select answer), but flip mode — the most-used mode — has no keyboard shortcuts. Users studying hundreds of cards have to click three buttons: "Show Answer" → "Correct"/"Incorrect". For power users, this is painfully slow. Type-the-answer mode has Enter to submit (natural), but match mode has no keyboard support either.
+From first principles: if a user buys notecards, they should be theirs to do with as they please. Restricting editing on something someone paid for feels wrong. But there's a practical concern — if we let users edit purchased decks directly and they break the content, there's no way to reset to the original.
 
-**Approach — Flip Mode:**
-- **Space** — flip the card (show/hide answer)
-- **Right arrow** or **Enter** — mark correct and advance
-- **Left arrow** or **Backspace** — mark incorrect and advance
-- Show shortcut hints below the buttons: `Space to flip · → Correct · ← Incorrect`
+Options:
+1. **Allow editing on purchased decks directly.** Simple, respects ownership. Risk: user edits a purchased deck, ruins it, can't get original back. Could mitigate by showing a warning: "This deck was purchased. Edits can't be undone — consider duplicating first."
+2. **Block editing on purchased decks, explain why, offer duplication.** When a user tries to edit a purchased card, show a message: "Purchased decks are read-only to preserve the original content. Duplicate this deck to create an editable copy." With a one-click "Duplicate & Edit" action.
+3. **Allow editing but keep a hidden "original" snapshot.** Most complex. Adds a "Reset to original" button. Significant backend work for a rare use case.
 
-**Approach — Match Mode:**
-- **Tab** — cycle through cards
-- **Enter** — select highlighted card
-- Lower priority — match mode is inherently mouse/touch-driven
+**Decision: Option 2 — block editing on purchased decks, explain why, offer duplication.** When a user tries to edit a purchased card, show a message: "Purchased decks are read-only to preserve the original content. Duplicate this deck to create an editable copy." With a one-click "Duplicate & Edit" action. This is the simplest approach, preserves originals, and the duplication flow makes it painless.
 
-**Architecture:**
-- Add `useEffect` with `keydown` event listener in Study.jsx flip mode section
-- Clean up listener on unmount and mode change
-- Prevent default on Space (would scroll page) and arrow keys
-- Only active when study session is in progress (not on mode select or results screen)
-
-**Design:** Show keyboard hints as subtle gray text below the action buttons. Hide on mobile (touch devices don't need keyboard hints). Detect touch device via `'ontouchstart' in window` or media query.
-
-**Accessibility bonus:** Keyboard shortcuts also improve accessibility for users who can't use a mouse.
-
-### 4. Guided Onboarding Flow
+### 2. Guided Onboarding Flow
 
 **Problem:** Welcome.jsx just collects a display name and drops users on an empty dashboard. First-time users don't know what the app does, how to generate a deck, or that a marketplace exists. The empty state CTA buttons help ("Generate your first deck") but there's no guided walkthrough. The activation rate (signup → first deck generated) is likely low, and we can't even measure it because there's no analytics.
 
@@ -123,7 +91,7 @@ Analytics is included here because without data, we're guessing which of these p
 
 **Open question:** Should step 2 be a simplified generation form (just topic, no notes/photos) or the full Generate page? Recommendation: simplified — just a topic input with a "surprise me" random topic button. Reduces cognitive load for first-time users.
 
-### 5. Analytics Integration
+### 3. Analytics Integration
 
 **Problem:** We have no data on how users interact with the app. We don't know: how many users complete onboarding, what percentage generate a second deck, which study mode is most popular, where users drop off in the purchase flow, or whether anyone actually uses the marketplace. Without this data, every product decision is a guess.
 
@@ -141,6 +109,7 @@ Analytics is included here because without data, we're guessing which of these p
 
 **Core engagement:**
 - `deck_generated` (method: text/photo, card_count)
+- `deck_duplicated` (source_origin: generated/purchased)
 - `study_session_started` (mode: flip/mc/type/match)
 - `study_session_completed` (mode, accuracy, duration)
 - `streak_milestone` (days: 7/30/100)
@@ -152,6 +121,7 @@ Analytics is included here because without data, we're guessing which of these p
 - `purchase_completed` (listing_id, price)
 
 **Seller funnel:**
+- `seller_terms_accepted`
 - `seller_onboarding_started`
 - `seller_onboarding_completed`
 - `listing_created`
@@ -181,26 +151,28 @@ Analytics is included here because without data, we're guessing which of these p
 
 | Decision | Choice | Reasoning |
 |----------|--------|-----------|
-| Card editing scope | Edit + add + delete (no reorder) | Covers core needs; reorder is pointless with forced randomization |
-| Purchased deck editing | Not allowed (duplicate first) | Preserves marketplace content integrity |
-| Deck duplication | Available for all decks | Simple, non-destructive, enables editing of purchased content |
-| Keyboard shortcuts | Flip mode priority | Most-used mode, highest impact per keystroke |
+| Deck duplication origin | `'duplicated'` (not `'generated'`) | Duplicated decks must not be sellable — only truly generated decks can be listed |
+| Purchased deck editing | Not allowed (duplicate first) | Preserves original content; "Duplicate & Edit" one-click action makes it painless |
+| Deck duplication | Available for all decks (owned + purchased) | Simple, non-destructive, enables editing of purchased content via copy |
+| Duplicated deck sell button | Disabled with explanation | Show why the deck can't be sold: "Only decks you generate from scratch are eligible" |
 | Onboarding style | Dedicated flow, not tooltip tour | Tooltip tours are universally dismissed; generation-in-onboarding drives activation |
 | Analytics tool | PostHog | Free tier 50x larger than alternatives, includes session replay |
-| Tracking philosophy | Key events only | Track decisions, not clicks. 15 events, not 150. |
+| Tracking philosophy | Key events only | Track decisions, not clicks. ~18 events, not 150. |
 
 ## Implementation Priority
 
 Recommended build order:
-1. **Card editing** — highest user demand, unblocks deck quality improvement
-2. **Keyboard shortcuts** — quick win, improves daily power user experience
-3. **Deck duplication** — small backend + frontend, complements card editing
-4. **Analytics integration** — npm install + event calls, starts collecting data immediately
-5. **Guided onboarding** — largest effort, but informed by analytics data on where users drop off
+1. **Deck duplication** — small backend + frontend, enables editing of purchased content, quick win
+2. **Analytics integration** — npm install + event calls, starts collecting data immediately
+3. **Guided onboarding** — largest effort, but informed by analytics data on where users drop off
 
 ## Scope Boundaries
 
-**In scope:** Five UX and retention features.
+**In scope:** Three UX and retention features.
+
+**Already complete (from original brainstorm):**
+- Card editing after save (edit/add/delete in DeckView)
+- Keyboard shortcuts in study mode (flip mode: Space, arrows)
 
 **Out of scope:**
 - Spaced repetition / SM-2 algorithm (v2 — requires significant study flow redesign)

@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/AuthContext.jsx';
+import { analytics } from '../lib/analytics.js';
 import Navbar from '../components/Navbar.jsx';
 
 function SellerTermsModal({ onAccept, onClose }) {
@@ -78,6 +79,7 @@ function getDeckSellState(deck, user) {
 
   if (deck.listing_id && deck.listing_status === 'active') return 'view';
   if (deck.listing_id && deck.listing_status === 'delisted') return 'relist';
+  if (deck.origin === 'duplicated') return 'disabled-duplicated';
   if (!isSeller) return 'hidden';
   if (deck.origin === 'purchased') return 'hidden';
   if (deck.card_count < 10) return 'disabled';
@@ -89,9 +91,14 @@ function SellIcon({ state, deck, onRelist }) {
 
   if (state === 'hidden') return null;
 
-  if (state === 'disabled') {
+  if (state === 'disabled' || state === 'disabled-duplicated') {
     return (
-      <div className="absolute top-3 right-3 opacity-40 cursor-not-allowed">
+      <div
+        className="absolute top-3 right-3 opacity-40 cursor-not-allowed"
+        title={state === 'disabled-duplicated'
+          ? "Duplicated decks can't be sold. Only decks you generate from scratch are eligible for the marketplace."
+          : 'Need at least 10 cards to sell'}
+      >
         <svg className="w-5 h-5 text-[#6B635A]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
           <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" />
@@ -154,6 +161,10 @@ export default function Dashboard() {
       .then(([deckData, statsData]) => {
         setDecks(deckData.decks);
         setStats(statsData.stats);
+        const streak = statsData.stats?.current_streak ?? 0;
+        if (streak === 7 || streak === 30 || streak === 100) {
+          analytics.track('streak_milestone', { days: streak });
+        }
       })
       .catch((err) => toast.error(err.message))
       .finally(() => setLoading(false));
@@ -488,6 +499,11 @@ export default function Dashboard() {
                       {deck.origin === 'purchased' && (
                         <span className="px-1.5 py-0.5 bg-[#E8F5F0] text-[#1B6B5A] text-xs font-medium rounded">
                           Purchased
+                        </span>
+                      )}
+                      {deck.origin === 'duplicated' && (
+                        <span className="px-1.5 py-0.5 bg-gray-100 text-[#6B635A] text-xs font-medium rounded">
+                          Duplicated
                         </span>
                       )}
                       {deck.has_rated && (

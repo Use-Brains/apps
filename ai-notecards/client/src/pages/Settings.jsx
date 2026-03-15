@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../lib/AuthContext.jsx';
 import { api } from '../lib/api.js';
+import { analytics, updateConsent } from '../lib/analytics.js';
 import Navbar from '../components/Navbar.jsx';
 
 function SellerTermsModal({ onAccept, onClose }) {
@@ -160,6 +161,8 @@ export default function Settings() {
   // Data & Privacy state
   const [busyAction, setBusyAction] = useState(null); // null | 'exporting' | 'deleting'
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [analyticsOptOut, setAnalyticsOptOut] = useState(user?.preferences?.analytics_opt_out ?? true);
+  const [analyticsToggling, setAnalyticsToggling] = useState(false);
 
   // Portal return flow — refresh user after returning from Stripe
   useEffect(() => {
@@ -308,6 +311,23 @@ export default function Settings() {
       await refreshUser();
     } catch (err) {
       toast.error(err.message);
+    }
+  };
+
+  const handleAnalyticsToggle = async (optOut) => {
+    setAnalyticsToggling(true);
+    try {
+      await api.updatePreferences({ analytics_opt_out: optOut });
+      // Only update local state after server confirms
+      setAnalyticsOptOut(optOut);
+      updateConsent(!optOut);
+      if (optOut) { analytics.optOut(); }
+      else { analytics.optIn(); }
+      toast.success(optOut ? 'Analytics disabled' : 'Analytics enabled');
+    } catch {
+      toast.error('Failed to update preference');
+    } finally {
+      setAnalyticsToggling(false);
     }
   };
 
@@ -617,6 +637,17 @@ export default function Settings() {
         <section className="bg-white rounded-2xl p-6 border border-gray-100">
           <h2 className="text-lg font-semibold text-[#1A1614] mb-4">Data & Privacy</h2>
           <div className="space-y-4">
+            <div className="flex items-center justify-between pb-4 border-b border-gray-100">
+              <div>
+                <span className="text-sm text-[#1A1614]">Analytics</span>
+                <p className="text-xs text-[#6B635A] mt-0.5">Help us improve by sharing anonymous usage data</p>
+              </div>
+              <Toggle
+                checked={!analyticsOptOut}
+                onChange={(enabled) => handleAnalyticsToggle(!enabled)}
+                disabled={analyticsToggling}
+              />
+            </div>
             <div>
               <p className="text-sm text-[#6B635A] mb-2">Download all your decks and flashcards as a JSON file.</p>
               <button

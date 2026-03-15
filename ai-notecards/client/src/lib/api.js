@@ -61,6 +61,7 @@ export const api = {
   getDeck: (id) => request(`/decks/${id}`),
   updateDeck: (id, title) => request(`/decks/${id}`, { method: 'PATCH', body: JSON.stringify({ title }) }),
   deleteDeck: (id) => request(`/decks/${id}`, { method: 'DELETE' }),
+  duplicateDeck: (id, options = {}) => request(`/decks/${id}/duplicate`, { method: 'POST', ...options }),
 
   // Cards
   addCard: (deckId, front, back) => request(`/decks/${deckId}/cards`, { method: 'POST', body: JSON.stringify({ front, back }) }),

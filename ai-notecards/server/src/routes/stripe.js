@@ -6,6 +6,7 @@ import { fulfillPurchase } from '../services/purchase.js';
 import { sendTransactionalEmail } from '../services/email.js';
 import { getStripe } from '../services/stripe.js';
 import pool from '../db/pool.js';
+import { trackServerEvent } from '../services/analytics.js';
 
 const PLATFORM_FEE_RATE = 0.5;
 
@@ -140,6 +141,7 @@ router.post('/webhook', async (req, res) => {
             [session.subscription, userId]
           );
           console.log(`User ${userId} upgraded to pro`);
+          trackServerEvent(userId, 'subscription_started');
           res.json({ received: true });
           if (updatedUser?.email) {
             sendTransactionalEmail('subscription_confirmed', updatedUser.email, {}).catch(() => {});
@@ -156,9 +158,12 @@ router.post('/webhook', async (req, res) => {
           const cancelAt = new Date(subscription.cancel_at * 1000);
           const { rows: [cancelledUser] } = await pool.query(
             `UPDATE users SET cancel_at_period_end = true, cancel_at = $1
-             WHERE stripe_customer_id = $2 RETURNING email`,
+             WHERE stripe_customer_id = $2 RETURNING id, email`,
             [cancelAt.toISOString(), customerId]
           );
+          if (cancelledUser?.id) {
+            trackServerEvent(cancelledUser.id, 'subscription_cancelled');
+          }
           res.json({ received: true });
           if (cancelledUser?.email) {
             sendTransactionalEmail('subscription_cancelling', cancelledUser.email, {
@@ -221,8 +226,9 @@ router.post('/webhook', async (req, res) => {
             // Still return 200 — log for manual resolution
           }
           res.json({ received: true });
-          // Send emails only for new purchases (not replays)
+          // Send emails and track only for new purchases (not replays)
           if (result?.isNew) {
+            trackServerEvent(meta.buyer_id, 'purchase_completed', { listing_id: meta.listing_id });
             const { rows: [emailData] } = await pool.query(`
               SELECT buyer.email AS buyer_email, seller.email AS seller_email,
                      ml.title, ml.price_cents

@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import rateLimit from 'express-rate-limit';
 import pool from '../db/pool.js';
 import { PLAN_LIMITS } from '../middleware/plan.js';
+import { trackServerEvent } from '../services/analytics.js';
 
 const router = Router();
 export const SALT_ROUNDS = 12;
@@ -96,6 +97,7 @@ router.post('/signup', signupLimiter, async (req, res) => {
 
     const user = result.rows[0];
     setTokenCookie(res, user.id);
+    trackServerEvent(user.id, 'signup_completed', { method: 'email' });
     res.status(201).json({ user: sanitizeUser(user) });
   } catch (err) {
     console.error('Signup error:', err);
@@ -149,7 +151,9 @@ router.get('/me', async (req, res) => {
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
     const result = await pool.query(
-      `SELECT ${USER_SELECT} FROM users WHERE id = $1 AND deleted_at IS NULL`,
+      `SELECT ${USER_SELECT},
+        (SELECT COUNT(*)::int FROM decks WHERE user_id = users.id) AS deck_count
+       FROM users WHERE id = $1 AND deleted_at IS NULL`,
       [payload.userId]
     );
     if (result.rows.length === 0) {
@@ -172,7 +176,7 @@ router.get('/me', async (req, res) => {
     }
 
     const limits = PLAN_LIMITS[user.plan] || PLAN_LIMITS.free;
-    res.json({ user: sanitizeUser(user), daily_generation_limit: limits.generationsPerDay });
+    res.json({ user: sanitizeUser(user), daily_generation_limit: limits.generationsPerDay, deck_count: user.deck_count });
   } catch {
     res.clearCookie('token');
     res.json({ user: null });

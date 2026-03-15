@@ -25,6 +25,7 @@
     "multer": "^2.1.1",
     "openai": "^4.82.0",
     "pg": "^8.13.1",
+    "posthog-node": "^5.28.2",
     "resend": "^6.9.3",
     "stripe": "^17.5.0",
     "striptags": "^3.2.0",

@@ -4,6 +4,7 @@ import { requireXHR } from '../middleware/csrf.js';
 import { checkTrialExpiry, requirePlan } from '../middleware/plan.js';
 import { getStripe } from '../services/stripe.js';
 import pool from '../db/pool.js';
+import { trackServerEvent } from '../services/analytics.js';
 
 const router = Router();
 
@@ -112,6 +113,7 @@ router.post('/listings', requireXHR, authenticate, requireActiveUser, checkTrial
       }
 
       await client.query('COMMIT');
+      trackServerEvent(req.userId, 'listing_created', { listing_id: listing.id, price_cents: price_cents });
       res.status(201).json({ listing });
     } catch (err) {
       await client.query('ROLLBACK');
@@ -352,6 +354,7 @@ router.post('/accept-terms', requireXHR, authenticate, requireActiveUser, checkT
       'UPDATE users SET seller_terms_accepted_at = NOW(), seller_terms_version = 1 WHERE id = $1 RETURNING seller_terms_accepted_at, seller_terms_version',
       [req.userId]
     );
+    trackServerEvent(req.userId, 'seller_terms_accepted');
     res.json(updated[0]);
   } catch (err) {
     console.error('Accept terms error:', err);
@@ -407,6 +410,7 @@ router.post('/onboard', requireXHR, authenticate, requireActiveUser, checkTrialE
       collection_options: { fields: 'eventually_due' },
     });
 
+    trackServerEvent(req.userId, 'seller_onboarding_started');
     res.json({ url: accountLink.url });
   } catch (err) {
     console.error('Connect onboarding error:', err);
@@ -463,8 +467,12 @@ router.get('/onboard/return', authenticate, async (req, res) => {
       [account.charges_enabled, account.payouts_enabled, req.userId]
     );
 
+    const onboarded = account.charges_enabled && account.details_submitted;
+    if (onboarded) {
+      trackServerEvent(req.userId, 'seller_onboarding_completed');
+    }
     res.json({
-      onboarded: account.charges_enabled && account.details_submitted,
+      onboarded,
       charges_enabled: account.charges_enabled,
       payouts_enabled: account.payouts_enabled,
       details_submitted: account.details_submitted,

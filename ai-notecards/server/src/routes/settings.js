@@ -51,19 +51,27 @@ router.patch('/preferences', authenticate, requireXHR, async (req, res) => {
       return res.status(400).json({ error: 'Invalid preferences' });
     }
 
-    // Read current preferences, deep-merge, write back
-    const { rows: [current] } = await pool.query(
-      'SELECT preferences FROM users WHERE id = $1',
-      [req.userId]
-    );
-    const merged = deepMerge(current.preferences || {}, validated);
-
-    await pool.query(
-      'UPDATE users SET preferences = $1 WHERE id = $2',
-      [JSON.stringify(merged), req.userId]
-    );
-
-    res.json({ preferences: merged });
+    // Transaction with FOR UPDATE to prevent concurrent clobber
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { rows: [current] } = await client.query(
+        'SELECT preferences FROM users WHERE id = $1 FOR UPDATE',
+        [req.userId]
+      );
+      const merged = deepMerge(current.preferences || {}, validated);
+      await client.query(
+        'UPDATE users SET preferences = $1 WHERE id = $2',
+        [JSON.stringify(merged), req.userId]
+      );
+      await client.query('COMMIT');
+      res.json({ preferences: merged });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
   } catch (err) {
     console.error('Update preferences error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -129,6 +137,16 @@ function validatePreferences(input) {
     if ('marketplace_activity' in input.notifications) {
       clean.notifications.marketplace_activity = !!input.notifications.marketplace_activity;
     }
+  }
+  // One-way latch: silently ignore non-true values (don't reject the entire payload)
+  if ('onboarding_completed' in input) {
+    if (input.onboarding_completed === true) {
+      clean.onboarding_completed = true;
+    }
+  }
+  if ('analytics_opt_out' in input) {
+    if (typeof input.analytics_opt_out !== 'boolean') return null;
+    clean.analytics_opt_out = input.analytics_opt_out;
   }
   return clean;
 }

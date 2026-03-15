@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { api } from '../lib/api.js';
+import { analytics } from '../lib/analytics.js';
 import shuffle from '../lib/shuffle.js';
 import MultipleChoiceMode from '../components/study/MultipleChoiceMode.jsx';
 import TypeAnswerMode from '../components/study/TypeAnswerMode.jsx';
@@ -79,8 +80,10 @@ export default function Study() {
     if (resultsRef.current.length === totalCards && !completingRef.current) {
       completingRef.current = true;
       const correct = resultsRef.current.filter((r) => r === 'correct').length;
+      const accuracy = totalCards > 0 ? Math.round((correct / totalCards) * 100) : 0;
       api.completeSession(sessionId, correct, totalCards)
         .then((res) => {
+          analytics.track('study_session_completed', { mode, accuracy, duration: null });
           setDeckStats(res.deck_stats);
           setHasRated(res.has_rated);
           setListingId(res.listing_id);
@@ -143,6 +146,7 @@ export default function Study() {
       completingRef.current = false;
       advancingRef.current = false;
       setCards(shuffle(cards));
+      analytics.track('study_session_started', { mode: selectedMode });
       setPhase('studying');
     } catch (err) {
       toast.error(err.message || 'Failed to start session');

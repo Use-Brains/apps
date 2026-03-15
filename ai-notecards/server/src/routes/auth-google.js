@@ -2,6 +2,7 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import pool from '../db/pool.js';
 import { USER_SELECT, setTokenCookie, sanitizeUser } from './auth.js';
+import { trackServerEvent } from '../services/analytics.js';
 
 const router = Router();
 
@@ -122,6 +123,7 @@ router.post('/', googleLimiter, async (req, res) => {
 
     const user = newUser.rows[0];
     setTokenCookie(res, user.id);
+    trackServerEvent(user.id, 'signup_completed', { method: 'google' });
     res.status(201).json({ user: sanitizeUser(user), isNewUser: true });
   } catch (err) {
     if (err.message?.includes('Token used too late') || err.message?.includes('Invalid token')) {

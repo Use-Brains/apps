@@ -22,8 +22,9 @@ import Terms from './pages/Terms.jsx';
 import Privacy from './pages/Privacy.jsx';
 import NotFound from './pages/NotFound.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
+import ConsentBanner from './components/ConsentBanner.jsx';
 
-function ProtectedRoute({ children }) {
+function ProtectedRoute({ children, skipOnboardingCheck = false }) {
   const { user, loading } = useAuth();
   if (loading) {
     return (
@@ -33,6 +34,9 @@ function ProtectedRoute({ children }) {
     );
   }
   if (!user) return <Navigate to="/login" />;
+  if (!skipOnboardingCheck && !user.preferences?.onboarding_completed && user.deck_count === 0) {
+    return <Navigate to="/welcome" />;
+  }
   return children;
 }
 
@@ -56,13 +60,14 @@ export default function App() {
             style: { background: '#1A1614', color: '#fff', borderRadius: '12px' },
           }}
         />
+        <ConsentBanner />
         <ErrorBoundary>
           <Routes>
             <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
             <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
             <Route path="/signup" element={<Navigate to="/login" replace />} />
             <Route path="/verify-code" element={<PublicRoute><VerifyCode /></PublicRoute>} />
-            <Route path="/welcome" element={<ProtectedRoute><Welcome /></ProtectedRoute>} />
+            <Route path="/welcome" element={<ProtectedRoute skipOnboardingCheck><Welcome /></ProtectedRoute>} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />

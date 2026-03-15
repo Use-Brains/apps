@@ -177,6 +177,17 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, () => {
+import { shutdownAnalytics } from './services/analytics.js';
+
+const server = app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+});
+
+process.on('SIGTERM', async () => {
+  const timeout = setTimeout(() => process.exit(1), 5000);
+  server.close();
+  await shutdownAnalytics();
+  await pool.end();
+  clearTimeout(timeout);
+  process.exit(0);
 });

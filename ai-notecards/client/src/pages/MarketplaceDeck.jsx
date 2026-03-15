@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/AuthContext.jsx';
+import { analytics } from '../lib/analytics.js';
 import Navbar from '../components/Navbar.jsx';
 import SharePopover from '../components/SharePopover.jsx';
 
@@ -100,6 +101,7 @@ export default function MarketplaceDeck() {
   const [reportTarget, setReportTarget] = useState({ flagType: 'listing', ratingId: null });
 
   useEffect(() => {
+    analytics.track('listing_viewed', { listing_id: id });
     Promise.all([api.getListing(id), api.getListingRatings(id)])
       .then(([listingData, ratingsData]) => {
         setData(listingData);
@@ -114,6 +116,7 @@ export default function MarketplaceDeck() {
       toast.error('Please log in to purchase');
       return;
     }
+    analytics.track('purchase_started', { listing_id: id });
     setPurchasing(true);
     try {
       const result = await api.createPurchase(id);

@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/AuthContext.jsx';
 import { resizeImages } from '../lib/imageResize.js';
+import { analytics } from '../lib/analytics.js';
 import Navbar from '../components/Navbar.jsx';
 
 const MAX_PHOTOS = 5;
@@ -124,6 +125,7 @@ export default function Generate() {
       const deckTitle = title.trim() || (input ? input.slice(0, 60).trim() + (input.length > 60 ? '...' : '') : 'Photo flashcards');
       const data = await api.saveDeck(deckTitle, input || null, previewCards);
       toast.success(`Saved ${previewCards.length} flashcards!`);
+      analytics.track('deck_generated', { method: photos.length > 0 ? 'photo' : 'text', card_count: previewCards.length });
       setPreviewCards(null);
       navigate(`/decks/${data.deck.id}`);
     } catch (err) {

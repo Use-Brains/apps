@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { api } from '../lib/api.js';
+import { useAsyncGuard } from '../hooks/useAsyncGuard.js';
+import { analytics } from '../lib/analytics.js';
 import Navbar from '../components/Navbar.jsx';
 
 export default function DeckView() {
@@ -18,6 +20,14 @@ export default function DeckView() {
   const [newBack, setNewBack] = useState('');
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState('');
+  const [duplicating, setDuplicating] = useState(false);
+
+  const { run: guardedRun } = useAsyncGuard();
+  const controllerRef = useRef(null);
+  useEffect(() => () => controllerRef.current?.abort(), []);
+
+  const isPurchased = deck?.origin === 'purchased';
+  const isDuplicated = deck?.origin === 'duplicated';
 
   useEffect(() => {
     api.getDeck(id)
@@ -32,6 +42,24 @@ export default function DeckView() {
       })
       .finally(() => setLoading(false));
   }, [id]);
+
+  const handleDuplicate = () => guardedRun(async () => {
+    const controller = new AbortController();
+    controllerRef.current = controller;
+    setDuplicating(true);
+    try {
+      const data = await api.duplicateDeck(id, { signal: controller.signal });
+      if (controller.signal.aborted) return;
+      toast.success('Deck duplicated!');
+      analytics.track('deck_duplicated', { source_origin: deck.origin });
+      navigate(`/decks/${data.deck.id}`);
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      toast.error(err.message);
+    } finally {
+      setDuplicating(false);
+    }
+  });
 
   const handleSaveTitle = async () => {
     if (!titleValue.trim() || titleValue === deck.title) {
@@ -113,10 +141,26 @@ export default function DeckView() {
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+        {/* Purchased deck banner */}
+        {isPurchased && (
+          <div className="bg-[#E8F5F0] border border-[#1B6B5A]/20 rounded-xl p-4 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <p className="text-sm text-[#1A1614]">
+              This deck was purchased — it's read-only to preserve the original content.
+            </p>
+            <button
+              onClick={handleDuplicate}
+              disabled={duplicating}
+              className="px-4 py-2 bg-[#1B6B5A] text-white rounded-lg text-sm font-medium hover:bg-[#155a4a] transition-colors disabled:opacity-50 shrink-0"
+            >
+              {duplicating ? 'Duplicating...' : 'Duplicate & Edit'}
+            </button>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-start justify-between mb-8">
           <div className="flex-1">
-            {editingTitle ? (
+            {!isPurchased && editingTitle ? (
               <div className="flex items-center gap-2">
                 <input
                   type="text"
@@ -134,13 +178,25 @@ export default function DeckView() {
                 </button>
               </div>
             ) : (
-              <h1
-                className="text-2xl font-bold text-gray-900 cursor-pointer hover:text-brand-700 transition-colors"
-                onClick={() => setEditingTitle(true)}
-                title="Click to rename"
-              >
-                {deck.title}
-              </h1>
+              <div className="flex items-center gap-2">
+                <h1
+                  className={`text-2xl font-bold text-gray-900 ${!isPurchased ? 'cursor-pointer hover:text-brand-700' : ''} transition-colors`}
+                  onClick={() => !isPurchased && setEditingTitle(true)}
+                  title={!isPurchased ? 'Click to rename' : undefined}
+                >
+                  {deck.title}
+                </h1>
+                {isPurchased && (
+                  <span className="px-2 py-0.5 bg-[#E8F5F0] text-[#1B6B5A] text-xs font-medium rounded">
+                    Purchased
+                  </span>
+                )}
+                {isDuplicated && (
+                  <span className="px-2 py-0.5 bg-gray-100 text-[#6B635A] text-xs font-medium rounded">
+                    Duplicated
+                  </span>
+                )}
+              </div>
             )}
             <p className="text-gray-500 text-sm mt-1">
               {cards.length} card{cards.length !== 1 ? 's' : ''} &middot; Created{' '}
@@ -148,11 +204,28 @@ export default function DeckView() {
             </p>
           </div>
           <div className="flex gap-2">
+            {!isPurchased && (
+              <button
+                onClick={() => setAddingCard(true)}
+                className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                + Add card
+              </button>
+            )}
+            {/* Duplicate button */}
             <button
-              onClick={() => setAddingCard(true)}
-              className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors"
+              onClick={handleDuplicate}
+              disabled={duplicating}
+              className="px-3 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
+              title="Duplicate deck"
             >
-              + Add card
+              {duplicating ? (
+                <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              )}
             </button>
             <Link
               to={`/study/${id}`}
@@ -164,7 +237,7 @@ export default function DeckView() {
         </div>
 
         {/* Add card form */}
-        {addingCard && (
+        {!isPurchased && addingCard && (
           <form onSubmit={handleAddCard} className="bg-white rounded-2xl border border-brand-200 p-6 mb-6 shadow-sm">
             <h3 className="font-semibold text-gray-900 mb-4">Add new card</h3>
             <div className="grid sm:grid-cols-2 gap-4 mb-4">
@@ -204,7 +277,7 @@ export default function DeckView() {
         <div className="space-y-3">
           {cards.map((card, index) => (
             <div key={card.id} className="bg-white rounded-xl border border-gray-100 hover:border-gray-200 transition-colors">
-              {editing === card.id ? (
+              {!isPurchased && editing === card.id ? (
                 <div className="p-5">
                   <div className="grid sm:grid-cols-2 gap-4 mb-4">
                     <div>
@@ -244,26 +317,28 @@ export default function DeckView() {
                       <p className="text-gray-700 text-sm">{card.back}</p>
                     </div>
                   </div>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => startEdit(card)}
-                      className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded transition-colors"
-                      title="Edit"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => handleDeleteCard(card.id)}
-                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
-                      title="Delete"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </div>
+                  {!isPurchased && (
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => startEdit(card)}
+                        className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded transition-colors"
+                        title="Edit"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCard(card.id)}
+                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                        title="Delete"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -273,12 +348,14 @@ export default function DeckView() {
         {cards.length === 0 && (
           <div className="text-center py-16">
             <p className="text-gray-500">No cards in this deck yet.</p>
-            <button
-              onClick={() => setAddingCard(true)}
-              className="mt-4 px-4 py-2 bg-brand-600 text-white rounded-xl text-sm font-medium"
-            >
-              Add your first card
-            </button>
+            {!isPurchased && (
+              <button
+                onClick={() => setAddingCard(true)}
+                className="mt-4 px-4 py-2 bg-brand-600 text-white rounded-xl text-sm font-medium"
+              >
+                Add your first card
+              </button>
+            )}
           </div>
         )}
       </div>

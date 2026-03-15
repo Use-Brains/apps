@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/AuthContext.jsx';
+import { analytics } from '../lib/analytics.js';
 import Navbar from '../components/Navbar.jsx';
 import Footer from '../components/Footer.jsx';
 
@@ -89,6 +90,7 @@ export default function Marketplace() {
 
   useEffect(() => {
     api.getCategories().then((data) => setCategories(data.categories)).catch(() => {});
+    analytics.track('marketplace_viewed');
   }, []);
 
   useEffect(() => {

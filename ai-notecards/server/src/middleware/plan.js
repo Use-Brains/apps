@@ -1,4 +1,5 @@
 import pool from '../db/pool.js';
+import { countUserDecks } from '../db/queries.js';
 
 export const PLAN_LIMITS = {
   free: { generationsPerDay: 1, maxDecks: 10 },
@@ -89,11 +90,8 @@ export async function checkGenerationLimits(req, res, next) {
 
     // Check deck limit for free users (purchased decks are exempt)
     if (limits.maxDecks !== Infinity) {
-      const { rows: countRows } = await pool.query(
-        "SELECT COUNT(*) FROM decks WHERE user_id = $1 AND origin = 'generated'",
-        [req.userId]
-      );
-      if (parseInt(countRows[0].count) >= limits.maxDecks) {
+      const deckCount = await countUserDecks(req.userId);
+      if (deckCount >= limits.maxDecks) {
         return res.status(429).json({
           error: `Maximum deck limit reached (${limits.maxDecks}). Delete a deck or upgrade to Pro for unlimited decks.`,
         });
