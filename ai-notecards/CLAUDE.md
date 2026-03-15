@@ -217,7 +217,7 @@ Server env vars in `server/.env` (see `server/.env.example`):
 ## Marketplace
 
 - **Selling:** Pro users accept seller terms, complete Stripe Connect Express onboarding, then list generated decks ($1–$5, min 10 cards, max 50 active listings, 13 categories, up to 5 tags). New listings start as `pending_review` with auto-approve fallback.
-- **Payments:** Destination charges with 50/50 split (seller/platform). `application_fee_amount` calculated at checkout.
+- **Payments:** Destination charges with 70/30 split (seller/platform). `application_fee_amount` calculated at checkout.
 - **Purchase flow:** Stripe Checkout → `payment_intent.succeeded` webhook → idempotent fulfillment (ON CONFLICT DO NOTHING) → copy source deck+cards in transaction → increment purchase_count → email confirmation to buyer + sale notification to seller
 - **Search:** PostgreSQL full-text search via `tsvector` GENERATED column + GIN index
 - **Browse:** Cursor-based pagination (20/page), sort by popular/newest/rating/price

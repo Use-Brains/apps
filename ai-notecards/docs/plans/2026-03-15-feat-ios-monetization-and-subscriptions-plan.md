@@ -255,10 +255,10 @@ Make the monetization surface coherent across platforms and reviewable by Apple.
 
 ### Should Fix
 
-- [ ] Record enough Apple product metadata to explain a user’s current subscription state in support/debugging
+- [x] Record enough Apple product metadata to explain a user’s current subscription state in support/debugging
 - [x] Surface cancellation / billing-issue status cleanly in mobile settings
-- [ ] Add a clear review-note checklist for App Store submission
-- [ ] Align legal/product copy with the final monetization implementation
+- [x] Add a clear review-note checklist for App Store submission
+- [x] Align legal/product copy with the final monetization implementation
 - [x] Resolve the 50/50 vs 70/30 marketplace split inconsistency before shipping iOS marketplace purchase copy
 - [x] Put iOS marketplace purchasing behind a feature flag so review fallback is operationally simple
 - [x] Make cancellation-state UI accurate for both Apple and Stripe subscribers without reusing Stripe-only assumptions blindly
@@ -279,16 +279,16 @@ Make the monetization surface coherent across platforms and reviewable by Apple.
 ### Backend
 
 - [ ] Add webhook tests for RevenueCat initial purchase, renewal, cancellation, expiration, and replayed retries
-- [ ] Add downgrade tests proving Stripe and Apple entitlements do not clobber each other
+- [x] Add downgrade tests proving Stripe and Apple entitlements do not clobber each other
 - [ ] Add out-of-order event tests proving entitlement projection remains correct across Stripe + RevenueCat sequences
 - [ ] Add migration verification for new billing columns and defaults
 - [ ] Add regression tests for existing Stripe webhook behavior
-- [ ] Add tests proving unknown RevenueCat products / entitlements do not unlock Pro
+- [x] Add tests proving unknown RevenueCat products / entitlements do not unlock Pro
 
 ### Mobile
 
 - [x] Typecheck `mobile/` after RevenueCat and WebBrowser integration
-- [ ] Verify RevenueCat initialization is one-time and tied to authenticated user identity
+- [x] Verify RevenueCat initialization is one-time and tied to authenticated user identity
 - [ ] Verify existing Stripe Pro users do not see a false subscribe path on iOS
 - [ ] Verify restore purchases updates UI correctly
 - [ ] Verify purchase restore triggers server reconciliation and `/api/auth/me` reflects the updated plan without waiting on eventual webhook timing

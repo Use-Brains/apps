@@ -8,10 +8,12 @@ ALTER TABLE users
   ADD COLUMN IF NOT EXISTS stripe_cancel_at_period_end BOOLEAN NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS stripe_cancel_at TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS apple_subscription_active BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS apple_entitlement_id TEXT,
   ADD COLUMN IF NOT EXISTS apple_product_id TEXT,
   ADD COLUMN IF NOT EXISTS apple_cancel_at_period_end BOOLEAN NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS apple_cancel_at TIMESTAMPTZ,
-  ADD COLUMN IF NOT EXISTS apple_expires_at TIMESTAMPTZ;
+  ADD COLUMN IF NOT EXISTS apple_expires_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS apple_last_synced_at TIMESTAMPTZ;
 
 UPDATE users
 SET stripe_cancel_at_period_end = cancel_at_period_end,

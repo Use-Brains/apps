@@ -156,10 +156,12 @@ export function getRevenueCatProductStateFromSubscriber(subscriber) {
   if (!subscriber || typeof subscriber !== 'object') {
     return {
       active: false,
+      entitlementId: null,
       productId: null,
       expiresAt: null,
       cancelAtPeriodEnd: false,
       cancelAt: null,
+      lastSyncedAt: new Date(),
     };
   }
 
@@ -172,23 +174,27 @@ export function getRevenueCatProductStateFromSubscriber(subscriber) {
   if (!activeEntitlement) {
     return {
       active: false,
+      entitlementId: null,
       productId: null,
       expiresAt: null,
       cancelAtPeriodEnd: false,
       cancelAt: null,
+      lastSyncedAt: new Date(),
     };
   }
 
-  const [, entitlement] = activeEntitlement;
+  const [entitlementId, entitlement] = activeEntitlement;
   const productId = entitlement.product_identifier || null;
 
   if (!isAllowedRevenueCatProduct(productId)) {
     return {
       active: false,
+      entitlementId: null,
       productId: null,
       expiresAt: null,
       cancelAtPeriodEnd: false,
       cancelAt: null,
+      lastSyncedAt: new Date(),
     };
   }
 
@@ -198,10 +204,12 @@ export function getRevenueCatProductStateFromSubscriber(subscriber) {
 
   return {
     active: !expiresAt || expiresAt > new Date(),
+    entitlementId,
     productId,
     expiresAt,
     cancelAtPeriodEnd: !!unsubscribeDetectedAt,
     cancelAt: unsubscribeDetectedAt || expiresAt,
+    lastSyncedAt: new Date(),
   };
 }
 
@@ -212,12 +220,24 @@ export async function syncRevenueCatStateForUser(client, userId, subscriber) {
     `UPDATE users
      SET revenuecat_app_user_id = COALESCE(revenuecat_app_user_id, $2),
          apple_subscription_active = $3,
-         apple_product_id = $4,
-         apple_expires_at = $5,
-         apple_cancel_at_period_end = $6,
-         apple_cancel_at = $7
+         apple_entitlement_id = $4,
+         apple_product_id = $5,
+         apple_expires_at = $6,
+         apple_cancel_at_period_end = $7,
+         apple_cancel_at = $8,
+         apple_last_synced_at = $9
      WHERE id = $1`,
-    [userId, userId, state.active, state.productId, toIso(state.expiresAt), state.cancelAtPeriodEnd, toIso(state.cancelAt)]
+    [
+      userId,
+      userId,
+      state.active,
+      state.entitlementId,
+      state.productId,
+      toIso(state.expiresAt),
+      state.cancelAtPeriodEnd,
+      toIso(state.cancelAt),
+      toIso(state.lastSyncedAt),
+    ]
   );
 
   return reconcileUserBillingState(client, userId);
@@ -263,19 +283,23 @@ export async function applyRevenueCatWebhookPayload(client, payload) {
     `UPDATE users
      SET revenuecat_app_user_id = COALESCE(revenuecat_app_user_id, $2),
          apple_subscription_active = $3,
-         apple_product_id = $4,
-         apple_expires_at = $5,
-         apple_cancel_at_period_end = $6,
-         apple_cancel_at = $7
+         apple_entitlement_id = $4,
+         apple_product_id = $5,
+         apple_expires_at = $6,
+         apple_cancel_at_period_end = $7,
+         apple_cancel_at = $8,
+         apple_last_synced_at = $9
      WHERE id = $1`,
     [
       userId,
       userId,
       isActiveEvent,
+      isExpiredEvent ? null : event.entitlement_id || null,
       isExpiredEvent ? null : productId,
       toIso(expiresAt),
       isCancelEvent,
       isCancelEvent ? toIso(expiresAt) : null,
+      new Date().toISOString(),
     ]
   );
 

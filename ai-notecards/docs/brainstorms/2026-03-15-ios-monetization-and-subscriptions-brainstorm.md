@@ -127,7 +127,7 @@ Three strategies were considered:
 
 **Approach:** This is a non-problem with the chosen hybrid strategy.
 
-- Marketplace purchases always go through Stripe (via web checkout), even when initiated from the iOS app. Stripe Connect destination charges work exactly as they do today. Sellers receive their 50% split directly from Stripe. No change to seller payout infrastructure.
+- Marketplace purchases always go through Stripe (via web checkout), even when initiated from the iOS app. Stripe Connect destination charges work exactly as they do today. Sellers receive their 70% split directly from Stripe. No change to seller payout infrastructure.
 - Stripe Connect onboarding happens on the web (it already does -- the Stripe Connect Express flow opens in a browser). On iOS, the seller onboarding link opens in `SFSafariViewController`.
 - The Seller Dashboard in the iOS app displays earnings data fetched from the existing `/api/seller/dashboard` endpoint. No iOS-specific seller payout code needed.
 
