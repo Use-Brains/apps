@@ -54,9 +54,11 @@ Three-axis composition: `mode` (light/dark/system) × `style` (default/minimal/�
 ## API Client
 
 All requests go through `src/lib/api.ts`. The client:
-1. Reads the JWT from SecureStore (`auth-token` key)
-2. Attaches it as `Authorization: Bearer <token>`
-3. Throws `ApiError` on non-2xx responses (check `err.status`)
+1. Reads the access token and refresh token from SecureStore
+2. Attaches the access token as `Authorization: Bearer <token>`
+3. Uses `X-Client-Platform: ios-native` for native auth contracts
+4. Attempts a single-flight token refresh on eligible `401` responses
+5. Throws `ApiError` on non-2xx responses (check `err.status`)
 
 To add a new endpoint, add a method to the `api` object following the existing pattern. For typed responses, add the response type as a generic: `request<MyResponseType>(...)`.
 
@@ -81,7 +83,7 @@ const PERSISTABLE_ROOTS = new Set(['decks', 'marketplace', 'study']);
 | Layer | Module | Use for |
 |-------|--------|---------|
 | MMKV | `src/lib/mmkv.ts` | Fast non-sensitive data (query cache, theme prefs, user cache) |
-| SecureStore | `expo-secure-store` | Auth tokens only (`WHEN_UNLOCKED_THIS_DEVICE_ONLY`) |
+| SecureStore | `expo-secure-store` | Access + refresh tokens only (`WHEN_UNLOCKED_THIS_DEVICE_ONLY`) |
 
 SecureStore has a 2 KB value limit — store only tokens, not user data.
 
@@ -121,4 +123,4 @@ When implementing features in this directory:
 - Query keys must use factories from `src/types/query-keys.ts`
 - New query roots must be added to `PERSISTABLE_ROOTS` in `query-client.ts` to enable offline caching
 - New API endpoints must be added to `src/lib/api.ts`; add types when implementing each endpoint
-- Auth token is stored via `setToken()` / `clearToken()` in `api.ts` — do not write to SecureStore directly
+- Auth tokens are stored via `setSessionTokens()` / `clearSessionTokens()` in `api.ts` — do not write to SecureStore directly

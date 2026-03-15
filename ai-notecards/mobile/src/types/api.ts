@@ -1,3 +1,19 @@
+export type ApiUser = {
+  id: string;
+  email: string;
+  display_name: string | null;
+  plan: 'free' | 'trial' | 'pro';
+  avatar_url: string | null;
+  study_score: number;
+  current_streak: number;
+  longest_streak: number;
+  trial_ends_at: string | null;
+  seller_terms_accepted_at: string | null;
+  stripe_connect_account_id: string | null;
+  connect_payouts_enabled: boolean;
+  created_at: string;
+};
+
 export type User = {
   id: string;
   email: string;
@@ -12,6 +28,19 @@ export type User = {
   stripeConnectId: string | null;
   stripeConnectOnboarded: boolean;
   createdAt: string;
+};
+
+export type AuthSessionResponse = {
+  accessToken: string;
+  refreshToken: string;
+  user: User;
+  isNewUser?: boolean;
+};
+
+export type AuthMeResponse = {
+  user: User | null;
+  dailyGenerationLimit?: number;
+  deckCount?: number;
 };
 
 export type Deck = {

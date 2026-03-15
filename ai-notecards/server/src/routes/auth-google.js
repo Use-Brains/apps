@@ -1,14 +1,13 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import pool from '../db/pool.js';
-import { USER_SELECT, setTokenCookie, sanitizeUser } from './auth.js';
+import { USER_SELECT, respondWithSession } from './auth.js';
 import { trackServerEvent } from '../services/analytics.js';
 
 const router = Router();
 
 const googleLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
 
-// Lazy-initialized OAuth2Client (ESM hoisting)
 let oauthClient;
 async function getOAuthClient() {
   if (!oauthClient) {
@@ -18,22 +17,19 @@ async function getOAuthClient() {
   return oauthClient;
 }
 
-// Apple relay email patterns — never auto-link to these
 function isAppleRelayEmail(email) {
   return email.endsWith('@privaterelay.appleid.com') || /^apple-[a-z0-9]+@private\.relay$/i.test(email);
 }
 
-// POST / — verify Google ID token, login/create user
 router.post('/', googleLimiter, async (req, res) => {
-  const { idToken } = req.body;
-  if (!idToken) {
+  const { idToken } = req.body ?? {};
+  if (typeof idToken !== 'string' || !idToken) {
     return res.status(400).json({ error: 'ID token is required' });
   }
 
   try {
     const client = await getOAuthClient();
     const audience = [process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_IOS_CLIENT_ID].filter(Boolean);
-
     const ticket = await client.verifyIdToken({ idToken, audience });
     const payload = ticket.getPayload();
 
@@ -43,10 +39,8 @@ router.post('/', googleLimiter, async (req, res) => {
     }
 
     const normalizedEmail = email.toLowerCase();
-
     const googleAvatarUrl = payload.picture || null;
 
-    // 1. Lookup by google_user_id
     const googleResult = await pool.query(
       `SELECT ${USER_SELECT} FROM users WHERE google_user_id = $1 AND deleted_at IS NULL`,
       [sub]
@@ -57,16 +51,13 @@ router.post('/', googleLimiter, async (req, res) => {
       if (user.suspended) {
         return res.status(403).json({ error: 'Account suspended. Contact support.', code: 'AUTH_ACCOUNT_SUSPENDED' });
       }
-      // Refresh Google avatar on each login
       if (googleAvatarUrl) {
         await pool.query('UPDATE users SET google_avatar_url = $1 WHERE id = $2', [googleAvatarUrl, user.id]);
         user.google_avatar_url = googleAvatarUrl;
       }
-      setTokenCookie(res, user.id);
-      return res.json({ user: sanitizeUser(user), isNewUser: false });
+      return await respondWithSession(req, res, { user, isNewUser: false });
     }
 
-    // 2. Check email match for auto-link
     const emailResult = await pool.query(
       `SELECT ${USER_SELECT} FROM users WHERE email = $1 AND deleted_at IS NULL`,
       [normalizedEmail]
@@ -78,17 +69,13 @@ router.post('/', googleLimiter, async (req, res) => {
         return res.status(403).json({ error: 'Account suspended. Contact support.', code: 'AUTH_ACCOUNT_SUSPENDED' });
       }
 
-      // Auto-link safety: require Google email_verified, block relay emails
       if (!email_verified || isAppleRelayEmail(normalizedEmail)) {
         return res.status(409).json({ error: 'An account with this email already exists. Try signing in with a different method.' });
       }
 
-      // Auto-link: set google_user_id, update email_verified, display_name, and google avatar
-      const updates = ['google_user_id = $2'];
+      const updates = ['google_user_id = $2', 'email_verified = true'];
       const params = [user.id, sub];
       let paramIdx = 3;
-
-      updates.push(`email_verified = true`);
 
       if (googleAvatarUrl) {
         updates.push(`google_avatar_url = $${paramIdx}`);
@@ -102,18 +89,11 @@ router.post('/', googleLimiter, async (req, res) => {
         paramIdx++;
       }
 
-      await pool.query(
-        `UPDATE users SET ${updates.join(', ')} WHERE id = $1`,
-        params
-      );
-
-      // Re-fetch to get updated data
+      await pool.query(`UPDATE users SET ${updates.join(', ')} WHERE id = $1`, params);
       const updated = await pool.query(`SELECT ${USER_SELECT} FROM users WHERE id = $1`, [user.id]);
-      setTokenCookie(res, user.id);
-      return res.json({ user: sanitizeUser(updated.rows[0]), isNewUser: false });
+      return await respondWithSession(req, res, { user: updated.rows[0], isNewUser: false });
     }
 
-    // 3. Create new user
     const newUser = await pool.query(
       `INSERT INTO users (email, display_name, google_user_id, google_avatar_url, email_verified, plan, trial_ends_at)
        VALUES ($1, $2, $3, $4, true, 'trial', NOW() + INTERVAL '7 days')
@@ -122,9 +102,8 @@ router.post('/', googleLimiter, async (req, res) => {
     );
 
     const user = newUser.rows[0];
-    setTokenCookie(res, user.id);
     trackServerEvent(user.id, 'signup_completed', { method: 'google' });
-    res.status(201).json({ user: sanitizeUser(user), isNewUser: true });
+    return await respondWithSession(req, res, { user, isNewUser: true, statusCode: 201 });
   } catch (err) {
     if (err.message?.includes('Token used too late') || err.message?.includes('Invalid token')) {
       return res.status(401).json({ error: 'Invalid or expired Google token' });
