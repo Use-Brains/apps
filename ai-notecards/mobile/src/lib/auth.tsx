@@ -4,6 +4,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import type { AuthSessionResponse, User } from '@/types/api';
 import { api, clearSessionTokens, hasStoredRefreshToken, refreshSession, setSessionTokens } from './api';
 import { storage } from './mmkv';
+import { clearPersistedQueryCache } from './query-client';
 import { initializeSubscriptionIdentity, resetSubscriptionIdentity } from './subscriptions';
 import { getDeviceTimezone, shouldSyncTimezone } from './timezone';
 
@@ -365,6 +366,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       await resetSubscriptionIdentity();
       await clearSessionTokens();
+      await clearPersistedQueryCache();
       persistUser(null);
       setState((current) => ({
         ...current,
