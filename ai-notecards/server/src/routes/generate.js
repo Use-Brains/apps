@@ -8,8 +8,6 @@ import { checkTrialExpiry, checkGenerationLimits } from '../middleware/plan.js';
 import { generateCards, generateCardsWithVision } from '../services/ai.js';
 import pool from '../db/pool.js';
 
-const router = Router();
-
 function summarizeVisionFiles(files = []) {
   return files.map((file, index) => ({
     index,
@@ -87,94 +85,108 @@ function optionalMulter(req, res, next) {
   next();
 }
 
-// Magic byte validation — runs after multer
-async function validateImageContent(req, res, next) {
-  if (!req.files?.length) return next();
-  const allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
-  for (const file of req.files) {
-    const type = await fileTypeFromBuffer(file.buffer);
-    if (!type || !allowedMimes.includes(type.mime)) {
-      return res.status(422).json({ error: 'File content does not match an allowed image format.' });
-    }
-    file.detectedMime = type.mime;
-  }
-  next();
-}
-
 // Concurrency semaphore — prevent OOM and Gemini rate exhaustion
 let activeVisionRequests = 0;
 const MAX_CONCURRENT_VISION = parseInt(process.env.MAX_CONCURRENT_VISION, 10) || 3;
 
-// POST /preview — AI generation only, returns unsaved cards. Consumes generation count.
-router.post(
-  '/preview',
-  generateLimiter,
-  requireXHR,
-  authenticate,
-  checkTrialExpiry,
-  checkGenerationLimits,
-  optionalMulter,
-  validateImageContent,
-  async (req, res) => {
-    const { input, title } = req.body;
+export function createGenerateRouter({
+  authenticateMiddleware = authenticate,
+  requireXHRMiddleware = requireXHR,
+  checkTrialExpiryMiddleware = checkTrialExpiry,
+  checkGenerationLimitsMiddleware = checkGenerationLimits,
+  generateCardsFn = generateCards,
+  generateCardsWithVisionFn = generateCardsWithVision,
+  poolInstance = pool,
+  fileTypeFromBufferFn = fileTypeFromBuffer,
+} = {}) {
+  const router = Router();
 
-    // Input validation (applies to both JSON and multipart)
-    if (input && input.length > 50000) {
-      return res.status(400).json({ error: 'Input text is too long. Maximum 50,000 characters.' });
-    }
-    if (title && title.length > 200) {
-      return res.status(400).json({ error: 'Title is too long. Maximum 200 characters.' });
-    }
-    if (!input?.trim() && (!req.files || req.files.length === 0)) {
-      return res.status(400).json({ error: 'Input text or photos are required.' });
-    }
-
-    try {
-      let cards;
-
-      if (req.files?.length) {
-        // Vision path
-        if (activeVisionRequests >= MAX_CONCURRENT_VISION) {
-          return res.status(503).json({ error: 'Photo processing is busy. Please try again in a moment.' });
-        }
-        activeVisionRequests++;
-        try {
-          cards = await generateCardsWithVision(input, req.files);
-        } catch (err) {
-          logVisionFailure(req, err);
-          if (err.code === 'NO_CARDS') {
-            return res.status(422).json({ error: err.message });
-          }
-          return res.status(502).json({
-            error: 'Photo processing failed. Try clearer photos, or remove them to generate from text.',
-          });
-        } finally {
-          activeVisionRequests--;
-        }
-      } else {
-        // Text-only path
-        cards = await generateCards(input);
+  async function validateImageContent(req, res, next) {
+    if (!req.files?.length) return next();
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
+    for (const file of req.files) {
+      const type = await fileTypeFromBufferFn(file.buffer);
+      if (!type || !allowedMimes.includes(type.mime)) {
+        return res.status(422).json({ error: 'File content does not match an allowed image format.' });
       }
-
-      // Increment generation count (consumed at preview time)
-      const today = new Date().toISOString().split('T')[0];
-      await pool.query(
-        'UPDATE users SET daily_generation_count = $1, last_generation_date = $2 WHERE id = $3',
-        [req.generationCount + 1, today, req.userId]
-      );
-
-      res.json({
-        cards,
-        generationsRemaining: req.generationLimit - (req.generationCount + 1),
-      });
-    } catch (err) {
-      console.error('Generation error:', err);
-      if (err.message === 'Failed to parse AI-generated cards') {
-        return res.status(502).json({ error: 'AI returned an invalid response. Please try again.' });
-      }
-      res.status(500).json({ error: 'Internal server error' });
+      file.detectedMime = type.mime;
     }
+    next();
   }
-);
 
-export default router;
+  // POST /preview — AI generation only, returns unsaved cards. Consumes generation count.
+  router.post(
+    '/preview',
+    generateLimiter,
+    requireXHRMiddleware,
+    authenticateMiddleware,
+    checkTrialExpiryMiddleware,
+    checkGenerationLimitsMiddleware,
+    optionalMulter,
+    validateImageContent,
+    async (req, res) => {
+      const { input, title } = req.body;
+
+      // Input validation (applies to both JSON and multipart)
+      if (input && input.length > 50000) {
+        return res.status(400).json({ error: 'Input text is too long. Maximum 50,000 characters.' });
+      }
+      if (title && title.length > 200) {
+        return res.status(400).json({ error: 'Title is too long. Maximum 200 characters.' });
+      }
+      if (!input?.trim() && (!req.files || req.files.length === 0)) {
+        return res.status(400).json({ error: 'Input text or photos are required.' });
+      }
+
+      try {
+        let cards;
+
+        if (req.files?.length) {
+          // Vision path
+          if (activeVisionRequests >= MAX_CONCURRENT_VISION) {
+            return res.status(503).json({ error: 'Photo processing is busy. Please try again in a moment.' });
+          }
+          activeVisionRequests++;
+          try {
+            cards = await generateCardsWithVisionFn(input, req.files);
+          } catch (err) {
+            logVisionFailure(req, err);
+            if (err.code === 'NO_CARDS') {
+              return res.status(422).json({ error: err.message });
+            }
+            return res.status(502).json({
+              error: 'Photo processing failed. Try clearer photos, or remove them to generate from text.',
+            });
+          } finally {
+            activeVisionRequests--;
+          }
+        } else {
+          // Text-only path
+          cards = await generateCardsFn(input);
+        }
+
+        // Increment generation count (consumed at preview time)
+        const today = new Date().toISOString().split('T')[0];
+        await poolInstance.query(
+          'UPDATE users SET daily_generation_count = $1, last_generation_date = $2 WHERE id = $3',
+          [req.generationCount + 1, today, req.userId]
+        );
+
+        res.json({
+          cards,
+          generationsRemaining: req.generationLimit - (req.generationCount + 1),
+        });
+      } catch (err) {
+        console.error('Generation error:', err);
+        if (err.message === 'Failed to parse AI-generated cards') {
+          return res.status(502).json({ error: 'AI returned an invalid response. Please try again.' });
+        }
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    }
+  );
+
+  return router;
+}
+
+export default createGenerateRouter();
