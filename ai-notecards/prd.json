@@ -1,10 +1,10 @@
 {
   "meta": {
     "app_name": "AI Notecards",
-    "tagline": "AI-powered flashcard app with marketplace",
-    "description": "Paste notes or type a topic, AI generates study flashcards. Buy and sell decks on the marketplace.",
-    "version": "1.0.0",
-    "last_updated": "2026-03-14",
+    "tagline": "AI-powered flashcard app with marketplace and native iOS companion",
+    "description": "Generate flashcards from text or photos, study across web and iPhone, and buy or sell decks in the marketplace.",
+    "version": "1.1.0",
+    "last_updated": "2026-03-15",
     "tech_stack": {
       "frontend": {
         "framework": "React 19",
@@ -13,6 +13,16 @@
         "routing": "react-router-dom v7",
         "notifications": "react-hot-toast",
         "auth_provider": "@react-oauth/google"
+      },
+      "mobile": {
+        "framework": "Expo SDK 55 + React Native 0.83",
+        "routing": "Expo Router",
+        "state": "TanStack Query + MMKV",
+        "offline_storage": "Expo SQLite + MMKV",
+        "native_auth": "expo-apple-authentication + SecureStore refresh tokens",
+        "subscriptions": "RevenueCat (react-native-purchases)",
+        "native_features": "Biometrics, push notifications, haptics, universal links, share sheets",
+        "crash_monitoring": "@sentry/react-native"
       },
       "backend": {
         "runtime": "Node.js (ES modules)",
@@ -34,9 +44,9 @@
         "vision": "Gemini for photo-to-flashcard generation"
       },
       "payments": {
-        "subscriptions": "Stripe Checkout",
+        "subscriptions": "Stripe Checkout (web) + RevenueCat / Apple IAP (iOS)",
         "marketplace_payouts": "Stripe Connect Express (destination charges, 50/50 split)",
-        "webhooks": "Platform + Connect (separate signing secrets)"
+        "webhooks": "Stripe platform + Stripe Connect + RevenueCat"
       },
       "storage": {
         "avatars": "Supabase Storage (REST API, no SDK)",
@@ -49,6 +59,7 @@
     },
     "deployment": {
       "frontend": "Vercel",
+      "mobile": "Expo EAS Build + TestFlight / App Store",
       "backend": "Railway",
       "database": "Supabase PostgreSQL",
       "storage": "Supabase Storage"
@@ -100,6 +111,11 @@
           "name": "Deck Management",
           "description": "View, browse, and delete flashcard decks",
           "details": "Decks listed on dashboard with card count, origin badge (generated/purchased), creation date"
+        },
+        {
+          "name": "Deck Duplication",
+          "description": "Duplicate an existing deck into a new editable copy",
+          "details": "Server-side copy of deck + cards with ownership checks and deck-limit enforcement"
         },
         {
           "name": "Study Sessions",
@@ -166,6 +182,11 @@
           "details": "Captures google_user_id and google_avatar_url, auto-links to existing email accounts, creates trial on first login"
         },
         {
+          "name": "Apple Sign-In",
+          "description": "Native Sign in with Apple on iOS",
+          "details": "Stores apple_user_id, links existing accounts by email when appropriate, and issues refresh-token-backed native sessions"
+        },
+        {
           "name": "Magic Link Auth",
           "description": "Passwordless email login via 6-digit code",
           "details": "Resend API for email delivery, code_hash stored (not plaintext), 10-min expiry, max 3 attempts, rate limited"
@@ -189,6 +210,59 @@
           "name": "CSRF Protection",
           "description": "Custom X-Requested-With header on state-changing endpoints",
           "details": "requireXHR middleware forces CORS preflight, shared across generate/account/settings routes"
+        }
+      ],
+
+      "mobile_ios": [
+        {
+          "name": "Native iOS App Shell",
+          "description": "Expo/React Native iPhone app with tab navigation and authenticated flows",
+          "details": "Separate mobile workspace with Expo Router, theme system, offline banner, and authenticated tab layout"
+        },
+        {
+          "name": "Native Auth Sessions",
+          "description": "Refresh-token-backed mobile auth with SecureStore persistence",
+          "details": "Dedicated refresh_tokens table, device metadata capture, native token refresh endpoint, and session restore on app reopen"
+        },
+        {
+          "name": "Biometric Re-Entry Lock",
+          "description": "Optional Face ID / Touch ID gate before reopening an existing mobile session",
+          "details": "expo-local-authentication + device-local preference"
+        },
+        {
+          "name": "RevenueCat iOS Subscriptions",
+          "description": "In-app Pro purchases and restore flow on iPhone",
+          "details": "react-native-purchases on device, RevenueCat reconcile/webhook flow on server, platform-aware billing state shared with Stripe"
+        },
+        {
+          "name": "Offline Deck Downloads",
+          "description": "Download decks for local study without connectivity",
+          "details": "Deck snapshots stored in SQLite, warm cache persisted via MMKV, downloaded decks survive app restarts"
+        },
+        {
+          "name": "Offline Local Study + Sync",
+          "description": "Study downloaded decks fully offline and sync results later",
+          "details": "Queued study_sessions sync through /api/study/sync with dedupe by client_session_id and timezone-aware streak recomputation"
+        },
+        {
+          "name": "Native Deep Linking and Browser Return",
+          "description": "Universal links open supported marketplace and auth flows directly in the app",
+          "details": "AASA hosted by server, associated domains configured in iOS app, seller onboarding return and verify-code links route into native screens"
+        },
+        {
+          "name": "Push Notifications",
+          "description": "Expo push token registration for study reminders and marketplace events",
+          "details": "device_tokens table, latest-registration-wins token ownership, user preference checks, invalid-token cleanup, native registration and logout cleanup"
+        },
+        {
+          "name": "Native Polish",
+          "description": "iOS haptics, share sheets, offline banners, and profile-level notification controls",
+          "details": "Share marketplace listings and study summaries, haptics on reveal/answer interactions, notification and haptics toggles in mobile profile"
+        },
+        {
+          "name": "Mobile Crash Monitoring",
+          "description": "Release-like crash reporting for native builds",
+          "details": "@sentry/react-native initialization plus mobile error-boundary capture"
         }
       ],
 
@@ -349,6 +423,11 @@
           "endpoint": "POST /api/stripe/checkout"
         },
         {
+          "name": "Stripe Billing Portal",
+          "description": "Open self-serve subscription management for web Stripe subscribers",
+          "endpoint": "POST /api/stripe/portal"
+        },
+        {
           "name": "Subscription Cancellation",
           "description": "Cancel at period end, delists all active marketplace listings on downgrade",
           "endpoint": "POST /api/stripe/cancel"
@@ -357,6 +436,11 @@
           "name": "Webhook-Driven Status Sync",
           "description": "Platform webhook handles subscription lifecycle events",
           "details": "payment_intent.succeeded, customer.subscription.updated, customer.subscription.deleted"
+        },
+        {
+          "name": "RevenueCat Reconciliation",
+          "description": "Platform-aware billing state sync for Apple subscriptions",
+          "details": "RevenueCat webhook ingest + authenticated reconcile endpoint keep Apple entitlement state aligned with server-side plan access"
         }
       ],
 
@@ -400,6 +484,11 @@
           "name": "Trust Proxy",
           "description": "Enabled in production for correct IP detection behind Railway/Vercel",
           "details": "Required for rate limiting accuracy"
+        },
+        {
+          "name": "Universal Link Association Hosting",
+          "description": "Server-hosted apple-app-site-association for iOS universal links",
+          "details": "Path-scoped AASA response served at /.well-known/apple-app-site-association"
         }
       ],
 
@@ -514,18 +603,11 @@
         "notes": "Preference toggles exist (study_reminders, marketplace_activity) but no email delivery pipeline yet"
       },
       {
-        "name": "Apple Sign-In",
-        "description": "Sign in with Apple for iOS parity",
-        "source": "brainstorm/auth-revamp",
-        "priority": "low",
-        "notes": "Mentioned in auth revamp brainstorm; Google is done, Apple is deferred"
-      },
-      {
         "name": "Testing Suite",
         "description": "Comprehensive automated test coverage",
         "source": "general",
         "priority": "high",
-        "notes": "No tests exist currently. Need unit tests for route handlers, integration tests for auth flows, E2E tests for critical paths"
+        "notes": "Server route/service coverage and mobile unit tests now exist, but broader integration and E2E coverage are still missing"
       },
       {
         "name": "Card Editing",
@@ -587,10 +669,22 @@
           "email TEXT UNIQUE NOT NULL",
           "password_hash TEXT (nullable for Google/magic-link users)",
           "display_name TEXT",
+          "apple_user_id TEXT (partial unique index)",
           "plan TEXT (free/trial/pro)",
           "trial_ends_at TIMESTAMPTZ",
           "stripe_customer_id TEXT",
           "stripe_subscription_id TEXT",
+          "subscription_platform TEXT (stripe/apple)",
+          "revenuecat_app_user_id TEXT",
+          "stripe_cancel_at_period_end BOOLEAN",
+          "stripe_cancel_at TIMESTAMPTZ",
+          "apple_subscription_active BOOLEAN",
+          "apple_entitlement_id TEXT",
+          "apple_product_id TEXT",
+          "apple_cancel_at_period_end BOOLEAN",
+          "apple_cancel_at TIMESTAMPTZ",
+          "apple_expires_at TIMESTAMPTZ",
+          "apple_last_synced_at TIMESTAMPTZ",
           "stripe_connect_account_id TEXT",
           "connect_charges_enabled BOOLEAN",
           "connect_payouts_enabled BOOLEAN",
@@ -755,6 +849,44 @@
           "created_at TIMESTAMPTZ"
         ]
       },
+      "refresh_tokens": {
+        "description": "Native/mobile refresh-token sessions with device metadata",
+        "columns": [
+          "id UUID PK",
+          "user_id UUID FK→users (CASCADE)",
+          "token_hash TEXT UNIQUE NOT NULL",
+          "expires_at TIMESTAMPTZ NOT NULL",
+          "device_info JSONB",
+          "created_at TIMESTAMPTZ",
+          "last_used_at TIMESTAMPTZ",
+          "revoked_at TIMESTAMPTZ"
+        ]
+      },
+      "revenuecat_webhook_events": {
+        "description": "Idempotency ledger for RevenueCat webhooks",
+        "columns": [
+          "event_id TEXT PK",
+          "event_type TEXT NOT NULL",
+          "app_user_id TEXT",
+          "processed_at TIMESTAMPTZ"
+        ]
+      },
+      "device_tokens": {
+        "description": "Expo push tokens registered per authenticated device",
+        "columns": [
+          "id UUID PK",
+          "user_id UUID FK→users (CASCADE)",
+          "platform TEXT",
+          "provider TEXT",
+          "token TEXT UNIQUE NOT NULL",
+          "timezone TEXT",
+          "status TEXT (active/inactive)",
+          "permission_status TEXT (granted/denied/undetermined)",
+          "created_at TIMESTAMPTZ",
+          "updated_at TIMESTAMPTZ",
+          "last_used_at TIMESTAMPTZ"
+        ]
+      },
       "schema_migrations": {
         "description": "Migration version tracking",
         "columns": ["version INT"]
@@ -769,7 +901,16 @@
       "006_seller_terms.sql — seller_terms_accepted_at, delisted_at",
       "007_deck_stats_and_reviews.sql — deck_stats, review_text, flag_type",
       "008_account_settings.sql — avatar, preferences JSONB, soft-delete, token revocation, cursor pagination index",
-      "009_study_modes_and_streaks.sql — study session mode column, user streak tracking (current_streak, longest_streak, last_study_date), last_studied covering index"
+      "009_study_modes_and_streaks.sql — study session mode column, user streak tracking (current_streak, longest_streak, last_study_date), last_studied covering index",
+      "010_billing_portal.sql — Stripe billing portal support",
+      "011_content_moderation.sql — admin moderation queue and suspension flows",
+      "012_validate_moderation_constraints.sql — moderation hardening constraints",
+      "013_deck_duplication.sql — duplicate decks and cards safely",
+      "014_validate_deck_constraints.sql — stricter deck/card validation",
+      "015_mobile_auth_sessions.sql — Apple Sign-In + refresh_tokens for native sessions",
+      "016_billing_platforms_and_revenuecat.sql — platform-aware billing state and RevenueCat events",
+      "017_study_sync.sql — offline study sync support",
+      "018_device_tokens.sql — push notification device registry"
     ]
   },
 
@@ -777,15 +918,17 @@
     "auth": [
       "POST   /api/auth/signup",
       "POST   /api/auth/login",
+      "POST   /api/auth/refresh",
       "GET    /api/auth/me",
       "POST   /api/auth/logout",
-      "POST   /api/auth/magic-link/send",
-      "POST   /api/auth/magic-link/verify",
-      "POST   /api/auth/google/callback"
+      "POST   /api/auth/apple",
+      "POST   /api/auth/google",
+      "POST   /api/auth/magic-link/request",
+      "POST   /api/auth/magic-link/verify"
     ],
     "generation": ["POST   /api/generate/preview", "POST   /api/generate (save previewed cards to deck)"],
-    "decks": ["GET    /api/decks", "GET    /api/decks/:id", "DELETE /api/decks/:id"],
-    "study": ["POST   /api/study", "PATCH  /api/study/:id", "GET    /api/study/stats", "GET    /api/study/history", "GET    /api/study/deck-stats"],
+    "decks": ["GET    /api/decks", "GET    /api/decks/:id", "POST   /api/decks/save", "POST   /api/decks/:id/duplicate", "PATCH  /api/decks/:id", "DELETE /api/decks/:id", "POST   /api/decks/:id/cards", "PATCH  /api/decks/:deckId/cards/:cardId", "DELETE /api/decks/:deckId/cards/:cardId"],
+    "study": ["POST   /api/study", "PATCH  /api/study/:id", "POST   /api/study/sync", "GET    /api/study/stats", "GET    /api/study/history", "GET    /api/study/deck-stats"],
     "account": ["POST   /api/account/avatar", "DELETE /api/account/avatar", "PATCH  /api/account/password", "DELETE /api/account"],
     "settings": ["GET    /api/settings", "PATCH  /api/settings", "PATCH  /api/settings/preferences", "GET    /api/settings/export"],
     "marketplace": ["GET    /api/marketplace", "GET    /api/marketplace/categories", "GET    /api/marketplace/:id", "POST   /api/marketplace/:id/purchase", "POST   /api/marketplace/:id/flag"],
@@ -796,12 +939,15 @@
       "POST   /api/seller/listings/:id/relist",
       "GET    /api/seller/listings",
       "GET    /api/seller/dashboard",
+      "POST   /api/seller/accept-terms",
       "POST   /api/seller/onboard",
       "GET    /api/seller/onboard/refresh",
       "GET    /api/seller/onboard/return"
     ],
     "ratings": ["POST   /api/ratings", "GET    /api/ratings/listing/:id"],
-    "stripe": ["POST   /api/stripe/checkout", "POST   /api/stripe/cancel", "POST   /api/stripe/webhook"],
+    "stripe": ["POST   /api/stripe/checkout", "POST   /api/stripe/cancel", "POST   /api/stripe/portal", "POST   /api/stripe/webhook"],
+    "revenuecat": ["POST   /api/revenuecat/webhook", "POST   /api/revenuecat/reconcile"],
+    "notifications": ["POST   /api/notifications/devices", "DELETE /api/notifications/devices/:token"],
     "admin": ["GET    /api/admin/flags", "PATCH  /api/admin/flags/:id", "PATCH  /api/admin/users/:id/suspend"],
     "webhooks": ["POST   /webhooks/stripe-connect"],
     "health": ["GET    /api/health"]
@@ -828,12 +974,12 @@
   },
 
   "summary": {
-    "v1_feature_count": 47,
-    "v2_feature_count": 16,
+    "v1_feature_count": 79,
+    "v2_feature_count": 15,
     "pages": 17,
-    "api_endpoints": 39,
-    "database_tables": 13,
-    "migrations": 9,
-    "status": "v1 complete and deployed"
+    "api_endpoints": 63,
+    "database_tables": 16,
+    "migrations": 18,
+    "status": "v1 shipped on web with native iOS companion in active launch prep"
   }
 }

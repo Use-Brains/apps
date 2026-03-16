@@ -130,6 +130,26 @@ npm run lint            # Expo lint
 node ./node_modules/vitest/vitest.mjs run  # Run unit tests with Node 22 in this repo
 ```
 
+## Supported iOS Workflow
+
+Use a custom dev client workflow for this app.
+
+- Local simulator development: `APP_ENV=development npm run ios:simulator`
+- Local Metro for dev client: `APP_ENV=development npm run start:dev-client`
+- Device build via EAS: `npm run build:ios:development`
+- Preview build via EAS: `npm run build:ios:preview`
+- Production build via EAS: `npm run build:ios:production`
+
+Do not treat Expo Go as the primary path for this app. It uses native capabilities and should be developed against a dev build.
+
+For the simulator path, do not use Expo CLI's `--device` flag. `npm run ios:simulator` should use the default simulator flow and must not require iOS code signing.
+The local iOS scripts pre-generate React Native codegen artifacts before `expo run:ios` to avoid missing `ReactCodegen` build inputs in Xcode.
+
+`app.config.js` is the source of truth for environment-specific app identity:
+
+- `development` uses a non-production bundle identifier and disables production-only iOS capabilities
+- `preview` and `production` use production-like capabilities
+
 ## AI Output Contract
 
 When implementing features in this directory:
