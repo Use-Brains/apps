@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('@/lib/mmkv', () => ({
+  storage: { getString: vi.fn(), set: vi.fn(), remove: vi.fn() },
+}));
 
 import { sanitizePersistedClient, shouldPersistQuery } from '../../src/lib/query-client';
 

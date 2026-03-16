@@ -1,7 +1,6 @@
 import { QueryClient } from '@tanstack/react-query';
 import type { Query } from '@tanstack/react-query';
-import type { Persister } from '@tanstack/react-query-persist-client';
-import type { PersistedClient } from '@tanstack/react-query-persist-client';
+import type { PersistedClient, Persister } from '@tanstack/react-query-persist-client';
 import { storage } from './mmkv';
 
 export const queryClient = new QueryClient({
