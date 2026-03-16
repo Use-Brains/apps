@@ -1,12 +1,21 @@
 import { Router } from 'express';
-import { authenticate } from '../middleware/auth.js';
+import rateLimit from 'express-rate-limit';
+import { authenticate, requireActiveUser } from '../middleware/auth.js';
 import { requireXHR } from '../middleware/csrf.js';
 import pool from '../db/pool.js';
+import { syncOfflineStudySessions } from '../services/study-sync.js';
 
 const router = Router();
 
 const ALLOWED_MODES = ['flip', 'multiple_choice', 'type_answer', 'match'];
 const MIN_CARDS = { flip: 1, multiple_choice: 4, type_answer: 1, match: 6 };
+const syncLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  keyGenerator: (req) => req.userId || req.ip,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Start a study session
 router.post('/', requireXHR, authenticate, async (req, res) => {
@@ -160,6 +169,21 @@ router.patch('/:id', requireXHR, authenticate, async (req, res) => {
   } catch (err) {
     console.error('Complete session error:', err);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/sync', requireXHR, authenticate, requireActiveUser, syncLimiter, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const result = await syncOfflineStudySessions(client, req.userId, {
+      sessions: req.body?.sessions,
+    });
+    return res.json(result);
+  } catch (err) {
+    console.error('Study sync error:', err);
+    return res.status(err.status || 400).json({ error: err.message || 'Unable to sync study sessions' });
+  } finally {
+    client.release();
   }
 });
 
