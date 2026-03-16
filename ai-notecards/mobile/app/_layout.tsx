@@ -4,6 +4,8 @@ import { Slot, useRouter, useSegments } from 'expo-router';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { queryClient, queryPersister, dehydrateOptions } from '@/lib/query-client';
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { NetworkProvider } from '@/lib/network';
+import { OfflineBanner } from '@/components/OfflineBanner';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ThemeProvider, useTheme, useThemedStyles } from '@/lib/theme';
 import type { AppTheme } from '@/lib/theme';
@@ -54,9 +56,14 @@ export default function RootLayout() {
       <ErrorBoundary>
         <PersistQueryClientProvider client={queryClient} persistOptions={{ persister: queryPersister, dehydrateOptions }}>
           <AuthProvider>
-            <AuthGate>
-              <Slot />
-            </AuthGate>
+            <NetworkProvider>
+              <AuthGate>
+                <>
+                  <OfflineBanner />
+                  <Slot />
+                </>
+              </AuthGate>
+            </NetworkProvider>
           </AuthProvider>
         </PersistQueryClientProvider>
       </ErrorBoundary>
