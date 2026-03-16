@@ -3,6 +3,8 @@ date: 2026-03-15
 topic: ios-offline-study-and-data-sync
 ---
 
+<!-- FINISHED -->
+
 # iOS Offline Study & Data Synchronization
 
 ## What We're Building
@@ -159,16 +161,16 @@ CREATE TABLE pending_sessions (
 
 ## Key Decisions
 
-| Decision | Choice | Reasoning |
-|----------|--------|-----------|
-| Local database | expo-sqlite | Ships with Expo, zero config, full SQL control, no heavy ORM |
-| Existing cache layer | Keep MMKV query persistence | Useful for warm starts, but not durable enough for offline study source of truth |
-| Sync direction | Upload-only (sessions) | Deck data is read-only locally, avoids bidirectional sync complexity |
-| Download strategy | Opt-in per deck | Respects storage and data usage, safe default for all users |
-| Conflict resolution | Avoided by design | Sessions are append-only, deck data is read-only locally, deck edits stay online-only |
-| Streak accuracy | Use real session timestamps | Requires backend support beyond the current `NOW()`-based study routes |
-| Session deduplication | `client_session_id` UUID | Idempotent server endpoint, safe retries, no double-counting |
-| Network detection | `@react-native-community/netinfo` | Standard RN library, event-driven, reliable |
+| Decision              | Choice                            | Reasoning                                                                             |
+| --------------------- | --------------------------------- | ------------------------------------------------------------------------------------- |
+| Local database        | expo-sqlite                       | Ships with Expo, zero config, full SQL control, no heavy ORM                          |
+| Existing cache layer  | Keep MMKV query persistence       | Useful for warm starts, but not durable enough for offline study source of truth      |
+| Sync direction        | Upload-only (sessions)            | Deck data is read-only locally, avoids bidirectional sync complexity                  |
+| Download strategy     | Opt-in per deck                   | Respects storage and data usage, safe default for all users                           |
+| Conflict resolution   | Avoided by design                 | Sessions are append-only, deck data is read-only locally, deck edits stay online-only |
+| Streak accuracy       | Use real session timestamps       | Requires backend support beyond the current `NOW()`-based study routes                |
+| Session deduplication | `client_session_id` UUID          | Idempotent server endpoint, safe retries, no double-counting                          |
+| Network detection     | `@react-native-community/netinfo` | Standard RN library, event-driven, reliable                                           |
 
 ## Open Questions
 

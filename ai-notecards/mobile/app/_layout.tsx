@@ -7,8 +7,12 @@ import { AuthProvider, useAuth } from '@/lib/auth';
 import { NetworkProvider } from '@/lib/network';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { NotificationProvider } from '@/lib/notifications';
+import { initializeSentry } from '@/lib/sentry';
 import { ThemeProvider, useTheme, useThemedStyles } from '@/lib/theme';
 import type { AppTheme } from '@/lib/theme';
+
+initializeSentry();
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading, user } = useAuth();
@@ -56,14 +60,16 @@ export default function RootLayout() {
       <ErrorBoundary>
         <PersistQueryClientProvider client={queryClient} persistOptions={{ persister: queryPersister, dehydrateOptions }}>
           <AuthProvider>
-            <NetworkProvider>
-              <AuthGate>
-                <>
-                  <OfflineBanner />
-                  <Slot />
-                </>
-              </AuthGate>
-            </NetworkProvider>
+            <NotificationProvider>
+              <NetworkProvider>
+                <AuthGate>
+                  <>
+                    <OfflineBanner />
+                    <Slot />
+                  </>
+                </AuthGate>
+              </NetworkProvider>
+            </NotificationProvider>
           </AuthProvider>
         </PersistQueryClientProvider>
       </ErrorBoundary>

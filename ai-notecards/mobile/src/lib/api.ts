@@ -58,6 +58,7 @@ function normalizeUser(user: ApiUser): User {
     sellerTermsAccepted: !!user.seller_terms_accepted_at,
     stripeConnectOnboarded: !!user.connect_payouts_enabled,
     createdAt: user.created_at,
+    preferences: user.preferences && typeof user.preferences === 'object' ? user.preferences : {},
   };
 }
 
@@ -366,6 +367,10 @@ export const api = {
     request('/settings', { method: 'PATCH', body: JSON.stringify(data) }),
   updatePreferences: (prefs: Record<string, unknown>) =>
     request('/settings/preferences', { method: 'PATCH', body: JSON.stringify(prefs) }),
+  registerNotificationDevice: (device: { token: string; timezone: string; permissionStatus: 'granted' | 'denied' | 'undetermined' }) =>
+    request('/notifications/devices', { method: 'POST', body: JSON.stringify(device) }),
+  unregisterNotificationDevice: (token: string) =>
+    request(`/notifications/devices/${encodeURIComponent(token)}`, { method: 'DELETE' }),
   changePassword: (currentPassword: string | null, newPassword: string) =>
     request('/account/password', { method: 'PATCH', body: JSON.stringify({ currentPassword, newPassword }) }),
   deleteAccount: (confirmation: string) =>

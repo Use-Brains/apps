@@ -4,6 +4,7 @@ import { authenticate, requireActiveUser } from '../middleware/auth.js';
 import { requireXHR } from '../middleware/csrf.js';
 import pool from '../db/pool.js';
 import { syncOfflineStudySessions } from '../services/study-sync.js';
+import { computeStreakMetrics, getCurrentDateKey, getUserTimezone } from '../services/study-timezone.js';
 
 const router = Router();
 
@@ -105,24 +106,33 @@ router.patch('/:id', requireXHR, authenticate, async (req, res) => {
         [correct, totalCards, req.params.id, req.userId]
       );
 
-      // Atomic streak + study_score update (CTE computes streak value once)
-      const streakResult = await client.query(
-        `WITH new_streak AS (
-          SELECT CASE
-            WHEN last_study_date = (NOW() AT TIME ZONE 'UTC')::date THEN current_streak
-            WHEN last_study_date = (NOW() AT TIME ZONE 'UTC')::date - 1 THEN current_streak + 1
-            ELSE 1
-          END AS val
-          FROM users WHERE id = $1
-        )
-        UPDATE users SET
-          study_score = study_score + 1,
-          current_streak = (SELECT val FROM new_streak),
-          longest_streak = GREATEST(longest_streak, (SELECT val FROM new_streak)),
-          last_study_date = GREATEST(last_study_date, (NOW() AT TIME ZONE 'UTC')::date)
-        WHERE id = $1
-        RETURNING current_streak, longest_streak, study_score`,
+      const userResult = await client.query(
+        'SELECT preferences FROM users WHERE id = $1',
         [req.userId]
+      );
+      const timezone = getUserTimezone(userResult.rows[0]?.preferences);
+      const sessionRows = await client.query(
+        `SELECT completed_at FROM study_sessions
+         WHERE user_id = $1 AND completed_at IS NOT NULL
+         ORDER BY completed_at ASC`,
+        [req.userId]
+      );
+      const streak = computeStreakMetrics(sessionRows.rows.map((row) => row.completed_at), timezone);
+      const streakResult = await client.query(
+        `UPDATE users SET
+           study_score = $2,
+           current_streak = $3,
+           longest_streak = $4,
+           last_study_date = $5
+         WHERE id = $1
+         RETURNING current_streak, longest_streak, study_score`,
+        [
+          req.userId,
+          sessionRows.rowCount,
+          streak.current_streak,
+          streak.longest_streak,
+          streak.last_study_date,
+        ]
       );
 
       // UPSERT deck_stats — DO UPDATE pattern (accumulating, not deduplicating)
@@ -206,17 +216,21 @@ router.get('/stats', authenticate, async (req, res) => {
 
     // Streak + daily goal data
     const { rows: [userData] } = await pool.query(
-      `SELECT current_streak, longest_streak, preferences->'daily_goal' AS daily_goal
+      `SELECT current_streak, longest_streak, preferences->'daily_goal' AS daily_goal, preferences
        FROM users WHERE id = $1`,
       [req.userId]
     );
+    const timezone = getUserTimezone(userData?.preferences);
+    const todayKey = getCurrentDateKey(new Date(), timezone);
 
-    // Sessions completed today (UTC)
+    // Sessions completed today (user-local timezone)
     const { rows: [todayData] } = await pool.query(
       `SELECT COUNT(*)::int AS sessions_today
        FROM study_sessions
-       WHERE user_id = $1 AND completed_at >= (NOW() AT TIME ZONE 'UTC')::date`,
-      [req.userId]
+       WHERE user_id = $1
+         AND completed_at IS NOT NULL
+         AND timezone($2, completed_at)::date = $3::date`,
+      [req.userId, timezone, todayKey]
     );
 
     res.json({

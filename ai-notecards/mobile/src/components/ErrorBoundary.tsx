@@ -1,5 +1,6 @@
 import { Component, type ReactNode } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { captureException } from '@/lib/sentry';
 import { fontSize, spacing, borderRadius, useThemedStyles, type AppTheme } from '@/lib/theme';
 
 interface Props {
@@ -18,6 +19,10 @@ class ErrorBoundaryInner extends Component<Props & { styles: BoundaryStyles }, S
 
   static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error) {
+    captureException(error);
   }
 
   handleRetry = () => {

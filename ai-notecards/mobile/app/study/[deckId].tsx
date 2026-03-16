@@ -5,6 +5,8 @@ import { getDownloadedDeck } from '@/lib/offline/repository';
 import { StudySessionCard } from '@/components/study/StudySessionCard';
 import { StudyModePicker } from '@/components/study/StudyModePicker';
 import { createLocalStudySession, queueCompletedSession, type LocalStudySession } from '@/lib/study/session';
+import { shareStudyResult } from '@/lib/share';
+import { haptics } from '@/lib/haptics';
 import type { OfflineDeck } from '@/lib/offline/types';
 import type { StudyMode } from '@/types/api';
 import { borderRadius, fontSize, spacing, useThemedStyles } from '@/lib/theme';
@@ -69,6 +71,8 @@ export default function StudySessionScreen() {
   const handleAnswer = async (wasCorrect: boolean) => {
     if (!session) return;
 
+    await haptics.answer(wasCorrect);
+
     const nextCorrect = correctCount + (wasCorrect ? 1 : 0);
     const isLastCard = currentIndex >= sessionCards.length - 1;
 
@@ -85,6 +89,19 @@ export default function StudySessionScreen() {
     setCorrectCount(nextCorrect);
     setCurrentIndex((value) => value + 1);
     setShowAnswer(false);
+  };
+
+  const handleShareResult = async () => {
+    if (!deck || !completed) return;
+    try {
+      await shareStudyResult({
+        deckTitle: deck.title,
+        correct: completed.correct,
+        total: completed.total,
+      });
+    } catch (error) {
+      Alert.alert('Unable to share', error instanceof Error ? error.message : 'Please try again');
+    }
   };
 
   if (loading) {
@@ -118,6 +135,9 @@ export default function StudySessionScreen() {
           <Text style={styles.summaryText}>
             You got {completed.correct} of {completed.total} correct. This session is saved locally and will sync later.
           </Text>
+          <Pressable style={styles.secondaryButton} onPress={() => void handleShareResult()}>
+            <Text style={styles.secondaryButtonText}>Share Result</Text>
+          </Pressable>
           <Pressable style={styles.primaryButton} onPress={handleStart}>
             <Text style={styles.primaryButtonText}>Study Again</Text>
           </Pressable>

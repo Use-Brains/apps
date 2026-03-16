@@ -9,15 +9,18 @@ export default function VerifyCodeScreen() {
   const styles = useThemedStyles(createStyles);
   const router = useRouter();
   const params = useLocalSearchParams<{ email?: string }>();
-  const email = typeof params.email === 'string' ? params.email : '';
+  const initialEmail = typeof params.email === 'string' ? params.email : '';
   const { verifyMagicLink } = useAuth();
+  const [email, setEmail] = useState(initialEmail);
   const [code, setCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const normalizedEmail = email.trim();
+  const canSubmit = normalizedEmail.length > 0 && code.length === 6 && !submitting;
 
   const handleVerify = async () => {
     setSubmitting(true);
     try {
-      const session = await verifyMagicLink(email, code);
+      const session = await verifyMagicLink(normalizedEmail, code);
       if (session.isNewUser && !session.user.displayName) {
         router.replace('/welcome');
       } else {
@@ -34,6 +37,19 @@ export default function VerifyCodeScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Check your email</Text>
       <Text style={styles.subtitle}>Enter the 6-digit code sent to {email || 'your email address'}.</Text>
+      {!initialEmail ? (
+        <TextInput
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          textContentType="emailAddress"
+          placeholder="you@example.com"
+          placeholderTextColor={styles.placeholder.color}
+          style={styles.emailInput}
+        />
+      ) : null}
       <TextInput
         value={code}
         onChangeText={(value) => setCode(value.replace(/\D/g, '').slice(0, 6))}
@@ -44,7 +60,7 @@ export default function VerifyCodeScreen() {
         style={styles.input}
         maxLength={6}
       />
-      <Pressable style={[styles.button, (submitting || code.length !== 6) && styles.disabledButton]} onPress={handleVerify} disabled={submitting || code.length !== 6}>
+      <Pressable style={[styles.button, !canSubmit && styles.disabledButton]} onPress={handleVerify} disabled={!canSubmit}>
         <Text style={styles.buttonText}>Verify Code</Text>
       </Pressable>
       <Pressable onPress={() => router.back()}>
@@ -88,6 +104,16 @@ const createStyles = ({ colors }: AppTheme) => {
       letterSpacing: 8,
       fontSize: fontSize['2xl'],
       fontWeight: '600',
+    },
+    emailInput: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      color: colors.text,
+      backgroundColor: colors.surface,
+      fontSize: fontSize.md,
     },
     button: {
       backgroundColor: colors.primary,

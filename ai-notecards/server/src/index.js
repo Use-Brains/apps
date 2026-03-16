@@ -49,10 +49,13 @@ import sellerRoutes from './routes/seller.js';
 import ratingsRoutes from './routes/ratings.js';
 import accountRoutes from './routes/account.js';
 import adminRoutes from './routes/admin.js';
+import notificationsRoutes from './routes/notifications.js';
 import pool from './db/pool.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const APPLE_TEAM_ID = process.env.APPLE_TEAM_ID || '';
+const IOS_BUNDLE_ID = process.env.IOS_BUNDLE_ID || 'com.ainotecards.app';
 
 // Trust proxy when behind Railway/Vercel (needed for rate limiting + correct IP)
 if (process.env.NODE_ENV === 'production') {
@@ -100,6 +103,7 @@ app.use('/api/marketplace', marketplaceRoutes);
 app.use('/api/seller', sellerRoutes);
 app.use('/api/ratings', ratingsRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/notifications', notificationsRoutes);
 
 // Stripe Connect webhook (separate endpoint, separate signing secret)
 import { getStripe } from './services/stripe.js';
@@ -165,6 +169,28 @@ app.get('/api/health', async (req, res) => {
   } catch {
     res.status(503).json({ status: 'error', db: 'disconnected' });
   }
+});
+
+app.get('/.well-known/apple-app-site-association', (req, res) => {
+  res.type('application/json');
+  res.setHeader('Cache-Control', 'public, max-age=300');
+
+  const appId = APPLE_TEAM_ID ? `${APPLE_TEAM_ID}.${IOS_BUNDLE_ID}` : IOS_BUNDLE_ID;
+
+  res.json({
+    applinks: {
+      apps: [],
+      details: [{
+        appIDs: [appId],
+        components: [
+          { '/': '/marketplace', comment: 'Marketplace browse' },
+          { '/': '/marketplace/*', comment: 'Marketplace listing detail' },
+          { '/': '/verify-code', comment: 'Magic link verification' },
+          { '/': '/seller/onboard/return', comment: 'Seller onboarding return' },
+        ],
+      }],
+    },
+  });
 });
 
 // API 404 catch-all (after all route registrations)

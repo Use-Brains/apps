@@ -5,6 +5,7 @@ import type { AuthSessionResponse, User } from '@/types/api';
 import { api, clearSessionTokens, hasStoredRefreshToken, refreshSession, setSessionTokens } from './api';
 import { storage } from './mmkv';
 import { initializeSubscriptionIdentity, resetSubscriptionIdentity } from './subscriptions';
+import { getDeviceTimezone, shouldSyncTimezone } from './timezone';
 
 const USER_CACHE_KEY = 'cached-user';
 const BIOMETRIC_ENABLED_KEY = 'biometric-enabled';
@@ -255,6 +256,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     void resetSubscriptionIdentity();
   }, [state.user?.id]);
 
+  useEffect(() => {
+    const user = state.user;
+    if (!user?.id) return;
+
+    const currentTimezone = typeof user.preferences?.timezone === 'string'
+      ? user.preferences.timezone
+      : null;
+    const deviceTimezone = getDeviceTimezone();
+
+    if (!shouldSyncTimezone(currentTimezone, deviceTimezone)) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        await api.updatePreferences({ timezone: deviceTimezone });
+        if (cancelled) return;
+
+        const nextUser = {
+          ...user,
+          preferences: {
+            ...(user.preferences || {}),
+            timezone: deviceTimezone,
+          },
+        };
+
+        persistUser(nextUser);
+        setState((current) => {
+          if (current.user?.id !== user.id) return current;
+          return {
+            ...current,
+            user: nextUser,
+          };
+        });
+      } catch {
+        // Best-effort sync; try again on a future refresh.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [persistUser, state.user]);
+
   const login = useCallback(async (email: string, password: string) => {
     const session = await api.login(email, password);
     return applySession(session);
@@ -312,6 +359,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
+      const { unregisterCurrentDevice } = await import('./notifications');
+      await unregisterCurrentDevice();
       await api.logout();
     } finally {
       await resetSubscriptionIdentity();

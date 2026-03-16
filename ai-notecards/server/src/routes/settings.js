@@ -148,6 +148,17 @@ function validatePreferences(input) {
     if (typeof input.analytics_opt_out !== 'boolean') return null;
     clean.analytics_opt_out = input.analytics_opt_out;
   }
+  if ('timezone' in input) {
+    if (typeof input.timezone !== 'string') return null;
+    const timezone = input.timezone.trim();
+    if (timezone.length === 0 || timezone.length > 100) return null;
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: timezone }).format(new Date());
+    } catch {
+      return null;
+    }
+    clean.timezone = timezone;
+  }
   return clean;
 }
 

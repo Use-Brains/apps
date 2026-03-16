@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { borderRadius, fontSize, spacing, useThemedStyles } from '@/lib/theme';
+import { haptics } from '@/lib/haptics';
 import type { AppTheme } from '@/lib/theme';
 import type { OfflineCard } from '@/lib/offline/types';
 
@@ -14,8 +15,17 @@ export function StudySessionCard({
 }) {
   const styles = useThemedStyles(createStyles);
 
+  const handleReveal = () => {
+    if (showAnswer) {
+      return;
+    }
+
+    void haptics.reveal();
+    onReveal();
+  };
+
   return (
-    <Pressable style={styles.card} onPress={onReveal}>
+    <Pressable style={styles.card} onPress={handleReveal}>
       <Text style={styles.label}>Prompt</Text>
       <Text style={styles.front}>{card.front}</Text>
       {showAnswer ? (

@@ -6,6 +6,20 @@ import pool from '../db/pool.js';
 
 const router = Router();
 
+function getMarketplacePurchaseAvailability() {
+  const iosNativeWebCheckoutEnabled = process.env.IOS_MARKETPLACE_WEB_PURCHASES_ENABLED !== 'false';
+
+  return {
+    ios_native: {
+      enabled: iosNativeWebCheckoutEnabled,
+      code: iosNativeWebCheckoutEnabled ? null : 'IOS_MARKETPLACE_WEB_PURCHASES_DISABLED',
+      message: iosNativeWebCheckoutEnabled
+        ? null
+        : 'Marketplace purchases are temporarily disabled in the iOS app.',
+    },
+  };
+}
+
 // Auto-approve listings stuck in pending_review after 60s (manual review fallback)
 let lastCleanup = 0;
 async function maybeAutoApprove() {
@@ -103,7 +117,12 @@ router.get('/', async (req, res) => {
     }
 
     res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
-    res.json({ listings, nextCursor, hasMore });
+    res.json({
+      listings,
+      nextCursor,
+      hasMore,
+      purchaseAvailability: getMarketplacePurchaseAvailability(),
+    });
   } catch (err) {
     console.error('Marketplace browse error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -168,6 +187,7 @@ router.get('/:id', async (req, res) => {
       totalCards,
       sampleCards,
       previewCount,
+      purchaseAvailability: getMarketplacePurchaseAvailability(),
     });
   } catch (err) {
     console.error('Listing detail error:', err);
@@ -221,8 +241,12 @@ router.post('/:id/flag', requireXHR, authenticate, requireActiveUser, async (req
 // Purchase — create Stripe Checkout session
 router.post('/:id/purchase', requireXHR, authenticate, requireActiveUser, async (req, res) => {
   try {
-    if (req.get('X-Client-Platform') === 'ios-native' && process.env.IOS_MARKETPLACE_WEB_PURCHASES_ENABLED === 'false') {
-      return res.status(409).json({ error: 'Marketplace purchases on iOS are currently disabled', code: 'IOS_MARKETPLACE_WEB_PURCHASES_DISABLED' });
+    const purchaseAvailability = getMarketplacePurchaseAvailability();
+    if (req.get('X-Client-Platform') === 'ios-native' && purchaseAvailability.ios_native.enabled === false) {
+      return res.status(409).json({
+        error: purchaseAvailability.ios_native.message,
+        code: purchaseAvailability.ios_native.code,
+      });
     }
     const url = await createPurchaseCheckout(req.userId, req.params.id);
     res.json({ url });

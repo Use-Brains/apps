@@ -2,6 +2,8 @@ import { Alert, Linking, Pressable, StyleSheet, Switch, Text, View } from 'react
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/api';
+import { isHapticsEnabled, setHapticsEnabled } from '@/lib/haptics';
+import { useNotifications } from '@/lib/notifications';
 import { useNetwork } from '@/lib/network';
 import { ManageDownloads } from '@/components/downloads/ManageDownloads';
 import { getOfflineFeatureMessage, getOfflineStatsLabel } from '@/lib/offline/ui';
@@ -13,10 +15,16 @@ import type { PurchasesPackage } from 'react-native-purchases';
 export default function ProfileScreen() {
   const styles = useThemedStyles(createStyles);
   const { biometricEnabled, enableBiometricLock, disableBiometricLock, logout, user, refreshUser } = useAuth();
+  const { pushStatus, syncPushRegistration } = useNotifications();
   const { isOnline } = useNetwork();
   const [packages, setPackages] = useState<PurchasesPackage[]>([]);
   const [billingBusy, setBillingBusy] = useState(false);
+  const [preferencesBusy, setPreferencesBusy] = useState(false);
+  const [hapticsEnabled, setLocalHapticsEnabled] = useState(isHapticsEnabled());
   const subscriptionPlatform = user?.subscriptionPlatform;
+  const notificationPreferences = user?.preferences?.notifications as Record<string, unknown> | undefined;
+  const studyRemindersEnabled = notificationPreferences?.study_reminders !== false;
+  const marketplaceActivityEnabled = notificationPreferences?.marketplace_activity !== false;
 
   const handleToggleBiometric = async (enabled: boolean) => {
     if (!enabled) {
@@ -33,6 +41,42 @@ export default function ProfileScreen() {
     } catch (error) {
       Alert.alert('Logout failed', error instanceof Error ? error.message : 'Please try again');
     }
+  };
+
+  const handleTogglePreference = async (key: 'study_reminders' | 'marketplace_activity', value: boolean) => {
+    try {
+      setPreferencesBusy(true);
+      await api.updatePreferences({
+        notifications: {
+          [key]: value,
+        },
+      });
+      await refreshUser();
+    } catch (error) {
+      Alert.alert('Unable to update preference', error instanceof Error ? error.message : 'Please try again');
+    } finally {
+      setPreferencesBusy(false);
+    }
+  };
+
+  const handleEnablePush = async () => {
+    if (!isOnline) {
+      Alert.alert('Offline', getOfflineFeatureMessage('marketplace'));
+      return;
+    }
+
+    const ok = await syncPushRegistration({ requestPermissions: true });
+    if (ok) {
+      Alert.alert('Notifications enabled', 'This device can now receive study reminders and marketplace alerts.');
+      return;
+    }
+
+    if (pushStatus === 'denied') {
+      Alert.alert('Notifications blocked', 'Enable notifications for AI Notecards in iOS Settings to receive reminders and marketplace updates.');
+      return;
+    }
+
+    Alert.alert('Notifications unavailable', 'Push registration could not be completed on this device yet.');
   };
 
   useEffect(() => {
@@ -140,6 +184,54 @@ export default function ProfileScreen() {
           <Text style={styles.rowSubtitle}>Require Face ID or Touch ID before reopening the app on this device.</Text>
         </View>
         <Switch value={biometricEnabled} onValueChange={(value) => void handleToggleBiometric(value)} />
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.rowTitle}>Notifications</Text>
+        <Text style={styles.rowSubtitle}>
+          Enable push on this device after sign-in, then choose which reminders and marketplace events you want.
+        </Text>
+        <Pressable style={styles.primaryButton} onPress={() => void handleEnablePush()} disabled={preferencesBusy}>
+          <Text style={styles.primaryButtonText}>
+            {pushStatus === 'granted' ? 'Refresh Push Registration' : 'Enable Push Notifications'}
+          </Text>
+        </Pressable>
+        <View style={styles.row}>
+          <View style={styles.copy}>
+            <Text style={styles.rowTitle}>Study reminders</Text>
+            <Text style={styles.rowSubtitle}>Daily reminders and streak-at-risk nudges.</Text>
+          </View>
+          <Switch
+            value={studyRemindersEnabled}
+            onValueChange={(value) => void handleTogglePreference('study_reminders', value)}
+            disabled={preferencesBusy}
+          />
+        </View>
+        <View style={styles.row}>
+          <View style={styles.copy}>
+            <Text style={styles.rowTitle}>Marketplace activity</Text>
+            <Text style={styles.rowSubtitle}>Deck sales and purchased deck ready alerts.</Text>
+          </View>
+          <Switch
+            value={marketplaceActivityEnabled}
+            onValueChange={(value) => void handleTogglePreference('marketplace_activity', value)}
+            disabled={preferencesBusy}
+          />
+        </View>
+      </View>
+
+      <View style={styles.row}>
+        <View style={styles.copy}>
+          <Text style={styles.rowTitle}>Haptics</Text>
+          <Text style={styles.rowSubtitle}>Use light tactile feedback during study interactions on this device.</Text>
+        </View>
+        <Switch
+          value={hapticsEnabled}
+          onValueChange={(value) => {
+            setHapticsEnabled(value);
+            setLocalHapticsEnabled(value);
+          }}
+        />
       </View>
 
       <View style={styles.section}>

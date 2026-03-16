@@ -3,10 +3,11 @@ import assert from 'node:assert/strict';
 
 import { syncOfflineStudySessions } from './study-sync.js';
 
-function createClient({ sessionsByUser = new Map(), ownedDecks = new Set() } = {}) {
+function createClient({ sessionsByUser = new Map(), ownedDecks = new Set(), preferencesByUser = new Map() } = {}) {
   const state = {
     sessionsByUser: new Map(sessionsByUser),
     ownedDecks: new Set(ownedDecks),
+    preferencesByUser: new Map(preferencesByUser),
     insertedSessions: [],
     rollbacks: 0,
     commits: 0,
@@ -23,6 +24,14 @@ function createClient({ sessionsByUser = new Map(), ownedDecks = new Set() } = {
       if (sql === 'ROLLBACK') {
         state.rollbacks += 1;
         return { rows: [], rowCount: 0 };
+      }
+
+      if (sql.includes('SELECT preferences FROM users')) {
+        const [userId] = params;
+        return {
+          rows: [{ preferences: state.preferencesByUser.get(userId) || {} }],
+          rowCount: 1,
+        };
       }
 
       if (sql.includes('SELECT id, updated_at FROM decks')) {
@@ -109,6 +118,7 @@ function createClient({ sessionsByUser = new Map(), ownedDecks = new Set() } = {
 test('syncOfflineStudySessions rejects sessions too far in the future', async () => {
   const client = createClient({
     ownedDecks: new Set(['user-1:deck-1']),
+    preferencesByUser: new Map([['user-1', { timezone: 'UTC' }]]),
   });
 
   await assert.rejects(
@@ -132,6 +142,7 @@ test('syncOfflineStudySessions rejects sessions too far in the future', async ()
 test('syncOfflineStudySessions dedupes repeated client_session_id values', async () => {
   const client = createClient({
     ownedDecks: new Set(['user-1:deck-1']),
+    preferencesByUser: new Map([['user-1', { timezone: 'UTC' }]]),
     sessionsByUser: new Map([
       ['user-1', [{
         client_session_id: '4d9cbf27-7f1a-4a7b-aa41-77199eae3851',
@@ -168,6 +179,7 @@ test('syncOfflineStudySessions dedupes repeated client_session_id values', async
 test('syncOfflineStudySessions recomputes streaks from stored completion dates', async () => {
   const client = createClient({
     ownedDecks: new Set(['user-1:deck-1']),
+    preferencesByUser: new Map([['user-1', { timezone: 'UTC' }]]),
     sessionsByUser: new Map([
       ['user-1', [
         {
@@ -210,6 +222,7 @@ test('syncOfflineStudySessions recomputes streaks from stored completion dates',
 test('syncOfflineStudySessions accepts historical sessions even if the live deck changed after download', async () => {
   const client = createClient({
     ownedDecks: new Set(['user-1:deck-1']),
+    preferencesByUser: new Map([['user-1', { timezone: 'UTC' }]]),
   });
 
   const result = await syncOfflineStudySessions(client, 'user-1', {
@@ -228,4 +241,39 @@ test('syncOfflineStudySessions accepts historical sessions even if the live deck
 
   assert.equal(result.acceptedSessionIds.length, 1);
   assert.equal(client.state.insertedSessions[0].deck_snapshot_updated_at, '2026-03-10T09:00:00.000Z');
+});
+
+test('syncOfflineStudySessions uses the stored user timezone for streak boundaries', async () => {
+  const client = createClient({
+    ownedDecks: new Set(['user-1:deck-1']),
+    preferencesByUser: new Map([['user-1', { timezone: 'America/Los_Angeles' }]]),
+    sessionsByUser: new Map([
+      ['user-1', [
+        {
+          client_session_id: 'old-1',
+          completed_at: '2026-03-14T07:30:00.000Z',
+        },
+      ]],
+    ]),
+  });
+
+  const result = await syncOfflineStudySessions(client, 'user-1', {
+    now: new Date('2026-03-15T12:00:00.000Z'),
+    sessions: [{
+      client_session_id: 'session-2',
+      deck_id: 'deck-1',
+      mode: 'flip',
+      total_cards: 10,
+      correct: 8,
+      started_at: '2026-03-15T07:20:00.000Z',
+      completed_at: '2026-03-15T07:30:00.000Z',
+      deck_snapshot_updated_at: '2026-03-14T07:00:00.000Z',
+    }],
+  });
+
+  assert.deepEqual(result.streak, {
+    current_streak: 2,
+    longest_streak: 2,
+    last_study_date: '2026-03-15',
+  });
 });

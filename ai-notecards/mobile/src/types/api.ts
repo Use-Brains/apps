@@ -15,6 +15,7 @@ export type ApiUser = {
   seller_terms_accepted_at: string | null;
   connect_payouts_enabled: boolean;
   created_at: string;
+  preferences?: Record<string, unknown>;
 };
 
 export type User = {
@@ -34,6 +35,7 @@ export type User = {
   sellerTermsAccepted: boolean;
   stripeConnectOnboarded: boolean;
   createdAt: string;
+  preferences: Record<string, unknown>;
 };
 
 export type AuthSessionResponse = {
@@ -104,6 +106,14 @@ export type MarketplaceListing = {
   tags: string[];
   previewCards: Card[];
   createdAt: string;
+};
+
+export type MarketplacePurchaseAvailability = {
+  ios_native: {
+    enabled: boolean;
+    code: string | null;
+    message: string | null;
+  };
 };
 
 export type MarketplaceCategory = {

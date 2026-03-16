@@ -8,6 +8,7 @@ import { getStripe } from '../services/stripe.js';
 import pool from '../db/pool.js';
 import { trackServerEvent } from '../services/analytics.js';
 import { calculateSellerEarningsCents, getStripePriceIdForPeriod, reconcileUserBillingState } from '../services/billing.js';
+import { notifyUser } from '../services/notifications.js';
 
 const router = Router();
 
@@ -294,11 +295,32 @@ router.post('/webhook', async (req, res) => {
               WHERE p.id = $1
             `, [result.purchaseId]);
 
-            if (emailData) {
-              const earnings = calculateSellerEarningsCents(emailData.price_cents);
-              Promise.allSettled([
-                sendTransactionalEmail('sale_notification', emailData.seller_email, {
-                  title: emailData.title,
+	            if (emailData) {
+	              const earnings = calculateSellerEarningsCents(emailData.price_cents);
+	              Promise.allSettled([
+	                notifyUser(pool, meta.seller_id, {
+	                  type: 'marketplace_sale',
+	                  title: 'Deck sold',
+	                  body: `${emailData.title} was purchased.`,
+	                  url: `${process.env.CLIENT_URL}/seller/dashboard`,
+	                  metadata: { listingId: meta.listing_id },
+	                }, { preferenceKey: 'marketplace_activity' }),
+	                notifyUser(pool, meta.buyer_id, {
+	                  type: 'purchase_ready',
+	                  title: 'Deck ready',
+	                  body: `${emailData.title} is now in your library.`,
+	                  url: `${process.env.CLIENT_URL}/dashboard?purchased=true`,
+	                  metadata: { listingId: meta.listing_id },
+	                }, { preferenceKey: 'marketplace_activity' }),
+	              ]).then(results => {
+	                results.filter(r => r.status === 'rejected').forEach(r =>
+	                  console.error('Push notification failed:', r.reason)
+	                );
+	              });
+
+	              Promise.allSettled([
+	                sendTransactionalEmail('sale_notification', emailData.seller_email, {
+	                  title: emailData.title,
                   earnings,
                 }),
                 sendTransactionalEmail('purchase_confirmation', emailData.buyer_email, {

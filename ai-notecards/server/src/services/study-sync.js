@@ -1,3 +1,5 @@
+import { computeStreakMetrics, getUserTimezone } from './study-timezone.js';
+
 const ALLOWED_MODES = new Set(['flip', 'multiple_choice', 'type_answer', 'match']);
 const MIN_CARDS = {
   flip: 1,
@@ -20,10 +22,6 @@ function normalizeDate(value, fieldName) {
   }
 
   return parsed;
-}
-
-function toUtcDateKey(value) {
-  return value.toISOString().slice(0, 10);
 }
 
 function validateSyncedSession(session, now) {
@@ -78,55 +76,6 @@ function validateSyncedSession(session, now) {
   };
 }
 
-function computeStreakMetrics(completedAtValues) {
-  const uniqueDates = [...new Set(completedAtValues.map((value) => toUtcDateKey(new Date(value))))].sort();
-
-  if (uniqueDates.length === 0) {
-    return {
-      current_streak: 0,
-      longest_streak: 0,
-      last_study_date: null,
-    };
-  }
-
-  let longest = 1;
-  let currentRun = 1;
-
-  for (let index = 1; index < uniqueDates.length; index += 1) {
-    const previous = new Date(`${uniqueDates[index - 1]}T00:00:00.000Z`);
-    const current = new Date(`${uniqueDates[index]}T00:00:00.000Z`);
-    const dayDelta = (current.getTime() - previous.getTime()) / (24 * 60 * 60 * 1000);
-
-    if (dayDelta === 1) {
-      currentRun += 1;
-      longest = Math.max(longest, currentRun);
-      continue;
-    }
-
-    currentRun = 1;
-  }
-
-  let trailingRun = 1;
-  for (let index = uniqueDates.length - 1; index > 0; index -= 1) {
-    const current = new Date(`${uniqueDates[index]}T00:00:00.000Z`);
-    const previous = new Date(`${uniqueDates[index - 1]}T00:00:00.000Z`);
-    const dayDelta = (current.getTime() - previous.getTime()) / (24 * 60 * 60 * 1000);
-
-    if (dayDelta === 1) {
-      trailingRun += 1;
-      continue;
-    }
-
-    break;
-  }
-
-  return {
-    current_streak: trailingRun,
-    longest_streak: longest,
-    last_study_date: uniqueDates[uniqueDates.length - 1],
-  };
-}
-
 export async function syncOfflineStudySessions(client, userId, payload) {
   const now = payload?.now instanceof Date ? payload.now : new Date();
   const sessions = Array.isArray(payload?.sessions) ? payload.sessions : [];
@@ -145,6 +94,12 @@ export async function syncOfflineStudySessions(client, userId, payload) {
   await client.query('BEGIN');
 
   try {
+    const userResult = await client.query(
+      'SELECT preferences FROM users WHERE id = $1',
+      [userId],
+    );
+    const timezone = getUserTimezone(userResult.rows[0]?.preferences);
+
     for (const session of normalizedSessions) {
       const deckResult = await client.query(
         'SELECT id, updated_at FROM decks WHERE id = $1 AND user_id = $2',
@@ -201,7 +156,7 @@ export async function syncOfflineStudySessions(client, userId, payload) {
       [userId],
     );
 
-    const streak = computeStreakMetrics(sessionRows.rows.map((row) => row.completed_at));
+    const streak = computeStreakMetrics(sessionRows.rows.map((row) => row.completed_at), timezone);
 
     await client.query(
       `UPDATE users SET

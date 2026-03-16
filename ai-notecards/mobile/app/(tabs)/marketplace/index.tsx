@@ -6,6 +6,7 @@ import { useNetwork } from '@/lib/network';
 import { getOfflineFeatureMessage } from '@/lib/offline/ui';
 import { fontSize, spacing, useThemedStyles } from '@/lib/theme';
 import type { AppTheme } from '@/lib/theme';
+import type { MarketplacePurchaseAvailability } from '@/types/api';
 
 type MarketplaceListResponse = {
   listings: Array<{
@@ -15,6 +16,7 @@ type MarketplaceListResponse = {
     price_cents: number;
     seller_name: string;
   }>;
+  purchaseAvailability?: MarketplacePurchaseAvailability;
 };
 
 export default function MarketplaceScreen() {
@@ -22,6 +24,7 @@ export default function MarketplaceScreen() {
   const router = useRouter();
   const { isOnline } = useNetwork();
   const [listings, setListings] = useState<MarketplaceListResponse['listings']>([]);
+  const [purchaseAvailability, setPurchaseAvailability] = useState<MarketplacePurchaseAvailability | null>(null);
 
   useEffect(() => {
     if (!isOnline) {
@@ -32,11 +35,15 @@ export default function MarketplaceScreen() {
       try {
         const data = await api.getMarketplace({});
         setListings((data as MarketplaceListResponse).listings ?? []);
+        setPurchaseAvailability((data as MarketplaceListResponse).purchaseAvailability ?? null);
       } catch {
         setListings([]);
+        setPurchaseAvailability(null);
       }
     })();
-  }, []);
+  }, [isOnline]);
+
+  const iosPurchasesEnabled = purchaseAvailability?.ios_native.enabled !== false;
 
   return (
     <View style={styles.container}>
@@ -44,6 +51,13 @@ export default function MarketplaceScreen() {
       <Text style={styles.subtitle}>
         {isOnline ? 'Browse and purchase flashcard decks' : getOfflineFeatureMessage('marketplace')}
       </Text>
+      {isOnline && !iosPurchasesEnabled ? (
+        <View style={styles.banner}>
+          <Text style={styles.bannerText}>
+            {purchaseAvailability?.ios_native.message || 'Marketplace purchases are temporarily disabled in the iOS app.'}
+          </Text>
+        </View>
+      ) : null}
       <View style={styles.list}>
         {!isOnline ? (
           <Text style={styles.cardSubtitle}>Reconnect to browse listings and purchase decks.</Text>
@@ -86,6 +100,17 @@ const createStyles = ({ colors }: AppTheme) =>
     },
     list: {
       gap: spacing.md,
+    },
+    banner: {
+      borderRadius: 16,
+      padding: spacing.md,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    bannerText: {
+      color: colors.textSecondary,
+      fontSize: fontSize.sm,
     },
     card: {
       padding: spacing.lg,
