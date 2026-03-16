@@ -181,19 +181,58 @@ export async function generateCardsWithVision(input, files) {
       }),
       timeoutPromise,
     ]);
+  } catch (err) {
+    err.code = err.code || 'VISION_PROVIDER_ERROR';
+    err.visionMeta = {
+      provider: 'gemini',
+      model: 'gemini-2.5-flash-lite',
+      fileCount: files.length,
+      hasInputText: !!input?.trim(),
+      message: err.message,
+    };
+    throw err;
   } finally {
     clearTimeout(timeoutId);
   }
 
   const text = response.text;
   if (!text || text.trim().length === 0) {
-    throw new Error('AI returned empty response. The image may have been blocked by content filters.');
+    const err = new Error('AI returned empty response. The image may have been blocked by content filters.');
+    err.code = 'VISION_EMPTY_RESPONSE';
+    err.visionMeta = {
+      provider: 'gemini',
+      model: 'gemini-2.5-flash-lite',
+      fileCount: files.length,
+      hasInputText: !!input?.trim(),
+    };
+    throw err;
   }
 
-  const result = JSON.parse(text);
+  let result;
+  try {
+    result = JSON.parse(text);
+  } catch (err) {
+    err.code = 'VISION_INVALID_JSON';
+    err.visionMeta = {
+      provider: 'gemini',
+      model: 'gemini-2.5-flash-lite',
+      fileCount: files.length,
+      hasInputText: !!input?.trim(),
+      responseLength: text.length,
+    };
+    throw err;
+  }
+
   if (!result.cards?.length) {
     const err = new Error('No flashcards could be generated from the provided images.');
     err.code = 'NO_CARDS';
+    err.visionMeta = {
+      provider: 'gemini',
+      model: 'gemini-2.5-flash-lite',
+      fileCount: files.length,
+      hasInputText: !!input?.trim(),
+      responseKeys: Object.keys(result),
+    };
     throw err;
   }
 

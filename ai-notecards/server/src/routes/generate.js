@@ -10,6 +10,31 @@ import pool from '../db/pool.js';
 
 const router = Router();
 
+function summarizeVisionFiles(files = []) {
+  return files.map((file, index) => ({
+    index,
+    mime: file.detectedMime || file.mimetype,
+    sizeBytes: file.size,
+  }));
+}
+
+function logVisionFailure(req, err) {
+  console.error('Vision generation error:', {
+    userId: req.userId,
+    errorCode: err.code || 'UNKNOWN',
+    message: err.message,
+    generationCount: req.generationCount,
+    generationLimit: req.generationLimit,
+    activeVisionRequests,
+    hasInputText: !!req.body?.input?.trim(),
+    inputLength: req.body?.input?.length || 0,
+    titleLength: req.body?.title?.length || 0,
+    fileCount: req.files?.length || 0,
+    files: summarizeVisionFiles(req.files),
+    visionMeta: err.visionMeta || null,
+  });
+}
+
 // Rate limiter — JSON message so client's request() can parse it
 const generateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -116,10 +141,10 @@ router.post(
         try {
           cards = await generateCardsWithVision(input, req.files);
         } catch (err) {
+          logVisionFailure(req, err);
           if (err.code === 'NO_CARDS') {
             return res.status(422).json({ error: err.message });
           }
-          console.error('Vision generation error:', err);
           return res.status(502).json({
             error: 'Photo processing failed. Try clearer photos, or remove them to generate from text.',
           });
