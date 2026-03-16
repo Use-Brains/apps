@@ -90,6 +90,64 @@ cd client && npm run dev    # http://localhost:5173
 
 Open http://localhost:5173
 
+## iOS Mobile Development
+
+The iOS app lives in [mobile](/Users/kashane/app-dev/apps/ai-notecards/mobile) and should be developed as a custom Expo dev client app, not as an Expo Go-only app.
+
+### One-Time Setup
+
+```bash
+cd /Users/kashane/app-dev/apps/ai-notecards/mobile
+npm install
+cp .env.example .env
+```
+
+Set at least:
+
+```env
+APP_ENV=development
+EXPO_PUBLIC_API_URL=http://localhost:3001/api
+```
+
+If you later initialize EAS for this app, also set:
+
+```env
+EXPO_PUBLIC_EAS_PROJECT_ID=your-eas-project-id
+```
+
+### Local iOS Workflow
+
+Start the backend and Metro together from the repo root:
+
+```bash
+cd /Users/kashane/app-dev/apps/ai-notecards
+npm run app
+```
+
+Install the local simulator dev build when needed:
+
+```bash
+npm run app:ios:simulator
+```
+
+This uses `APP_ENV=development`, which keeps the app on a non-production bundle identifier and disables production-only iOS capabilities that should not block routine simulator work.
+It should install to the iOS Simulator without requiring code signing.
+The mobile script also pre-generates React Native iOS codegen artifacts before invoking `expo run:ios`.
+
+### EAS Build Profiles
+
+- `npm run app:ios:device` — development device build
+- `npm run app:ios:preview` — internal QA / preview build
+- `npm run app:ios:production` — production App Store build
+
+### App Environments
+
+- `development` — local simulator / local dev client
+- `preview` — internal testing with production-like capabilities
+- `production` — final shipping app identity
+
+The environment-specific app identity is defined in [mobile/app.config.js](/Users/kashane/app-dev/apps/ai-notecards/mobile/app.config.js).
+
 ## Database
 
 Migrations are versioned SQL files in `server/src/db/migrations/`:

@@ -1,0 +1,14 @@
+{
+  "name": "ai-notecards",
+  "private": true,
+  "scripts": {
+    "app": "node scripts/app.mjs",
+    "app:server": "npm --prefix server run dev",
+    "app:mobile": "npm --prefix mobile run start:dev-client",
+    "app:ios:simulator": "npm --prefix mobile run ios:simulator",
+    "app:ios:device": "npm --prefix mobile run build:ios:development",
+    "app:ios:preview": "npm --prefix mobile run build:ios:preview",
+    "app:ios:production": "npm --prefix mobile run build:ios:production",
+    "inspect:ios:config": "node scripts/inspect-mobile-config.mjs"
+  }
+}
