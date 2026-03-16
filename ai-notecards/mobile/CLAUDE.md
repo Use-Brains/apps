@@ -22,7 +22,10 @@ src/
     api.ts              # HTTP client with Bearer token auth
     auth.tsx            # AuthProvider + useAuth hook
     mmkv.ts             # MMKV storage with SecureStore fallback
+    network.tsx         # Reachability + foreground sync provider
+    offline/            # SQLite schema, repository, download/sync helpers
     query-client.ts     # TanStack Query client + MMKV persister + PERSISTABLE_ROOTS
+    study/              # Local study session orchestration + mode metadata
     theme.ts            # Theme system (mode × style × palette)
   types/
     api.ts              # Canonical API types (User, Deck, Card, StudyMode, etc.)
@@ -37,8 +40,10 @@ ThemeProvider
   ErrorBoundary          ← uses useThemedStyles (requires ThemeProvider)
     PersistQueryClientProvider
       AuthProvider
-        AuthGate         ← redirects unauthenticated users to (auth)/login
-          Slot
+        NetworkProvider  ← offline sync + downloaded deck refresh triggers
+          AuthGate       ← redirects unauthenticated users to (auth)/login
+            OfflineBanner
+            Slot
 ```
 
 Each layer is intentionally ordered — do not reorder without understanding the dependency chain.
@@ -83,9 +88,19 @@ const PERSISTABLE_ROOTS = new Set(['decks', 'marketplace', 'study']);
 | Layer | Module | Use for |
 |-------|--------|---------|
 | MMKV | `src/lib/mmkv.ts` | Fast non-sensitive data (query cache, theme prefs, user cache) |
+| SQLite | `src/lib/offline/*` | Durable offline deck snapshots + pending study session queue |
 | SecureStore | `expo-secure-store` | Access + refresh tokens only (`WHEN_UNLOCKED_THIS_DEVICE_ONLY`) |
 
 SecureStore has a 2 KB value limit — store only tokens, not user data.
+
+## Offline Study Architecture
+
+- SQLite is the source of truth for downloaded decks, cards, and pending study sessions.
+- MMKV-backed React Query persistence is still used for warm cache hydration, but not for durable offline study state.
+- `src/lib/offline/downloads.ts` handles deck snapshot save/refresh work.
+- `src/lib/offline/sync.ts` batches queued study sessions to `/api/study/sync`.
+- `src/lib/network.tsx` listens to reachability + foreground transitions and triggers best-effort sync/refresh.
+- The first offline study cut uses a simple local card-review loop in `app/study/[deckId].tsx`.
 
 ## Expo Router v4 Navigation
 
@@ -112,6 +127,7 @@ npx expo start          # Start Expo dev server (Expo Go)
 npx expo start --ios    # Start with iOS simulator
 npm run typecheck       # TypeScript check (tsc --noEmit)
 npm run lint            # Expo lint
+node ./node_modules/vitest/vitest.mjs run  # Run unit tests with Node 22 in this repo
 ```
 
 ## AI Output Contract

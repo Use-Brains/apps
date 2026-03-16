@@ -136,8 +136,9 @@ Server env vars in `server/.env` (see `server/.env.example`):
 | POST | `/api/decks/:id/cards` | Add a card to a deck |
 | PATCH | `/api/decks/:deckId/cards/:cardId` | Update a card's front/back text |
 | DELETE | `/api/decks/:deckId/cards/:cardId` | Delete a card |
-| POST | `/api/study/start` | Start study session |
+| POST | `/api/study` | Start study session |
 | PATCH | `/api/study/:id` | Complete session (increments study_score) |
+| POST | `/api/study/sync` | Sync offline-completed study sessions |
 | GET/PATCH | `/api/settings` | Profile management |
 | POST | `/api/account/avatar` | Upload avatar (JPEG/PNG, max 2MB) |
 | DELETE | `/api/account/avatar` | Remove avatar |
