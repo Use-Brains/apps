@@ -2,6 +2,9 @@ import { Alert, Linking, Pressable, StyleSheet, Switch, Text, View } from 'react
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/api';
+import { useNetwork } from '@/lib/network';
+import { ManageDownloads } from '@/components/downloads/ManageDownloads';
+import { getOfflineFeatureMessage, getOfflineStatsLabel } from '@/lib/offline/ui';
 import { canUseRevenueCat, getAvailablePackages, hasActiveProEntitlement, purchaseSubscription, restoreSubscriptions } from '@/lib/subscriptions';
 import { fontSize, spacing, useThemedStyles } from '@/lib/theme';
 import type { AppTheme } from '@/lib/theme';
@@ -10,6 +13,7 @@ import type { PurchasesPackage } from 'react-native-purchases';
 export default function ProfileScreen() {
   const styles = useThemedStyles(createStyles);
   const { biometricEnabled, enableBiometricLock, disableBiometricLock, logout, user, refreshUser } = useAuth();
+  const { isOnline } = useNetwork();
   const [packages, setPackages] = useState<PurchasesPackage[]>([]);
   const [billingBusy, setBillingBusy] = useState(false);
   const subscriptionPlatform = user?.subscriptionPlatform;
@@ -89,6 +93,10 @@ export default function ProfileScreen() {
   };
 
   const handleManageSubscription = async () => {
+    if (!isOnline) {
+      Alert.alert('Offline', getOfflineFeatureMessage('billing'));
+      return;
+    }
     try {
       setBillingBusy(true);
       if (subscriptionPlatform === 'apple') {
@@ -106,6 +114,10 @@ export default function ProfileScreen() {
   };
 
   const handleUpgradeOnWeb = async (billingPeriod: 'monthly' | 'annual') => {
+    if (!isOnline) {
+      Alert.alert('Offline', getOfflineFeatureMessage('billing'));
+      return;
+    }
     try {
       setBillingBusy(true);
       const data = await api.createStripeCheckout(billingPeriod);
@@ -137,6 +149,9 @@ export default function ProfileScreen() {
             ? `You are on Pro${subscriptionPlatform ? ` via ${subscriptionPlatform}` : ''}.`
             : 'Upgrade to Pro to unlock unlimited decks and selling.'}
         </Text>
+        {!isOnline ? (
+          <Text style={styles.helperText}>{getOfflineStatsLabel(false)}</Text>
+        ) : null}
         {user?.cancelAtPeriodEnd && user.cancelAt ? (
           <Text style={styles.helperText}>
             Access remains active until {new Date(user.cancelAt).toLocaleDateString()}.
@@ -175,6 +190,10 @@ export default function ProfileScreen() {
             )}
           </>
         )}
+      </View>
+
+      <View style={styles.section}>
+        <ManageDownloads />
       </View>
 
       <Pressable style={styles.logoutButton} onPress={() => void handleLogout()}>

@@ -36,7 +36,8 @@
       "expo-apple-authentication",
       "expo-secure-store",
       "expo-image-picker",
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+      "expo-sqlite"
     ],
     "extra": {
       "router": {},

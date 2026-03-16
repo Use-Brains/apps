@@ -1,14 +1,21 @@
 import { View, Text, StyleSheet } from 'react-native';
+import { useNetwork } from '@/lib/network';
+import { getOfflineFeatureMessage } from '@/lib/offline/ui';
 import { fontSize, spacing, useThemedStyles } from '@/lib/theme';
 import type { AppTheme } from '@/lib/theme';
 
 export default function GenerateScreen() {
   const styles = useThemedStyles(createStyles);
+  const { isOnline } = useNetwork();
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Generate Flashcards</Text>
-      <Text style={styles.subtitle}>Paste notes or type a topic to create study cards</Text>
+      <Text style={styles.subtitle}>
+        {isOnline
+          ? 'Paste notes or type a topic to create study cards'
+          : getOfflineFeatureMessage('generate')}
+      </Text>
     </View>
   );
 }

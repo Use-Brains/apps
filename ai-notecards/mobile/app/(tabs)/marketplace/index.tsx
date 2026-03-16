@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { api } from '@/lib/api';
+import { useNetwork } from '@/lib/network';
+import { getOfflineFeatureMessage } from '@/lib/offline/ui';
 import { fontSize, spacing, useThemedStyles } from '@/lib/theme';
 import type { AppTheme } from '@/lib/theme';
 
@@ -18,9 +20,14 @@ type MarketplaceListResponse = {
 export default function MarketplaceScreen() {
   const styles = useThemedStyles(createStyles);
   const router = useRouter();
+  const { isOnline } = useNetwork();
   const [listings, setListings] = useState<MarketplaceListResponse['listings']>([]);
 
   useEffect(() => {
+    if (!isOnline) {
+      setListings([]);
+      return;
+    }
     void (async () => {
       try {
         const data = await api.getMarketplace({});
@@ -34,10 +41,20 @@ export default function MarketplaceScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Marketplace</Text>
-      <Text style={styles.subtitle}>Browse and purchase flashcard decks</Text>
+      <Text style={styles.subtitle}>
+        {isOnline ? 'Browse and purchase flashcard decks' : getOfflineFeatureMessage('marketplace')}
+      </Text>
       <View style={styles.list}>
+        {!isOnline ? (
+          <Text style={styles.cardSubtitle}>Reconnect to browse listings and purchase decks.</Text>
+        ) : null}
         {listings.map((listing) => (
-          <Pressable key={listing.id} style={styles.card} onPress={() => router.push(`/(tabs)/marketplace/${listing.id}`)}>
+          <Pressable
+            key={listing.id}
+            style={[styles.card, !isOnline && styles.disabledCard]}
+            onPress={() => router.push(`/(tabs)/marketplace/${listing.id}`)}
+            disabled={!isOnline}
+          >
             <Text style={styles.cardTitle}>{listing.title}</Text>
             <Text style={styles.cardSubtitle} numberOfLines={2}>{listing.description}</Text>
             <Text style={styles.cardMeta}>
@@ -77,6 +94,9 @@ const createStyles = ({ colors }: AppTheme) =>
       borderColor: colors.border,
       backgroundColor: colors.surface,
       gap: spacing.sm,
+    },
+    disabledCard: {
+      opacity: 0.45,
     },
     cardTitle: {
       fontSize: fontSize.md,

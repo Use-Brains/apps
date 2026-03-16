@@ -6,6 +6,7 @@ AI-powered flashcard app with a peer-to-peer marketplace. Paste your notes or ty
 
 - **AI Generation** — Paste notes or type a topic, get 8–25 study flashcards in seconds (Groq + Gemini fallback)
 - **Study Mode** — Flip-card interface with keyboard shortcuts, progress tracking, and study score
+- **iOS Offline Study** — Download decks, study locally, and sync queued sessions when connectivity returns
 - **Deck Marketplace** — Browse, search, and buy flashcard decks from other users ($1–$5)
 - **Sell Your Decks** — List your best AI-generated decks and earn 50% of every sale via Stripe Connect
 - **Ratings & Reviews** — Rate purchased decks after studying, 1–5 stars
@@ -22,6 +23,7 @@ AI-powered flashcard app with a peer-to-peer marketplace. Paste your notes or ty
 | AI | Groq (llama-3.3-70b) primary, Google Gemini fallback |
 | Auth | bcrypt + JWT in httpOnly cookies |
 | Payments | Stripe Checkout (subscriptions) + Stripe Connect Express (marketplace) |
+| Mobile Offline | Expo SQLite + NetInfo + MMKV |
 
 ## Getting Started
 
@@ -65,6 +67,8 @@ GROQ_API_KEY=gsk_xxx
 GEMINI_API_KEY=your-gemini-key
 AI_PROVIDER=groq
 JWT_SECRET=your-jwt-secret
+RESEND_API_KEY=re_xxx
+RESEND_FROM_EMAIL=noreply@ai-notecards.com
 STRIPE_SECRET_KEY=sk_test_xxx
 STRIPE_WEBHOOK_SECRET=whsec_xxx
 STRIPE_CONNECT_WEBHOOK_SECRET=whsec_xxx
