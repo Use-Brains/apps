@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { authenticate, requireActiveUser } from '../middleware/auth.js';
 import { requireXHR } from '../middleware/csrf.js';
 import pool from '../db/pool.js';
@@ -12,7 +12,7 @@ const MIN_CARDS = { flip: 1, multiple_choice: 4, type_answer: 1, match: 6 };
 const syncLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 60,
-  keyGenerator: (req) => req.userId || req.ip,
+  keyGenerator: (req) => req.userId || ipKeyGenerator(req.ip),
   standardHeaders: true,
   legacyHeaders: false,
 });

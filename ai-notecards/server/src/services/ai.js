@@ -66,7 +66,7 @@ function normalizeCardsPayload(payload) {
   return null;
 }
 
-function parseCards(text) {
+export function parseCards(text) {
   // Strip markdown code fences if the model wraps its response
   const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
   const parsed = JSON.parse(cleaned);
