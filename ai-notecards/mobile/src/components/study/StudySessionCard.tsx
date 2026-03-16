@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text } from 'react-native';
 import { borderRadius, fontSize, spacing, useThemedStyles } from '@/lib/theme';
 import { haptics } from '@/lib/haptics';
 import type { AppTheme } from '@/lib/theme';

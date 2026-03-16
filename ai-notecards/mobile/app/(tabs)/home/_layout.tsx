@@ -21,6 +21,13 @@ export default function HomeLayout() {
         headerTransparent: isGlass,
         headerShadowVisible: false,
       }}
-    />
+    >
+      <Stack.Screen
+        name="index"
+        options={{
+          headerShown: false,
+        }}
+      />
+    </Stack>
   );
 }

@@ -35,9 +35,9 @@ export type PendingSession = {
 
 export type OfflineDb = {
   execAsync: (sql: string) => Promise<unknown>;
-  runAsync: (sql: string, ...params: Array<string | number | null>) => Promise<unknown>;
-  getFirstAsync: <T>(sql: string, ...params: Array<string | number>) => Promise<T | null>;
-  getAllAsync: <T>(sql: string, ...params: Array<string | number>) => Promise<T[]>;
+  runAsync: (sql: string, ...params: (string | number | null)[]) => Promise<unknown>;
+  getFirstAsync: <T>(sql: string, ...params: (string | number)[]) => Promise<T | null>;
+  getAllAsync: <T>(sql: string, ...params: (string | number)[]) => Promise<T[]>;
 };
 
 export type OfflineDeckRow = {

@@ -349,7 +349,7 @@ export const api = {
     request('/study', { method: 'POST', body: JSON.stringify({ deckId, mode }) }),
   completeSession: (sessionId: string, correct: number, totalCards: number) =>
     request(`/study/${sessionId}`, { method: 'PATCH', body: JSON.stringify({ correct, totalCards }) }),
-  syncStudySessions: (sessions: Array<Record<string, unknown>>) =>
+  syncStudySessions: (sessions: Record<string, unknown>[]) =>
     request<{ acceptedSessionIds: string[]; dedupedSessionIds: string[]; streak?: Record<string, unknown> }>(
       '/study/sync',
       { method: 'POST', body: JSON.stringify({ sessions }) },

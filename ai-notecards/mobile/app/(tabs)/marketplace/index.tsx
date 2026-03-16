@@ -9,13 +9,13 @@ import type { AppTheme } from '@/lib/theme';
 import type { MarketplacePurchaseAvailability } from '@/types/api';
 
 type MarketplaceListResponse = {
-  listings: Array<{
+  listings: {
     id: string;
     title: string;
     description: string;
     price_cents: number;
     seller_name: string;
-  }>;
+  }[];
   purchaseAvailability?: MarketplacePurchaseAvailability;
 };
 
