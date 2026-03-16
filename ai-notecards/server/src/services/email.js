@@ -1,6 +1,9 @@
 import crypto from 'crypto';
 import he from 'he';
 
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'noreply@ai-notecards.com';
+const FROM_HEADER = `AI Notecards <${FROM_EMAIL}>`;
+
 // Lazy-initialized Resend client (ESM import hoisting means env vars are undefined at module level)
 let resend;
 async function getResend() {
@@ -21,7 +24,7 @@ export async function sendMagicLinkCode(email, code) {
   try {
     const client = await getResend();
     await client.emails.send({
-      from: 'AI Notecards <noreply@mail.ainotecards.com>',
+      from: FROM_HEADER,
       to: email,
       subject: `${code} is your AI Notecards code`,
       headers: {
@@ -127,7 +130,7 @@ export async function sendTransactionalEmail(type, to, data) {
   try {
     const client = await getResend();
     await client.emails.send({
-      from: 'AI Notecards <noreply@mail.ainotecards.com>',
+      from: FROM_HEADER,
       to,
       subject,
       html,
