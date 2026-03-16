@@ -56,23 +56,31 @@ const FLASHCARD_SCHEMA = {
   required: ['cards'],
 };
 
+function normalizeCardsPayload(payload) {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+  if (payload && Array.isArray(payload.cards)) {
+    return payload.cards;
+  }
+  return null;
+}
+
 function parseCards(text) {
   // Strip markdown code fences if the model wraps its response
   const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
   const parsed = JSON.parse(cleaned);
-  if (!parsed.cards || !Array.isArray(parsed.cards)) {
+  const cards = normalizeCardsPayload(parsed);
+  if (!cards) {
     throw new Error('Response missing cards array');
   }
-  for (const card of parsed.cards) {
+  for (const card of cards) {
     if (typeof card.front !== 'string' || typeof card.back !== 'string') {
       throw new Error('Invalid card format');
     }
   }
   // Hard cap: truncate to 30 cards if AI returns more
-  if (parsed.cards.length > 30) {
-    parsed.cards = parsed.cards.slice(0, 30);
-  }
-  return parsed.cards;
+  return cards.slice(0, 30);
 }
 
 async function generateWithGroq(input) {
@@ -223,7 +231,8 @@ export async function generateCardsWithVision(input, files) {
     throw err;
   }
 
-  if (!result.cards?.length) {
+  const cards = normalizeCardsPayload(result);
+  if (!cards?.length) {
     const err = new Error('No flashcards could be generated from the provided images.');
     err.code = 'NO_CARDS';
     err.visionMeta = {
@@ -231,10 +240,26 @@ export async function generateCardsWithVision(input, files) {
       model: 'gemini-2.5-flash-lite',
       fileCount: files.length,
       hasInputText: !!input?.trim(),
-      responseKeys: Object.keys(result),
+      responseShape: Array.isArray(result) ? 'array' : 'object',
+      responseKeys: Array.isArray(result) ? Object.keys(result).slice(0, 30) : Object.keys(result),
     };
     throw err;
   }
 
-  return result.cards.slice(0, 30); // hard cap, same as text generation
+  for (const card of cards) {
+    if (typeof card.front !== 'string' || typeof card.back !== 'string') {
+      const err = new Error('Vision response contained invalid card format.');
+      err.code = 'VISION_INVALID_CARD_FORMAT';
+      err.visionMeta = {
+        provider: 'gemini',
+        model: 'gemini-2.5-flash-lite',
+        fileCount: files.length,
+        hasInputText: !!input?.trim(),
+        responseShape: Array.isArray(result) ? 'array' : 'object',
+      };
+      throw err;
+    }
+  }
+
+  return cards.slice(0, 30); // hard cap, same as text generation
 }
