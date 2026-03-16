@@ -1,7 +1,16 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
-import type { ApiUser, AuthMeResponse, AuthSessionResponse, StudyMode, User } from '@/types/api';
+import type {
+  ApiUser,
+  AuthMeResponse,
+  AuthSessionResponse,
+  Card,
+  Deck,
+  DeckWithCards,
+  StudyMode,
+  User,
+} from '@/types/api';
 
 const ACCESS_TOKEN_KEY = 'auth-access-token';
 const REFRESH_TOKEN_KEY = 'auth-refresh-token';
@@ -66,6 +75,30 @@ function normalizeMeResponse(payload: Record<string, unknown>): AuthMeResponse {
     user: payload.user ? normalizeUser(payload.user as ApiUser) : null,
     dailyGenerationLimit: typeof payload.daily_generation_limit === 'number' ? payload.daily_generation_limit : undefined,
     deckCount: typeof payload.deck_count === 'number' ? payload.deck_count : undefined,
+  };
+}
+
+function normalizeDeck(deck: Record<string, unknown>): Deck {
+  return {
+    id: String(deck.id),
+    userId: String(deck.user_id),
+    title: String(deck.title),
+    sourceText: typeof deck.source_text === 'string' ? deck.source_text : null,
+    origin: deck.origin === 'purchased' ? 'purchased' : 'generated',
+    cardCount: typeof deck.card_count === 'number' ? deck.card_count : 0,
+    createdAt: String(deck.created_at),
+    updatedAt: String(deck.updated_at),
+  };
+}
+
+function normalizeCard(card: Record<string, unknown>): Card {
+  return {
+    id: String(card.id),
+    deckId: String(card.deck_id),
+    front: String(card.front),
+    back: String(card.back),
+    position: typeof card.position === 'number' ? card.position : 0,
+    createdAt: String(card.created_at),
   };
 }
 
@@ -284,8 +317,23 @@ export const api = {
 
   generate: (input: string, title?: string) =>
     request('/generate', { method: 'POST', body: JSON.stringify({ input, title }) }),
-  getDecks: () => request('/decks'),
-  getDeck: (id: string) => request(`/decks/${id}`),
+  getDecks: async (): Promise<{ decks: Deck[] }> => {
+    const payload = await request<{ decks: Record<string, unknown>[] }>('/decks');
+    return {
+      decks: payload.decks.map(normalizeDeck),
+    };
+  },
+  getDeck: async (id: string): Promise<{ deck: DeckWithCards; cards: Card[] }> => {
+    const payload = await request<{ deck: Record<string, unknown>; cards: Record<string, unknown>[] }>(`/decks/${id}`);
+    const cards = payload.cards.map(normalizeCard);
+    return {
+      deck: {
+        ...normalizeDeck(payload.deck),
+        cards,
+      },
+      cards,
+    };
+  },
   updateDeck: (id: string, title: string) =>
     request(`/decks/${id}`, { method: 'PATCH', body: JSON.stringify({ title }) }),
   deleteDeck: (id: string) => request(`/decks/${id}`, { method: 'DELETE' }),
@@ -300,6 +348,11 @@ export const api = {
     request('/study', { method: 'POST', body: JSON.stringify({ deckId, mode }) }),
   completeSession: (sessionId: string, correct: number, totalCards: number) =>
     request(`/study/${sessionId}`, { method: 'PATCH', body: JSON.stringify({ correct, totalCards }) }),
+  syncStudySessions: (sessions: Array<Record<string, unknown>>) =>
+    request<{ acceptedSessionIds: string[]; dedupedSessionIds: string[]; streak?: Record<string, unknown> }>(
+      '/study/sync',
+      { method: 'POST', body: JSON.stringify({ sessions }) },
+    ),
   getStats: () => request('/study/stats'),
   getStudyHistory: (cursorDate?: string, cursorId?: string) => {
     const params = new URLSearchParams();
