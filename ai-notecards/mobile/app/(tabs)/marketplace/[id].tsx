@@ -3,6 +3,8 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { api, ApiError } from '@/lib/api';
+import { useNetwork } from '@/lib/network';
+import { getOfflineFeatureMessage } from '@/lib/offline/ui';
 import { fontSize, spacing, useThemedStyles } from '@/lib/theme';
 import type { AppTheme } from '@/lib/theme';
 
@@ -20,11 +22,16 @@ type ListingResponse = {
 export default function ListingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const styles = useThemedStyles(createStyles);
+  const { isOnline } = useNetwork();
   const [listing, setListing] = useState<ListingResponse['listing'] | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!id) return;
+    if (!isOnline) {
+      setListing(null);
+      return;
+    }
     void (async () => {
       try {
         const data = await api.getListing(id);
@@ -33,10 +40,14 @@ export default function ListingDetailScreen() {
         setListing(null);
       }
     })();
-  }, [id]);
+  }, [id, isOnline]);
 
   const handlePurchase = async () => {
     if (!id) return;
+    if (!isOnline) {
+      Alert.alert('Offline', getOfflineFeatureMessage('marketplace'));
+      return;
+    }
     setBusy(true);
     try {
       const data = await api.createPurchase(id);
@@ -55,7 +66,11 @@ export default function ListingDetailScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{listing?.title || 'Listing Detail'}</Text>
-      <Text style={styles.subtitle}>{listing?.description || `Listing ID: ${id}`}</Text>
+      <Text style={styles.subtitle}>
+        {isOnline
+          ? (listing?.description || `Listing ID: ${id}`)
+          : getOfflineFeatureMessage('marketplace')}
+      </Text>
       {listing ? (
         <>
           <Text style={styles.meta}>Seller: {listing.seller_name}</Text>
