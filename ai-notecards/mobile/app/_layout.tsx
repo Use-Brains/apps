@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { queryClient, queryPersister, dehydrateOptions } from '@/lib/query-client';
@@ -56,6 +57,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
 export default function RootLayout() {
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <ThemeProvider>
       <ErrorBoundary>
         <PersistQueryClientProvider client={queryClient} persistOptions={{ persister: queryPersister, dehydrateOptions }}>
@@ -74,6 +76,7 @@ export default function RootLayout() {
         </PersistQueryClientProvider>
       </ErrorBoundary>
     </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }
 

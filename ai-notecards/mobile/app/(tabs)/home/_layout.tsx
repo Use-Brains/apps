@@ -25,7 +25,7 @@ export default function HomeLayout() {
       <Stack.Screen
         name="index"
         options={{
-          headerShown: false,
+          title: 'My Decks',
         }}
       />
     </Stack>

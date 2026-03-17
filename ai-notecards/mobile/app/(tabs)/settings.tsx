@@ -1,4 +1,4 @@
-import { Alert, Linking, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/api';
@@ -12,7 +12,7 @@ import { fontSize, spacing, useThemedStyles } from '@/lib/theme';
 import type { AppTheme } from '@/lib/theme';
 import type { PurchasesPackage } from 'react-native-purchases';
 
-export default function ProfileScreen() {
+export default function SettingsScreen() {
   const styles = useThemedStyles(createStyles);
   const { biometricEnabled, enableBiometricLock, disableBiometricLock, logout, user, refreshUser } = useAuth();
   const { pushStatus, syncPushRegistration } = useNotifications();
@@ -174,9 +174,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Profile</Text>
-      <Text style={styles.subtitle}>Settings, preferences, and subscription</Text>
+    <ScrollView contentContainerStyle={styles.container}>
 
       <View style={styles.row}>
         <View style={styles.copy}>
@@ -291,27 +289,16 @@ export default function ProfileScreen() {
       <Pressable style={styles.logoutButton} onPress={() => void handleLogout()}>
         <Text style={styles.logoutText}>Log out</Text>
       </Pressable>
-    </View>
+    </ScrollView>
   );
 }
 
 const createStyles = ({ colors }: AppTheme) =>
   StyleSheet.create({
     container: {
-      flex: 1,
       padding: spacing['3xl'],
-      justifyContent: 'center',
       gap: spacing.xl,
       backgroundColor: colors.background,
-    },
-    title: {
-      fontSize: fontSize['2xl'],
-      fontWeight: '700',
-      color: colors.text,
-    },
-    subtitle: {
-      fontSize: fontSize.md,
-      color: colors.textSecondary,
     },
     row: {
       flexDirection: 'row',
