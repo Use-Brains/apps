@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { borderRadius, fontSize, spacing, useThemedStyles } from '@/lib/theme';
 import { haptics } from '@/lib/haptics';
 import type { AppTheme } from '@/lib/theme';
@@ -16,25 +16,29 @@ export function StudySessionCard({
   const styles = useThemedStyles(createStyles);
 
   const handleReveal = () => {
-    if (showAnswer) {
-      return;
-    }
-
+    if (showAnswer) return;
     void haptics.reveal();
     onReveal();
   };
 
   return (
     <Pressable style={styles.card} onPress={handleReveal}>
-      <Text style={styles.label}>Prompt</Text>
-      <Text style={styles.front}>{card.front}</Text>
+      <View style={styles.section}>
+        <Text style={styles.label}>QUESTION</Text>
+        <Text style={styles.front}>{card.front}</Text>
+      </View>
+
+      <View style={styles.divider} />
+
       {showAnswer ? (
-        <>
-          <Text style={styles.label}>Answer</Text>
+        <View style={styles.section}>
+          <Text style={[styles.label, styles.answerLabel]}>ANSWER</Text>
           <Text style={styles.back}>{card.back}</Text>
-        </>
+        </View>
       ) : (
-        <Text style={styles.hint}>Tap to reveal the answer</Text>
+        <View style={styles.hintRow}>
+          <Text style={styles.hint}>Tap to reveal</Text>
+        </View>
       )}
     </Pressable>
   );
@@ -44,30 +48,49 @@ const createStyles = ({ colors }: AppTheme) =>
   StyleSheet.create({
     card: {
       borderRadius: borderRadius.xl,
-      backgroundColor: colors.surface,
+      backgroundColor: 'rgba(255,255,255,0.10)',
       borderWidth: 1,
-      borderColor: colors.border,
-      padding: spacing.xl,
+      borderColor: 'rgba(255,255,255,0.15)',
+      overflow: 'hidden',
+      minHeight: 220,
+    },
+    section: {
+      padding: spacing['2xl'],
       gap: spacing.md,
+    },
+    divider: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: 'rgba(255,255,255,0.15)',
     },
     label: {
       fontSize: fontSize.xs,
-      color: colors.textTertiary,
-      textTransform: 'uppercase',
-      letterSpacing: 1,
+      fontWeight: '700',
+      letterSpacing: 1.2,
+      color: 'rgba(255,255,255,0.45)',
+    },
+    answerLabel: {
+      color: colors.studyText,
+      opacity: 0.6,
     },
     front: {
       fontSize: fontSize.xl,
-      color: colors.text,
       fontWeight: '700',
+      color: colors.studyText,
+      lineHeight: 28,
     },
     back: {
       fontSize: fontSize.lg,
-      color: colors.text,
-      lineHeight: 24,
+      color: colors.studyText,
+      lineHeight: 26,
+      opacity: 0.9,
+    },
+    hintRow: {
+      padding: spacing['2xl'],
+      alignItems: 'center',
     },
     hint: {
       fontSize: fontSize.sm,
-      color: colors.textSecondary,
+      color: 'rgba(255,255,255,0.35)',
+      fontStyle: 'italic',
     },
   });
