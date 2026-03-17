@@ -7,8 +7,6 @@ import { checkTrialExpiry, PLAN_LIMITS } from '../middleware/plan.js';
 import pool from '../db/pool.js';
 import { countUserDecks } from '../db/queries.js';
 
-const router = Router();
-
 const saveLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 20,
@@ -23,12 +21,27 @@ const PURCHASED_READONLY_ERROR = {
   message: 'Purchased decks cannot be edited. Duplicate the deck to create an editable copy.',
 };
 
+const PURCHASED_DECK_DELETE_FORBIDDEN_ERROR = {
+  error: 'purchased_deck_archive_only',
+  message: 'Purchased decks cannot be deleted. Archive them instead.',
+};
+
+export function createDeckRouter({
+  authenticateMiddleware = authenticate,
+  requireActiveUserMiddleware = requireActiveUser,
+  requireXHRMiddleware = requireXHR,
+  checkTrialExpiryMiddleware = checkTrialExpiry,
+  poolInstance = pool,
+  countUserDecksFn = countUserDecks,
+} = {}) {
+  const router = Router();
+
 // List all decks for the user
-router.get('/', authenticate, async (req, res) => {
+router.get('/', authenticateMiddleware, async (req, res) => {
   try {
-    const result = await pool.query(
+    const result = await poolInstance.query(
       `SELECT d.id, d.user_id, d.title, d.source_text, d.origin, d.purchased_from_listing_id,
-              d.created_at, d.updated_at, COUNT(c.id)::int AS card_count,
+              d.archived_at, d.created_at, d.updated_at, COUNT(c.id)::int AS card_count,
               ml.id AS listing_id, ml.status AS listing_status,
               (rt.id IS NOT NULL) AS has_rated,
               ls.last_studied_at
@@ -56,9 +69,9 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // Get a single deck with its cards
-router.get('/:id', authenticate, async (req, res) => {
+router.get('/:id', authenticateMiddleware, async (req, res) => {
   try {
-    const deckResult = await pool.query(
+    const deckResult = await poolInstance.query(
       'SELECT * FROM decks WHERE id = $1 AND user_id = $2',
       [req.params.id, req.userId]
     );
@@ -66,7 +79,7 @@ router.get('/:id', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Deck not found' });
     }
 
-    const cardsResult = await pool.query(
+    const cardsResult = await poolInstance.query(
       'SELECT id, front, back, position, created_at FROM cards WHERE deck_id = $1 ORDER BY position',
       [req.params.id]
     );
@@ -79,7 +92,7 @@ router.get('/:id', authenticate, async (req, res) => {
 });
 
 // Save deck from preview
-router.post('/save', requireXHR, authenticate, checkTrialExpiry, saveLimiter, async (req, res) => {
+router.post('/save', requireXHRMiddleware, authenticateMiddleware, checkTrialExpiryMiddleware, saveLimiter, async (req, res) => {
   const { title, source_text, cards } = req.body;
 
   // Validation
@@ -114,7 +127,7 @@ router.post('/save', requireXHR, authenticate, checkTrialExpiry, saveLimiter, as
     // Deck count limit check
     const limits = PLAN_LIMITS[req.userPlan] || PLAN_LIMITS.free;
     if (limits.maxDecks !== Infinity) {
-      const deckCount = await countUserDecks(req.userId);
+      const deckCount = await countUserDecksFn(req.userId);
       if (deckCount >= limits.maxDecks) {
         return res.status(429).json({
           error: `Maximum deck limit reached (${limits.maxDecks}). Upgrade to Pro for unlimited decks.`,
@@ -123,7 +136,7 @@ router.post('/save', requireXHR, authenticate, checkTrialExpiry, saveLimiter, as
       }
     }
 
-    const client = await pool.connect();
+    const client = await poolInstance.connect();
     try {
       await client.query('BEGIN');
 
@@ -165,10 +178,10 @@ router.post('/save', requireXHR, authenticate, checkTrialExpiry, saveLimiter, as
 });
 
 // Duplicate a deck
-router.post('/:id/duplicate', requireXHR, authenticate, requireActiveUser, checkTrialExpiry, saveLimiter, async (req, res) => {
+router.post('/:id/duplicate', requireXHRMiddleware, authenticateMiddleware, requireActiveUserMiddleware, checkTrialExpiryMiddleware, saveLimiter, async (req, res) => {
   try {
     // 1. Verify ownership (MUST include user_id to prevent IDOR)
-    const sourceResult = await pool.query(
+    const sourceResult = await poolInstance.query(
       'SELECT id, title, source_text, origin FROM decks WHERE id = $1 AND user_id = $2',
       [req.params.id, req.userId]
     );
@@ -180,7 +193,7 @@ router.post('/:id/duplicate', requireXHR, authenticate, requireActiveUser, check
     // 2. Check deck limits
     const limits = PLAN_LIMITS[req.userPlan] || PLAN_LIMITS.free;
     if (limits.maxDecks !== Infinity) {
-      const deckCount = await countUserDecks(req.userId);
+      const deckCount = await countUserDecksFn(req.userId);
       if (deckCount >= limits.maxDecks) {
         return res.status(429).json({
           error: `Maximum deck limit reached (${limits.maxDecks}). Upgrade to Pro for unlimited decks.`,
@@ -190,7 +203,7 @@ router.post('/:id/duplicate', requireXHR, authenticate, requireActiveUser, check
     }
 
     // 3. Read source cards OUTSIDE transaction (follows purchase.js pattern)
-    const { rows: sourceCards } = await pool.query(
+    const { rows: sourceCards } = await poolInstance.query(
       'SELECT front, back, position FROM cards WHERE deck_id = $1 ORDER BY position',
       [sourceDeck.id]
     );
@@ -203,7 +216,7 @@ router.post('/:id/duplicate', requireXHR, authenticate, requireActiveUser, check
     title += ' (Copy)';
 
     // 5. Transaction
-    const client = await pool.connect();
+    const client = await poolInstance.connect();
     try {
       await client.query('BEGIN');
 
@@ -251,7 +264,7 @@ router.post('/:id/duplicate', requireXHR, authenticate, requireActiveUser, check
 });
 
 // Rename a deck
-router.patch('/:id', requireXHR, authenticate, requireActiveUser, async (req, res) => {
+router.patch('/:id', requireXHRMiddleware, authenticateMiddleware, requireActiveUserMiddleware, async (req, res) => {
   const { title } = req.body;
   if (!title) {
     return res.status(400).json({ error: 'Title is required' });
@@ -261,7 +274,7 @@ router.patch('/:id', requireXHR, authenticate, requireActiveUser, async (req, re
   }
   try {
     // Check ownership and origin
-    const deckCheck = await pool.query(
+    const deckCheck = await poolInstance.query(
       'SELECT origin FROM decks WHERE id = $1 AND user_id = $2',
       [req.params.id, req.userId]
     );
@@ -272,7 +285,7 @@ router.patch('/:id', requireXHR, authenticate, requireActiveUser, async (req, re
       return res.status(403).json(PURCHASED_READONLY_ERROR);
     }
 
-    const result = await pool.query(
+    const result = await poolInstance.query(
       'UPDATE decks SET title = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3 RETURNING *',
       [striptags(title), req.params.id, req.userId]
     );
@@ -283,16 +296,72 @@ router.patch('/:id', requireXHR, authenticate, requireActiveUser, async (req, re
   }
 });
 
-// Delete a deck
-router.delete('/:id', requireXHR, authenticate, requireActiveUser, async (req, res) => {
+router.post('/:id/archive', requireXHRMiddleware, authenticateMiddleware, requireActiveUserMiddleware, async (req, res) => {
   try {
-    const result = await pool.query(
+    const deckResult = await poolInstance.query(
+      'SELECT id, origin, archived_at FROM decks WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.userId]
+    );
+    if (deckResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Deck not found' });
+    }
+    if (deckResult.rows[0].origin !== 'purchased') {
+      return res.status(403).json({ error: 'Only purchased decks can be archived.' });
+    }
+
+    const result = await poolInstance.query(
+      'UPDATE decks SET archived_at = NOW(), updated_at = NOW() WHERE id = $1 AND user_id = $2 RETURNING id, archived_at',
+      [req.params.id, req.userId]
+    );
+    res.json({ deck: result.rows[0] });
+  } catch (err) {
+    console.error('Archive deck error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/:id/unarchive', requireXHRMiddleware, authenticateMiddleware, requireActiveUserMiddleware, async (req, res) => {
+  try {
+    const deckResult = await poolInstance.query(
+      'SELECT id, origin FROM decks WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.userId]
+    );
+    if (deckResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Deck not found' });
+    }
+    if (deckResult.rows[0].origin !== 'purchased') {
+      return res.status(403).json({ error: 'Only purchased decks can be unarchived.' });
+    }
+
+    const result = await poolInstance.query(
+      'UPDATE decks SET archived_at = NULL, updated_at = NOW() WHERE id = $1 AND user_id = $2 RETURNING id, archived_at',
+      [req.params.id, req.userId]
+    );
+    res.json({ deck: result.rows[0] });
+  } catch (err) {
+    console.error('Unarchive deck error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete a deck
+router.delete('/:id', requireXHRMiddleware, authenticateMiddleware, requireActiveUserMiddleware, async (req, res) => {
+  try {
+    const deckResult = await poolInstance.query(
+      'SELECT origin FROM decks WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.userId]
+    );
+    if (deckResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Deck not found' });
+    }
+    if (deckResult.rows[0].origin === 'purchased') {
+      return res.status(403).json(PURCHASED_DECK_DELETE_FORBIDDEN_ERROR);
+    }
+
+    const result = await poolInstance.query(
       'DELETE FROM decks WHERE id = $1 AND user_id = $2 RETURNING id',
       [req.params.id, req.userId]
     );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Deck not found' });
-    }
     res.json({ ok: true });
   } catch (err) {
     console.error('Delete deck error:', err);
@@ -301,7 +370,7 @@ router.delete('/:id', requireXHR, authenticate, requireActiveUser, async (req, r
 });
 
 // Add a card to a deck
-router.post('/:id/cards', requireXHR, authenticate, requireActiveUser, async (req, res) => {
+router.post('/:id/cards', requireXHRMiddleware, authenticateMiddleware, requireActiveUserMiddleware, async (req, res) => {
   const { front, back } = req.body;
   if (!front || !back) {
     return res.status(400).json({ error: 'Front and back are required' });
@@ -314,7 +383,7 @@ router.post('/:id/cards', requireXHR, authenticate, requireActiveUser, async (re
   }
   try {
     // Verify ownership and check origin
-    const deck = await pool.query('SELECT id, origin FROM decks WHERE id = $1 AND user_id = $2', [req.params.id, req.userId]);
+    const deck = await poolInstance.query('SELECT id, origin FROM decks WHERE id = $1 AND user_id = $2', [req.params.id, req.userId]);
     if (deck.rows.length === 0) {
       return res.status(404).json({ error: 'Deck not found' });
     }
@@ -322,8 +391,8 @@ router.post('/:id/cards', requireXHR, authenticate, requireActiveUser, async (re
       return res.status(403).json(PURCHASED_READONLY_ERROR);
     }
 
-    const maxPos = await pool.query('SELECT COALESCE(MAX(position), -1) AS max_pos FROM cards WHERE deck_id = $1', [req.params.id]);
-    const result = await pool.query(
+    const maxPos = await poolInstance.query('SELECT COALESCE(MAX(position), -1) AS max_pos FROM cards WHERE deck_id = $1', [req.params.id]);
+    const result = await poolInstance.query(
       'INSERT INTO cards (deck_id, front, back, position) VALUES ($1, $2, $3, $4) RETURNING *',
       [req.params.id, striptags(front), striptags(back), maxPos.rows[0].max_pos + 1]
     );
@@ -335,7 +404,7 @@ router.post('/:id/cards', requireXHR, authenticate, requireActiveUser, async (re
 });
 
 // Update a card
-router.patch('/:deckId/cards/:cardId', requireXHR, authenticate, requireActiveUser, async (req, res) => {
+router.patch('/:deckId/cards/:cardId', requireXHRMiddleware, authenticateMiddleware, requireActiveUserMiddleware, async (req, res) => {
   const { front, back } = req.body;
   if (front !== undefined && front.length > 2000) {
     return res.status(400).json({ error: 'Card front text is too long. Maximum 2,000 characters.' });
@@ -344,7 +413,7 @@ router.patch('/:deckId/cards/:cardId', requireXHR, authenticate, requireActiveUs
     return res.status(400).json({ error: 'Card back text is too long. Maximum 5,000 characters.' });
   }
   try {
-    const deck = await pool.query('SELECT id, origin FROM decks WHERE id = $1 AND user_id = $2', [req.params.deckId, req.userId]);
+    const deck = await poolInstance.query('SELECT id, origin FROM decks WHERE id = $1 AND user_id = $2', [req.params.deckId, req.userId]);
     if (deck.rows.length === 0) {
       return res.status(404).json({ error: 'Deck not found' });
     }
@@ -352,7 +421,7 @@ router.patch('/:deckId/cards/:cardId', requireXHR, authenticate, requireActiveUs
       return res.status(403).json(PURCHASED_READONLY_ERROR);
     }
 
-    const result = await pool.query(
+    const result = await poolInstance.query(
       'UPDATE cards SET front = COALESCE($1, front), back = COALESCE($2, back) WHERE id = $3 AND deck_id = $4 RETURNING *',
       [front ? striptags(front) : front, back ? striptags(back) : back, req.params.cardId, req.params.deckId]
     );
@@ -367,9 +436,9 @@ router.patch('/:deckId/cards/:cardId', requireXHR, authenticate, requireActiveUs
 });
 
 // Delete a card
-router.delete('/:deckId/cards/:cardId', requireXHR, authenticate, requireActiveUser, async (req, res) => {
+router.delete('/:deckId/cards/:cardId', requireXHRMiddleware, authenticateMiddleware, requireActiveUserMiddleware, async (req, res) => {
   try {
-    const deck = await pool.query('SELECT id, origin FROM decks WHERE id = $1 AND user_id = $2', [req.params.deckId, req.userId]);
+    const deck = await poolInstance.query('SELECT id, origin FROM decks WHERE id = $1 AND user_id = $2', [req.params.deckId, req.userId]);
     if (deck.rows.length === 0) {
       return res.status(404).json({ error: 'Deck not found' });
     }
@@ -377,7 +446,7 @@ router.delete('/:deckId/cards/:cardId', requireXHR, authenticate, requireActiveU
       return res.status(403).json(PURCHASED_READONLY_ERROR);
     }
 
-    const result = await pool.query(
+    const result = await poolInstance.query(
       'DELETE FROM cards WHERE id = $1 AND deck_id = $2 RETURNING id',
       [req.params.cardId, req.params.deckId]
     );
@@ -391,4 +460,7 @@ router.delete('/:deckId/cards/:cardId', requireXHR, authenticate, requireActiveU
   }
 });
 
-export default router;
+  return router;
+}
+
+export default createDeckRouter();
