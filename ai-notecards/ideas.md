@@ -1,5 +1,8 @@
 v1 features:
 ---
+add gestures to flip cards during studying. allow a user to select the type of action to flip a card, tap, double tap, swipe left or right, swipe up or down
+
+---
 Gaps to Build an iOS App
 If the goal is to ship an iOS app (per the apps/CLAUDE.md indie iOS app playbook):
 

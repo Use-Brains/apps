@@ -48,7 +48,7 @@ module.exports = () => {
       name: current.appName,
       slug: 'ai-notecards',
       version: '0.1.0',
-      orientation: 'portrait',
+      orientation: 'default',
       icon: './assets/icon.png',
       scheme: appEnv === 'production' ? 'ai-notecards' : `ai-notecards-${appEnv}`,
       userInterfaceStyle: 'automatic',
