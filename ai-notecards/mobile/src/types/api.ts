@@ -57,6 +57,7 @@ export type Deck = {
   title: string;
   sourceText: string | null;
   origin: 'generated' | 'purchased';
+  archivedAt: string | null;
   cardCount: number;
   createdAt: string;
   updatedAt: string;

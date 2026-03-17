@@ -52,11 +52,11 @@ export function NetworkProvider({ children }: { children: React.ReactNode }) {
 
     void NetInfo.fetch().then((state) => {
       if (!mounted) return;
-      setIsOnline(!!state.isConnected && state.isInternetReachable !== false);
+      setIsOnline(!!state.isConnected);
     });
 
     const unsubscribeNetInfo = NetInfo.addEventListener((state) => {
-      const nextOnline = !!state.isConnected && state.isInternetReachable !== false;
+      const nextOnline = !!state.isConnected;
       setIsOnline(nextOnline);
       if (nextOnline) {
         void refreshOfflineState();
@@ -66,7 +66,7 @@ export function NetworkProvider({ children }: { children: React.ReactNode }) {
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active') {
         void NetInfo.fetch().then((state) => {
-          const nextOnline = !!state.isConnected && state.isInternetReachable !== false;
+          const nextOnline = !!state.isConnected;
           setIsOnline(nextOnline);
           if (nextOnline) {
             void refreshOfflineState();

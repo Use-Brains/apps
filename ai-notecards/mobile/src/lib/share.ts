@@ -20,8 +20,24 @@ export function buildMarketplaceSharePayload(input: { id: string; title: string;
   };
 }
 
+function buildScoreBar(correct: number, total: number): string {
+  const filled = Math.round((correct / total) * 5);
+  return '🟩'.repeat(filled) + '⬜'.repeat(5 - filled);
+}
+
 export function buildStudyResultShareMessage(input: { deckTitle: string; correct: number; total: number }) {
-  return `I reviewed "${input.deckTitle}" on AI Notecards and got ${input.correct}/${input.total} correct.`;
+  const pct = Math.round((input.correct / input.total) * 100);
+  const bar = buildScoreBar(input.correct, input.total);
+  const medal = pct >= 80 ? '🏆' : pct >= 60 ? '⭐' : '📚';
+  return [
+    `${medal} AI Notecards`,
+    `"${input.deckTitle}"`,
+    ``,
+    `${bar}`,
+    `${input.correct}/${input.total} correct · ${pct}%`,
+    ``,
+    getPublicWebUrl(),
+  ].join('\n');
 }
 
 export async function shareMarketplaceListing(input: { id: string; title: string; sellerName?: string | null }) {
@@ -38,7 +54,12 @@ export async function shareMarketplaceListing(input: { id: string; title: string
 }
 
 export async function shareStudyResult(input: { deckTitle: string; correct: number; total: number }) {
-  await Share.share({
-    message: buildStudyResultShareMessage(input),
-  });
+  const message = buildStudyResultShareMessage(input);
+  const url = getPublicWebUrl();
+  await Share.share(
+    Platform.select({
+      ios: { message, url },
+      default: { message },
+    }) ?? { message },
+  );
 }

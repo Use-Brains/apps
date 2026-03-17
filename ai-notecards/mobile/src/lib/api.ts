@@ -86,6 +86,7 @@ function normalizeDeck(deck: Record<string, unknown>): Deck {
     title: String(deck.title),
     sourceText: typeof deck.source_text === 'string' ? deck.source_text : null,
     origin: deck.origin === 'purchased' ? 'purchased' : 'generated',
+    archivedAt: typeof deck.archived_at === 'string' ? deck.archived_at : null,
     cardCount: typeof deck.card_count === 'number' ? deck.card_count : 0,
     createdAt: String(deck.created_at),
     updatedAt: String(deck.updated_at),
@@ -318,6 +319,33 @@ export const api = {
 
   generate: (input: string, title?: string) =>
     request('/generate', { method: 'POST', body: JSON.stringify({ input, title }) }),
+  generatePreview: (input: string, title?: string) =>
+    request<{ cards: Array<{ front: string; back: string }>; generationsRemaining?: number }>(
+      '/generate/preview',
+      { method: 'POST', body: JSON.stringify({ input, title }) },
+    ),
+  generatePreviewWithPhotos: (
+    input: string,
+    title: string | undefined,
+    photos: Array<{ uri: string; mimeType?: string }>,
+  ) => {
+    const form = new FormData();
+    if (input) form.append('input', input);
+    if (title) form.append('title', title);
+    photos.forEach((photo, i) => {
+      // React Native FormData accepts a file-like object with uri/type/name
+      form.append('photos', { uri: photo.uri, type: photo.mimeType ?? 'image/jpeg', name: `photo_${i}.jpg` } as unknown as Blob);
+    });
+    return request<{ cards: Array<{ front: string; back: string }>; generationsRemaining?: number }>(
+      '/generate/preview',
+      { method: 'POST', body: form },
+    );
+  },
+  saveDeck: (title: string, sourceText: string | null, cards: Array<{ front: string; back: string }>) =>
+    request<{ deck: Record<string, unknown> }>('/decks/save', {
+      method: 'POST',
+      body: JSON.stringify({ title, source_text: sourceText, cards }),
+    }),
   getDecks: async (): Promise<{ decks: Deck[] }> => {
     const payload = await request<{ decks: Record<string, unknown>[] }>('/decks');
     return {
@@ -338,6 +366,8 @@ export const api = {
   updateDeck: (id: string, title: string) =>
     request(`/decks/${id}`, { method: 'PATCH', body: JSON.stringify({ title }) }),
   deleteDeck: (id: string) => request(`/decks/${id}`, { method: 'DELETE' }),
+  archiveDeck: (id: string) => request<{ deck: { id: string; archived_at: string | null } }>(`/decks/${id}/archive`, { method: 'POST' }),
+  unarchiveDeck: (id: string) => request<{ deck: { id: string; archived_at: string | null } }>(`/decks/${id}/unarchive`, { method: 'POST' }),
   duplicateDeck: (id: string) => request(`/decks/${id}/duplicate`, { method: 'POST' }),
   addCard: (deckId: string, front: string, back: string) =>
     request(`/decks/${deckId}/cards`, { method: 'POST', body: JSON.stringify({ front, back }) }),

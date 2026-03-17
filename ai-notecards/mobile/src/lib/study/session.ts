@@ -1,3 +1,4 @@
+import { randomUUID } from 'expo-crypto';
 import type { StudyMode } from '@/types/api';
 import { enqueuePendingSession } from '@/lib/offline/repository';
 import type { OfflineCard, OfflineDeck, PendingSession } from '@/lib/offline/types';
@@ -25,8 +26,7 @@ export type LocalStudySession = {
 };
 
 function defaultCreateId() {
-  return globalThis.crypto?.randomUUID?.()
-    ?? `offline-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return randomUUID();
 }
 
 function getSessionCards(deck: Pick<OfflineDeck, 'cards'>, mode: StudyMode): OfflineCard[] {
