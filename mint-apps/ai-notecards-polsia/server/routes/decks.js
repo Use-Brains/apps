@@ -5,7 +5,7 @@ import { authenticate, requireActiveUser } from '../middleware/auth.js';
 import { requireXHR } from '../middleware/csrf.js';
 import { checkTrialExpiry, PLAN_LIMITS } from '../middleware/plan.js';
 import pool from '../db/index.js';
-import { countUserDecks } from '../src/db/queries.js';
+import { countUserDecks } from '../db/queries.js';
 
 const saveLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
