@@ -28,6 +28,10 @@ export default function Pricing() {
   const handleUpgrade = async (billingPeriod = 'monthly') => {
     try {
       const data = await api.createCheckout(billingPeriod);
+      if (data.status === 'unavailable') {
+        toast(data.message);
+        return;
+      }
       if (data.url) {
         window.location.href = data.url;
       }
@@ -48,6 +52,9 @@ export default function Pricing() {
         <h1 className="text-4xl font-bold text-center text-[#1A1614] mb-4">Choose your plan</h1>
         <p className="text-center text-[#6B635A] mb-4 max-w-lg mx-auto">
           Start with a free 7-day Pro trial. No credit card required.
+        </p>
+        <p className="text-center text-sm text-[#6B635A] mb-8">
+          Subscription checkout is not active in this handoff build yet.
         </p>
         {isTrialActive && (
           <p className="text-center text-[#1B6B5A] font-medium mb-8">

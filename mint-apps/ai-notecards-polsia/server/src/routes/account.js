@@ -3,11 +3,11 @@ import bcrypt from 'bcrypt';
 import multer from 'multer';
 import { fileTypeFromBuffer } from 'file-type';
 import rateLimit from 'express-rate-limit';
-import { authenticate, requireActiveUser } from '../middleware/auth.js';
-import { getStripe } from '../services/stripe.js';
-import { requireXHR } from '../middleware/csrf.js';
+import { authenticate, requireActiveUser } from '../../middleware/auth.js';
+import { getStripe } from '../../services/stripe.js';
+import { requireXHR } from '../../middleware/csrf.js';
 import { SALT_ROUNDS, setTokenCookie } from './auth.js';
-import { buildPublicStorageUrl, uploadAvatar, deleteAvatar } from '../services/storage.js';
+import { buildPublicStorageUrl, uploadAvatar, deleteAvatar } from '../../services/storage.js';
 import pool from '../db/pool.js';
 
 const router = Router();

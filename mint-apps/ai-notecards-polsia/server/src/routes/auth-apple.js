@@ -2,7 +2,7 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import pool from '../db/pool.js';
 import { USER_SELECT, respondWithSession } from './auth.js';
-import { trackServerEvent } from '../services/analytics.js';
+import { trackServerEvent } from '../../services/analytics.js';
 
 const router = Router();
 const appleLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });

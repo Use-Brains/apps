@@ -55,8 +55,8 @@ This matrix classifies the current server route surface against the confirmed Po
 
 ## Legacy deployment artifact removal trigger
 
-`client/vercel.json` should only be removed after all of the following are true:
+Phase 4 status:
 
-1. Root `build` and `start:render` are verified in an environment with installed dependencies.
-2. Express static serving of `client/dist` is verified as the primary deployment path.
-3. No active split-host deployment still depends on the Vercel rewrite.
+1. `client/vercel.json` has been removed from the handoff path.
+2. Express static serving of `client/dist` is now the default runtime expectation.
+3. Buyer purchase, seller, Stripe, and admin deferred areas remain registered only as placeholder or shell surfaces in the sandbox handoff build.

@@ -30,24 +30,24 @@ import express from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 
-import authRoutes from './routes/auth.js';
-import authAppleRoutes from './routes/auth-apple.js';
-import authMagicRoutes from './routes/auth-magic.js';
-import authGoogleRoutes from './routes/auth-google.js';
-import generateRoutes from './routes/generate.js';
-import deckRoutes from './routes/decks.js';
-import studyRoutes from './routes/study.js';
-import stripeRoutes from './routes/stripe.js';
-import revenueCatRoutes from './routes/revenuecat.js';
-import settingsRoutes from './routes/settings.js';
-import marketplaceRoutes from './routes/marketplace.js';
-import sellerRoutes from './routes/seller.js';
-import ratingsRoutes from './routes/ratings.js';
-import accountRoutes from './routes/account.js';
-import adminRoutes from './routes/admin.js';
-import notificationsRoutes from './routes/notifications.js';
+import authRoutes from '../routes/auth.js';
+import authAppleRoutes from '../routes/auth-apple.js';
+import authMagicRoutes from '../routes/auth-magic.js';
+import authGoogleRoutes from '../routes/auth-google.js';
+import generateRoutes from '../routes/generate.js';
+import deckRoutes from '../routes/decks.js';
+import studyRoutes from '../routes/study.js';
+import handoffBillingRoutes from '../routes/handoff-billing.js';
+import revenueCatRoutes from '../routes/revenuecat.js';
+import settingsRoutes from '../routes/settings.js';
+import marketplaceRoutes from '../routes/marketplace.js';
+import sellerRoutes from '../routes/seller.js';
+import ratingsRoutes from '../routes/ratings.js';
+import accountRoutes from '../routes/account.js';
+import adminRoutes from '../routes/admin.js';
+import notificationsRoutes from '../routes/notifications.js';
 import { getRuntimeConfig } from './config/runtime.js';
-import pool from './db/pool.js';
+import pool from '../db/index.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -62,10 +62,6 @@ const IOS_BUNDLE_ID = process.env.IOS_BUNDLE_ID || 'com.ainotecards.app';
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 }
-
-// Stripe webhooks need raw body — must be before express.json()
-app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
-app.use('/webhooks', express.raw({ type: 'application/json' }));
 
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
@@ -96,7 +92,7 @@ app.use('/api/auth/google', authGoogleRoutes);
 app.use('/api/generate', generateRoutes);
 app.use('/api/decks', deckRoutes);
 app.use('/api/study', studyRoutes);
-app.use('/api/stripe', stripeRoutes);
+app.use('/api/stripe', handoffBillingRoutes);
 app.use('/api/revenuecat', revenueCatRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/account', accountRoutes);
@@ -105,62 +101,6 @@ app.use('/api/seller', sellerRoutes);
 app.use('/api/ratings', ratingsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationsRoutes);
-
-// Stripe Connect webhook (separate endpoint, separate signing secret)
-import { getStripe } from './services/stripe.js';
-app.post('/webhooks/stripe-connect', async (req, res) => {
-  const stripe = getStripe();
-  const sig = req.headers['stripe-signature'];
-  let event;
-  try {
-    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_CONNECT_WEBHOOK_SECRET);
-  } catch (err) {
-    console.error('Connect webhook signature verification failed:', err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
-
-  try {
-    switch (event.type) {
-      case 'account.updated': {
-        const account = event.data.object;
-        await pool.query(
-          `UPDATE users SET connect_charges_enabled = $1, connect_payouts_enabled = $2
-           WHERE stripe_connect_account_id = $3`,
-          [account.charges_enabled, account.payouts_enabled, account.id]
-        );
-        if (account.requirements?.currently_due?.length > 0) {
-          console.log(`Connect account ${account.id} has pending requirements:`, account.requirements.currently_due);
-        }
-        break;
-      }
-
-      case 'account.application.deauthorized': {
-        const account = event.data.object;
-        // Delist first, then nullify — single CTE to avoid race condition
-        await pool.query(
-          `WITH delisted AS (
-            UPDATE marketplace_listings SET status = 'delisted', delisted_at = NOW(), updated_at = NOW()
-            WHERE seller_id = (SELECT id FROM users WHERE stripe_connect_account_id = $1)
-              AND status = 'active'
-          )
-          UPDATE users SET stripe_connect_account_id = NULL,
-            connect_charges_enabled = false, connect_payouts_enabled = false
-          WHERE stripe_connect_account_id = $1`,
-          [account.id]
-        );
-        console.log(`Connect account ${account.id} deauthorized — listings delisted`);
-        break;
-      }
-
-      default:
-        break;
-    }
-  } catch (err) {
-    console.error(`Connect webhook ${event.type} error:`, err);
-  }
-
-  res.json({ received: true });
-});
 
 // Health check with DB connection test
 app.get('/api/health', async (req, res) => {
@@ -206,7 +146,7 @@ if (clientBuild.enabled) {
     app.get('*', (req, res, next) => {
       if (req.method !== 'GET') return next();
       if (req.path === '/api' || req.path.startsWith('/api/')) return next();
-      if (req.path.startsWith('/webhooks') || req.path.startsWith('/.well-known')) return next();
+      if (req.path.startsWith('/.well-known')) return next();
       res.sendFile(path.join(clientDistPath, 'index.html'));
     });
   } else {
@@ -223,7 +163,7 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ error: 'Internal server error' });
 });
 
-import { shutdownAnalytics } from './services/analytics.js';
+import { shutdownAnalytics } from '../services/analytics.js';
 
 const server = app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

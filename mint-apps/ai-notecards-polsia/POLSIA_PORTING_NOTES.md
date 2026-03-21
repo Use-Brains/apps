@@ -138,10 +138,44 @@ If that scope is accepted, the first code refactor should be an infrastructure b
 - Centralized pooled vs direct Postgres config parsing in `server/src/db/runtime.js`
 - Added `POLSIA_ROUTE_MATRIX.md` to classify route files into core, optional, and deferred groups
 
+## Phase 4 handoff prep completed
+
+- Added a squashed handoff migration at `server/db/migrations/001_initial.sql`
+- Added an idempotent handoff seed at `server/db/seed.js`
+- Added guarded handoff DB scripts so the squashed path does not run on top of the legacy migration history
+- Switched the default runtime expectation to unified Express-serves-client
+- Removed `client/vercel.json` from the handoff path
+- Removed `server/src/routes/stripe.js` from Express registration and replaced `/api/stripe/*` with placeholder responses
+- Converted buyer purchase checkout to a placeholder response while keeping marketplace browse/detail active
+- Kept seller and admin surfaces present as shell routes/pages for the handoff build
+
+## Packaging / path-move prep started
+
+- Added future-facing `server/routes/*` wrappers over the current route implementations
+- Added future-facing `server/middleware/*` wrappers over the current middleware implementations
+- Added future-facing `server/services/*` wrappers over the current service implementations
+- This should reduce the next move from a logic-heavy migration to a mostly mechanical relocation/import-rewrite pass
+
+## Packaging / path-move prep in progress
+
+- Promoted these live route implementations into `server/routes/*`:
+  - `auth`
+  - `auth-google`
+  - `auth-magic`
+  - `decks`
+  - `generate`
+  - `marketplace`
+  - `study`
+  - `settings`
+  - `ratings`
+  - `notifications`
+  - `revenuecat`
+- Converted the matching `server/src/routes/*` files above into compatibility re-exports
+- Updated `server/src/index.js` to consume the future-facing route surface instead of importing directly from `server/src/routes/*`
+- Verified the promoted route surface still imports cleanly and the current server test suite still passes
+
 ## Remaining direct infra coupling points
 
-- `client/vercel.json`
-  - Still encodes a Vercel-specific rewrite topology. Keep it until the real Polsia deployment target is finalized.
 - `server/src/db/pool.js`
   - Still carries current Postgres env expectations and is the right place to normalize any Neon-specific connection tuning.
 - `server/src/services/storage.js`
@@ -152,6 +186,10 @@ If that scope is accepted, the first code refactor should be an infrastructure b
   - Web subscription and marketplace purchase side effects are still Stripe-first.
 - `server/src/routes/seller.js`
   - Seller onboarding is still Stripe Connect-specific even though it is now easier to disable.
+- `server/src/routes/account.js`
+  - Account settings still couple avatar upload, password flows, and best-effort Stripe cleanup into one legacy route module.
+- `server/src/routes/auth-apple.js`
+  - Native auth remains isolated but has not yet been promoted onto the future-facing route path as a real implementation.
 - `server/src/services/purchase.js`
   - Marketplace checkout still assumes Stripe destination-charge style fulfillment.
 - `server/src/routes/revenuecat.js`

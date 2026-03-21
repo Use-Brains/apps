@@ -1,27 +1,50 @@
 import { Router } from 'express';
-import { authenticate, requireActiveUser } from '../middleware/auth.js';
-import { requireXHR } from '../middleware/csrf.js';
-import { checkTrialExpiry, requirePlan } from '../middleware/plan.js';
-import { getStripe } from '../services/stripe.js';
+import { authenticate, requireActiveUser } from '../../middleware/auth.js';
+import { requireXHR } from '../../middleware/csrf.js';
+import { checkTrialExpiry, requirePlan } from '../../middleware/plan.js';
+import { getStripe } from '../../services/stripe.js';
 import { buildClientUrl, getFeatureAvailability } from '../config/runtime.js';
 import pool from '../db/pool.js';
-import { trackServerEvent } from '../services/analytics.js';
+import { trackServerEvent } from '../../services/analytics.js';
 
-const router = Router();
-
-router.use((req, res, next) => {
-  const availability = getFeatureAvailability('sellerTools');
-  if (!availability.enabled) {
-    return res.status(503).json({ error: availability.message, code: availability.code });
-  }
-  next();
+const DEFAULT_SELLER_SHELL = Object.freeze({
+  status: 'unavailable',
+  message: 'Seller tools coming soon',
+  shell: true,
 });
+
+export function createSellerRouter({
+  authenticateMiddleware = authenticate,
+  requireActiveUserMiddleware = requireActiveUser,
+  requireXHRMiddleware = requireXHR,
+  checkTrialExpiryMiddleware = checkTrialExpiry,
+  requirePlanMiddleware = requirePlan,
+  getFeatureAvailabilityFn = getFeatureAvailability,
+  poolInstance = pool,
+  getStripeFn = getStripe,
+  buildClientUrlFn = buildClientUrl,
+  trackServerEventFn = trackServerEvent,
+  shellPayload = DEFAULT_SELLER_SHELL,
+} = {}) {
+  const router = Router();
+
+  router.use((req, res, next) => {
+    const availability = getFeatureAvailabilityFn('sellerTools');
+    if (!availability.enabled) {
+      return res.json({
+        ...shellPayload,
+        code: availability.code,
+        detail: availability.message,
+      });
+    }
+    next();
+  });
 
 const MAX_ACTIVE_LISTINGS = 50;
 const MIN_CARD_COUNT = 10;
 
 // Create a new listing
-router.post('/listings', requireXHR, authenticate, requireActiveUser, checkTrialExpiry, requirePlan('pro'), async (req, res) => {
+router.post('/listings', requireXHRMiddleware, authenticateMiddleware, requireActiveUserMiddleware, checkTrialExpiryMiddleware, requirePlanMiddleware('pro'), async (req, res) => {
   const { deck_id, category_id, description, price_cents, tags = [] } = req.body;
 
   if (!deck_id || !category_id || !description || !price_cents) {
@@ -42,7 +65,7 @@ router.post('/listings', requireXHR, authenticate, requireActiveUser, checkTrial
 
   try {
     // Verify deck ownership and eligibility
-    const { rows: deckRows } = await pool.query(
+    const { rows: deckRows } = await poolInstance.query(
       "SELECT id, title, user_id, origin FROM decks WHERE id = $1 AND user_id = $2 AND origin = 'generated'",
       [deck_id, req.userId]
     );
@@ -51,7 +74,7 @@ router.post('/listings', requireXHR, authenticate, requireActiveUser, checkTrial
     }
 
     // Check minimum card count
-    const { rows: cardCountRows } = await pool.query(
+    const { rows: cardCountRows } = await poolInstance.query(
       'SELECT COUNT(*)::int AS count FROM cards WHERE deck_id = $1',
       [deck_id]
     );
@@ -60,7 +83,7 @@ router.post('/listings', requireXHR, authenticate, requireActiveUser, checkTrial
     }
 
     // Check not already listed
-    const { rows: existingListing } = await pool.query(
+    const { rows: existingListing } = await poolInstance.query(
       'SELECT id FROM marketplace_listings WHERE deck_id = $1',
       [deck_id]
     );
@@ -69,7 +92,7 @@ router.post('/listings', requireXHR, authenticate, requireActiveUser, checkTrial
     }
 
     // Check active + pending listing count
-    const { rows: activeCount } = await pool.query(
+    const { rows: activeCount } = await poolInstance.query(
       "SELECT COUNT(*)::int AS count FROM marketplace_listings WHERE seller_id = $1 AND status IN ('active', 'pending_review')",
       [req.userId]
     );
@@ -78,7 +101,7 @@ router.post('/listings', requireXHR, authenticate, requireActiveUser, checkTrial
     }
 
     // Check seller has accepted terms and has Stripe Connect charges enabled
-    const { rows: userRows } = await pool.query(
+    const { rows: userRows } = await poolInstance.query(
       'SELECT connect_charges_enabled, seller_terms_accepted_at FROM users WHERE id = $1',
       [req.userId]
     );
@@ -90,7 +113,7 @@ router.post('/listings', requireXHR, authenticate, requireActiveUser, checkTrial
     }
 
     // Check duplicate title in same category by same seller
-    const { rows: dupeRows } = await pool.query(
+    const { rows: dupeRows } = await poolInstance.query(
       "SELECT id FROM marketplace_listings WHERE seller_id = $1 AND category_id = $2 AND title = $3 AND status IN ('active', 'pending_review')",
       [req.userId, category_id, deckRows[0].title]
     );
@@ -99,7 +122,7 @@ router.post('/listings', requireXHR, authenticate, requireActiveUser, checkTrial
     }
 
     // Create listing
-    const client = await pool.connect();
+    const client = await poolInstance.connect();
     try {
       await client.query('BEGIN');
 
@@ -122,7 +145,7 @@ router.post('/listings', requireXHR, authenticate, requireActiveUser, checkTrial
       }
 
       await client.query('COMMIT');
-      trackServerEvent(req.userId, 'listing_created', { listing_id: listing.id, price_cents: price_cents });
+      trackServerEventFn(req.userId, 'listing_created', { listing_id: listing.id, price_cents: price_cents });
       res.status(201).json({ listing });
     } catch (err) {
       await client.query('ROLLBACK');
@@ -137,11 +160,11 @@ router.post('/listings', requireXHR, authenticate, requireActiveUser, checkTrial
 });
 
 // Update a listing
-router.patch('/listings/:id', requireXHR, authenticate, requireActiveUser, checkTrialExpiry, requirePlan('pro'), async (req, res) => {
+router.patch('/listings/:id', requireXHRMiddleware, authenticateMiddleware, requireActiveUserMiddleware, checkTrialExpiryMiddleware, requirePlanMiddleware('pro'), async (req, res) => {
   const { description, price_cents, tags } = req.body;
 
   try {
-    const { rows } = await pool.query(
+    const { rows } = await poolInstance.query(
       'SELECT * FROM marketplace_listings WHERE id = $1 AND seller_id = $2',
       [req.params.id, req.userId]
     );
@@ -161,7 +184,7 @@ router.patch('/listings/:id', requireXHR, authenticate, requireActiveUser, check
 
     const descriptionChanged = description !== undefined && description !== rows[0].description;
 
-    const client = await pool.connect();
+    const client = await poolInstance.connect();
     try {
       await client.query('BEGIN');
 
@@ -214,7 +237,7 @@ router.patch('/listings/:id', requireXHR, authenticate, requireActiveUser, check
       client.release();
     }
 
-    const { rows: updated } = await pool.query(
+    const { rows: updated } = await poolInstance.query(
       'SELECT * FROM marketplace_listings WHERE id = $1',
       [req.params.id]
     );
@@ -226,9 +249,9 @@ router.patch('/listings/:id', requireXHR, authenticate, requireActiveUser, check
 });
 
 // Delist a listing (soft delete)
-router.delete('/listings/:id', requireXHR, authenticate, requireActiveUser, async (req, res) => {
+router.delete('/listings/:id', requireXHRMiddleware, authenticateMiddleware, requireActiveUserMiddleware, async (req, res) => {
   try {
-    const { rows } = await pool.query(
+    const { rows } = await poolInstance.query(
       `UPDATE marketplace_listings SET status = 'delisted', delisted_at = NOW(), updated_at = NOW()
        WHERE id = $1 AND seller_id = $2 AND status = 'active'
        RETURNING id`,
@@ -245,9 +268,9 @@ router.delete('/listings/:id', requireXHR, authenticate, requireActiveUser, asyn
 });
 
 // Relist a delisted listing
-router.post('/listings/:id/relist', requireXHR, authenticate, requireActiveUser, checkTrialExpiry, requirePlan('pro'), async (req, res) => {
+router.post('/listings/:id/relist', requireXHRMiddleware, authenticateMiddleware, requireActiveUserMiddleware, checkTrialExpiryMiddleware, requirePlanMiddleware('pro'), async (req, res) => {
   try {
-    const { rows: userRows } = await pool.query(
+    const { rows: userRows } = await poolInstance.query(
       'SELECT connect_charges_enabled, seller_terms_accepted_at FROM users WHERE id = $1',
       [req.userId]
     );
@@ -259,7 +282,7 @@ router.post('/listings/:id/relist', requireXHR, authenticate, requireActiveUser,
     }
 
     // Check current listing state
-    const { rows: listingRows } = await pool.query(
+    const { rows: listingRows } = await poolInstance.query(
       'SELECT id, moderation_status FROM marketplace_listings WHERE id = $1 AND seller_id = $2 AND status = $3',
       [req.params.id, req.userId, 'delisted']
     );
@@ -269,7 +292,7 @@ router.post('/listings/:id/relist', requireXHR, authenticate, requireActiveUser,
 
     if (listingRows[0].moderation_status === 'rejected') {
       // Previously rejected — needs re-review, can't go directly to active
-      await pool.query(
+      await poolInstance.query(
         `UPDATE marketplace_listings
          SET status = 'pending_review', moderation_status = 'pending',
              moderation_requested_at = NOW(), updated_at = NOW()
@@ -278,7 +301,7 @@ router.post('/listings/:id/relist', requireXHR, authenticate, requireActiveUser,
       );
     } else {
       // Normal relist (previously approved/delisted)
-      await pool.query(
+      await poolInstance.query(
         `UPDATE marketplace_listings SET status = 'active', updated_at = NOW()
          WHERE id = $1 AND seller_id = $2`,
         [req.params.id, req.userId]
@@ -293,9 +316,9 @@ router.post('/listings/:id/relist', requireXHR, authenticate, requireActiveUser,
 });
 
 // Get seller's own listings
-router.get('/listings', authenticate, async (req, res) => {
+router.get('/listings', authenticateMiddleware, async (req, res) => {
   try {
-    const { rows } = await pool.query(`
+    const { rows } = await poolInstance.query(`
       SELECT ml.*, mc.name AS category_name,
              (SELECT COUNT(*)::int FROM cards WHERE deck_id = ml.deck_id) AS card_count,
              ARRAY(SELECT tag FROM listing_tags WHERE listing_id = ml.id) AS tags
@@ -312,9 +335,9 @@ router.get('/listings', authenticate, async (req, res) => {
 });
 
 // Seller dashboard stats
-router.get('/dashboard', authenticate, async (req, res) => {
+router.get('/dashboard', authenticateMiddleware, async (req, res) => {
   try {
-    const { rows: stats } = await pool.query(`
+    const { rows: stats } = await poolInstance.query(`
       SELECT
         COALESCE(SUM(price_cents - platform_fee_cents), 0)::int AS total_earnings_cents,
         COALESCE(SUM(price_cents), 0)::int AS total_gross_cents,
@@ -324,7 +347,7 @@ router.get('/dashboard', authenticate, async (req, res) => {
       FROM purchases WHERE seller_id = $1
     `, [req.userId]);
 
-    const { rows: listingStats } = await pool.query(`
+    const { rows: listingStats } = await poolInstance.query(`
       SELECT
         COUNT(*)::int FILTER (WHERE status = 'active') AS active_listings,
         COUNT(*)::int AS total_listings,
@@ -343,9 +366,9 @@ router.get('/dashboard', authenticate, async (req, res) => {
 });
 
 // Accept seller terms
-router.post('/accept-terms', requireXHR, authenticate, requireActiveUser, checkTrialExpiry, requirePlan('pro'), async (req, res) => {
+router.post('/accept-terms', requireXHRMiddleware, authenticateMiddleware, requireActiveUserMiddleware, checkTrialExpiryMiddleware, requirePlanMiddleware('pro'), async (req, res) => {
   try {
-    const { rows } = await pool.query(
+    const { rows } = await poolInstance.query(
       'SELECT seller_terms_accepted_at, seller_terms_version FROM users WHERE id = $1',
       [req.userId]
     );
@@ -359,11 +382,11 @@ router.post('/accept-terms', requireXHR, authenticate, requireActiveUser, checkT
       });
     }
 
-    const { rows: updated } = await pool.query(
+    const { rows: updated } = await poolInstance.query(
       'UPDATE users SET seller_terms_accepted_at = NOW(), seller_terms_version = 1 WHERE id = $1 RETURNING seller_terms_accepted_at, seller_terms_version',
       [req.userId]
     );
-    trackServerEvent(req.userId, 'seller_terms_accepted');
+    trackServerEventFn(req.userId, 'seller_terms_accepted');
     res.json(updated[0]);
   } catch (err) {
     console.error('Accept terms error:', err);
@@ -372,10 +395,10 @@ router.post('/accept-terms', requireXHR, authenticate, requireActiveUser, checkT
 });
 
 // Stripe Connect onboarding — create Express account + account link
-router.post('/onboard', requireXHR, authenticate, requireActiveUser, checkTrialExpiry, requirePlan('pro'), async (req, res) => {
+router.post('/onboard', requireXHRMiddleware, authenticateMiddleware, requireActiveUserMiddleware, checkTrialExpiryMiddleware, requirePlanMiddleware('pro'), async (req, res) => {
   try {
     // Gate on terms acceptance
-    const { rows: termsRows } = await pool.query(
+    const { rows: termsRows } = await poolInstance.query(
       'SELECT seller_terms_accepted_at FROM users WHERE id = $1',
       [req.userId]
     );
@@ -383,8 +406,8 @@ router.post('/onboard', requireXHR, authenticate, requireActiveUser, checkTrialE
       return res.status(403).json({ error: 'terms_required', message: 'You must accept seller terms before connecting Stripe.' });
     }
 
-    const stripe = getStripe();
-    const { rows } = await pool.query(
+    const stripe = getStripeFn();
+    const { rows } = await poolInstance.query(
       'SELECT email, stripe_connect_account_id FROM users WHERE id = $1',
       [req.userId]
     );
@@ -404,7 +427,7 @@ router.post('/onboard', requireXHR, authenticate, requireActiveUser, checkTrialE
         metadata: { user_id: req.userId },
       });
       accountId = account.id;
-      await pool.query(
+      await poolInstance.query(
         'UPDATE users SET stripe_connect_account_id = $1 WHERE id = $2',
         [accountId, req.userId]
       );
@@ -413,13 +436,13 @@ router.post('/onboard', requireXHR, authenticate, requireActiveUser, checkTrialE
     // Create account link
     const accountLink = await stripe.accountLinks.create({
       account: accountId,
-      refresh_url: buildClientUrl('/seller', { query: { connect: 'refresh' } }),
-      return_url: buildClientUrl('/seller', { query: { connect: 'return' } }),
+      refresh_url: buildClientUrlFn('/seller', { query: { connect: 'refresh' } }),
+      return_url: buildClientUrlFn('/seller', { query: { connect: 'return' } }),
       type: 'account_onboarding',
       collection_options: { fields: 'eventually_due' },
     });
 
-    trackServerEvent(req.userId, 'seller_onboarding_started');
+    trackServerEventFn(req.userId, 'seller_onboarding_started');
     res.json({ url: accountLink.url });
   } catch (err) {
     console.error('Connect onboarding error:', err);
@@ -428,10 +451,10 @@ router.post('/onboard', requireXHR, authenticate, requireActiveUser, checkTrialE
 });
 
 // Regenerate account link (they're single-use and expire)
-router.get('/onboard/refresh', authenticate, async (req, res) => {
+router.get('/onboard/refresh', authenticateMiddleware, async (req, res) => {
   try {
-    const stripe = getStripe();
-    const { rows } = await pool.query(
+    const stripe = getStripeFn();
+    const { rows } = await poolInstance.query(
       'SELECT stripe_connect_account_id FROM users WHERE id = $1',
       [req.userId]
     );
@@ -442,8 +465,8 @@ router.get('/onboard/refresh', authenticate, async (req, res) => {
 
     const accountLink = await stripe.accountLinks.create({
       account: accountId,
-      refresh_url: buildClientUrl('/seller', { query: { connect: 'refresh' } }),
-      return_url: buildClientUrl('/seller', { query: { connect: 'return' } }),
+      refresh_url: buildClientUrlFn('/seller', { query: { connect: 'refresh' } }),
+      return_url: buildClientUrlFn('/seller', { query: { connect: 'return' } }),
       type: 'account_onboarding',
       collection_options: { fields: 'eventually_due' },
     });
@@ -456,10 +479,10 @@ router.get('/onboard/refresh', authenticate, async (req, res) => {
 });
 
 // Verify Connect status after return from Stripe
-router.get('/onboard/return', authenticate, async (req, res) => {
+router.get('/onboard/return', authenticateMiddleware, async (req, res) => {
   try {
-    const stripe = getStripe();
-    const { rows } = await pool.query(
+    const stripe = getStripeFn();
+    const { rows } = await poolInstance.query(
       'SELECT stripe_connect_account_id FROM users WHERE id = $1',
       [req.userId]
     );
@@ -471,14 +494,14 @@ router.get('/onboard/return', authenticate, async (req, res) => {
     // Return URL does NOT mean onboarding is complete — verify via API
     const account = await stripe.accounts.retrieve(accountId);
 
-    await pool.query(
+    await poolInstance.query(
       `UPDATE users SET connect_charges_enabled = $1, connect_payouts_enabled = $2 WHERE id = $3`,
       [account.charges_enabled, account.payouts_enabled, req.userId]
     );
 
     const onboarded = account.charges_enabled && account.details_submitted;
     if (onboarded) {
-      trackServerEvent(req.userId, 'seller_onboarding_completed');
+      trackServerEventFn(req.userId, 'seller_onboarding_completed');
     }
     res.json({
       onboarded,
@@ -493,4 +516,7 @@ router.get('/onboard/return', authenticate, async (req, res) => {
   }
 });
 
-export default router;
+  return router;
+}
+
+export default createSellerRouter();

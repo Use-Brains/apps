@@ -52,6 +52,18 @@ test('getFeatureFlags uses safe defaults and respects explicit false values', as
   );
 });
 
+test('getFeatureFlags defaults seller tools off in the handoff runtime', async () => {
+  await withEnv(
+    {
+      FEATURE_SELLER_TOOLS: undefined,
+    },
+    () => {
+      const flags = getFeatureFlags();
+      assert.equal(flags.sellerTools, false);
+    }
+  );
+});
+
 test('getStorageConfig infers supabase provider and supports public base override', async () => {
   await withEnv(
     {
@@ -112,6 +124,20 @@ test('getClientBuildConfig is opt-in and preserves explicit dist path overrides'
       const config = getClientBuildConfig();
       assert.equal(config.enabled, true);
       assert.equal(config.distPath, '/srv/polsia/client-dist');
+    }
+  );
+});
+
+test('getClientBuildConfig defaults unified serving on when env is unset', async () => {
+  await withEnv(
+    {
+      SERVE_CLIENT_BUILD: undefined,
+      CLIENT_DIST_PATH: undefined,
+    },
+    () => {
+      const config = getClientBuildConfig();
+      assert.equal(config.enabled, true);
+      assert.equal(config.distPath, null);
     }
   );
 });

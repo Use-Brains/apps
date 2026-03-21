@@ -12,7 +12,7 @@ function normalizeBaseUrl(value, fallback = DEFAULT_CLIENT_URL) {
 
 export function getFeatureFlags(env = process.env) {
   return {
-    sellerTools: parseBooleanFlag(env.FEATURE_SELLER_TOOLS, true),
+    sellerTools: parseBooleanFlag(env.FEATURE_SELLER_TOOLS, false),
     nativeAuthSessions: parseBooleanFlag(env.FEATURE_NATIVE_AUTH_SESSIONS, true),
     nativeBilling: parseBooleanFlag(env.FEATURE_NATIVE_BILLING, true),
     pushNotifications: parseBooleanFlag(env.FEATURE_PUSH_NOTIFICATIONS, true),
@@ -102,7 +102,7 @@ export function buildClientUrl(pathname = '/', options = {}, env = process.env) 
 
 export function getClientBuildConfig(env = process.env) {
   return {
-    enabled: parseBooleanFlag(env.SERVE_CLIENT_BUILD, false),
+    enabled: parseBooleanFlag(env.SERVE_CLIENT_BUILD, true),
     distPath: env.CLIENT_DIST_PATH || null,
   };
 }

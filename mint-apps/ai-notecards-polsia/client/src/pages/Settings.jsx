@@ -308,7 +308,11 @@ export default function Settings() {
   const handleCancel = async () => {
     if (!confirm('Cancel your Pro subscription? You\'ll keep access until the end of your billing period.')) return;
     try {
-      await api.cancelSubscription();
+      const result = await api.cancelSubscription();
+      if (result.status === 'unavailable') {
+        toast(result.message);
+        return;
+      }
       toast.success('Subscription will cancel at end of billing period');
       await refreshUser();
     } catch (err) {
@@ -532,6 +536,10 @@ export default function Settings() {
         {/* Subscription */}
         <section className="bg-white rounded-2xl p-6 border border-gray-100 mb-6">
           <h2 className="text-lg font-semibold text-[#1A1614] mb-4">Subscription</h2>
+          <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4 mb-4">
+            <p className="text-sm font-medium text-[#1A1614] mb-1">Billing is a placeholder in this handoff build</p>
+            <p className="text-sm text-[#6B635A]">Upgrade, billing portal, and cancellation actions will return a coming-soon response until Polsia wires the payment system.</p>
+          </div>
           <div className="flex items-center gap-3 mb-4">
             <span className="text-[#1A1614] font-medium capitalize">{user?.plan} plan</span>
             {user?.plan === 'trial' && user?.trial_ends_at && (
@@ -563,6 +571,11 @@ export default function Settings() {
                     setPortalLoading(true);
                     try {
                       const data = await api.createBillingPortal();
+                      if (data.status === 'unavailable') {
+                        toast(data.message);
+                        setPortalLoading(false);
+                        return;
+                      }
                       window.location.href = data.url;
                     } catch (err) {
                       toast.error(err.message);

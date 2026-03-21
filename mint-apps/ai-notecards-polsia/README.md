@@ -1,288 +1,127 @@
-# AI Notecards
+# AI Notecards Polsia Sandbox
 
-AI-powered flashcard app with a peer-to-peer marketplace. Paste your notes or type a topic — AI generates study flashcards instantly. Buy and sell decks from other learners.
+This sandbox is the Polsia handoff-prep copy of AI Notecards. Phase 4 now assumes a unified Express-serves-client runtime, a squashed handoff migration, and placeholder shells for deferred billing, seller, and admin workflows.
 
-## Features
+## Current handoff shape
 
-- **AI Generation** — Paste notes or type a topic, get 8–25 study flashcards in seconds (Groq + Gemini fallback)
-- **Study Mode** — Flip-card interface with keyboard shortcuts, progress tracking, and study score
-- **iOS Offline Study** — Download decks, study locally, and sync queued sessions when connectivity returns
-- **Deck Marketplace** — Browse, search, and buy flashcard decks from other users ($1–$5)
-- **Sell Your Decks** — List your best AI-generated decks and earn 50% of every sale via Stripe Connect
-- **Ratings & Reviews** — Rate purchased decks after studying, 1–5 stars
-- **Content Moderation** — Report inappropriate listings, admin review queue
-- **Tiered Plans** — Free (1 gen/day), 7-day trial (10 gen/day), Pro at $9/mo (10 gen/day + selling)
+- Web core stays active:
+  - auth
+  - deck CRUD
+  - AI generation
+  - study flows
+  - marketplace browse and listing detail
+- Deferred surfaces stay present as shells:
+  - buyer purchase routes return `{ status: "unavailable", message: "Deck purchases coming soon" }`
+  - `/api/stripe/*` returns billing placeholders
+  - seller routes/pages stay present as coming-soon shells
+  - admin moderation routes/pages stay present as coming-soon shells
+- Unified runtime is now the default:
+  - Express serves `client/dist` by default
+  - `client/vercel.json` is removed from the handoff path
 
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Frontend | React 19, Vite, Tailwind CSS 3, react-router-dom v7 |
-| Backend | Node.js, Express 4, ES modules |
-| Database | PostgreSQL (Supabase in production) |
-| AI | Groq (llama-3.3-70b) primary, Google Gemini fallback |
-| Auth | bcrypt + JWT in httpOnly cookies |
-| Payments | Stripe Checkout (subscriptions) + Stripe Connect Express (marketplace) |
-| Mobile Offline | Expo SQLite + NetInfo + MMKV |
-
-## Polsia Prep Notes
-
-- The copied Polsia sandbox now supports an env-driven web API base via `VITE_API_URL`, so it can run in split or unified deployments.
-- The server can now optionally serve the built web client in a unified Express deployment:
-  - `SERVE_CLIENT_BUILD=true`
-  - `CLIENT_DIST_PATH=/absolute/path/to/client/dist` (optional override)
-- Server runtime flags now exist for boundary hardening:
-  - `FEATURE_SELLER_TOOLS`
-  - `FEATURE_NATIVE_AUTH_SESSIONS`
-  - `FEATURE_NATIVE_BILLING`
-  - `FEATURE_PUSH_NOTIFICATIONS`
-- Storage now has an explicit provider/public-base boundary:
-  - `STORAGE_PROVIDER`
-  - `STORAGE_PUBLIC_BASE_URL`
-- Current seller and native systems are still present, but the copied app is being prepared so those surfaces can be disabled cleanly without deleting product logic.
-- When `FEATURE_SELLER_TOOLS=false`, seller pages stay visible on web but render in a read-only disabled state instead of immediately failing into seller API calls.
-- The copied app now also includes phase 2 structure-alignment prep:
-  - root build/start/migrate scripts in `package.json`
-  - a draft `render.yaml`
-  - a thin `server/index.js` entrypoint adapter
-  - `POLSIA_STRUCTURE_MAP.md` for current-to-target path mapping
-- Phase 3 has started with:
-  - a DB compatibility surface in `server/src/db/index.js`
-  - a future-facing wrapper in `server/db/index.js`
-  - `POLSIA_ROUTE_MATRIX.md` for route classification and legacy Vercel-removal criteria
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+
-- PostgreSQL 14+
-- Stripe account (test mode)
-- Groq API key (and optionally Gemini)
-
-### Setup
+## Install
 
 ```bash
-# Install dependencies
-cd client && npm install
-cd ../server && npm install
-
-# Create database
-createdb notecards
-
-# Configure environment
-cp server/.env.example server/.env
-# Edit server/.env with your API keys (see Environment Variables below)
-
-# Run migrations
-cd server && npm run migrate
-
-# Optional: seed demo data
-npm run seed
-# Demo user: demo@example.com / password123
+npm --prefix server ci
+npm --prefix client ci
 ```
 
-### Environment Variables
+## Environment
 
-Create `server/.env` from `server/.env.example`:
+Copy `server/.env.example` to `server/.env` and set at least:
 
 ```env
-DATABASE_URL=postgresql://localhost:5432/notecards
-DATABASE_URL_DIRECT=postgresql://localhost:5432/notecards
-DATABASE_POOL_MAX=12
-DATABASE_IDLE_TIMEOUT_MS=30000
-DATABASE_CONNECTION_TIMEOUT_MS=5000
+DATABASE_URL=postgresql://localhost:5432/notecards_polsia_handoff
+DATABASE_URL_DIRECT=postgresql://localhost:5432/notecards_polsia_handoff
+JWT_SECRET=replace-me
 GROQ_API_KEY=gsk_xxx
 GEMINI_API_KEY=your-gemini-key
-AI_PROVIDER=groq
-JWT_SECRET=your-jwt-secret
-RESEND_API_KEY=re_xxx
-RESEND_FROM_EMAIL=noreply@ai-notecards.com
-STRIPE_SECRET_KEY=sk_test_xxx
-STRIPE_WEBHOOK_SECRET=whsec_xxx
-STRIPE_CONNECT_WEBHOOK_SECRET=whsec_xxx
-STRIPE_PRO_PRICE_ID=price_xxx
-CLIENT_URL=http://localhost:5173
-SERVE_CLIENT_BUILD=false
-CLIENT_DIST_PATH=
-PORT=3001
-NODE_ENV=development
+CLIENT_URL=http://localhost:3001
+SERVE_CLIENT_BUILD=true
+FEATURE_SELLER_TOOLS=false
 ```
 
-### Run
+Notes:
+
+- `SERVE_CLIENT_BUILD=true` is already the default runtime behavior.
+- `FEATURE_SELLER_TOOLS=false` is the default handoff mode and keeps seller pages in shell/read-only mode.
+- Billing env vars can remain unset for the handoff path because `/api/stripe/*` is placeholder-only.
+
+## Fresh handoff boot path
+
+Use this path for a fresh Polsia-style local boot on a new database.
 
 ```bash
-# Terminal 1 — server
-cd server && npm run dev    # http://localhost:3001
-
-# Terminal 2 — client
-cd client && npm run dev    # http://localhost:5173
+createdb notecards_polsia_handoff
+npm run build
+npm run setup:handoff
+npm run start
 ```
 
-Open http://localhost:5173
+That flow does the following:
 
-## iOS Mobile Development
+- builds the web client into `client/dist`
+- applies `server/db/migrations/001_initial.sql`
+- seeds curated marketplace/sample data from `server/db/seed.js`
+- starts Express, which serves both the API and the built client
 
-The iOS app lives in [mobile](/Users/kashane/app-dev/apps/ai-notecards/mobile) and should be developed as a custom Expo dev client app, not as an Expo Go-only app.
+Open `http://localhost:3001`.
 
-### One-Time Setup
+Seed login:
+
+- `maya.chen@example.com / password123`
+
+## Handoff DB commands
 
 ```bash
-cd /Users/kashane/app-dev/apps/ai-notecards/mobile
-npm install
-cp .env.example .env
+npm run migrate:handoff
+npm run seed:handoff
+npm run setup:handoff
 ```
 
-Set at least:
+Safety note:
 
-```env
-APP_ENV=development
-EXPO_PUBLIC_API_URL=http://localhost:3001/api
-```
+- `npm run migrate:handoff` refuses to run against a database that already contains the legacy multi-file migration history.
+- The legacy chain is still available via `npm run migrate` and the old demo seed via `npm --prefix server run seed`.
 
-If you later initialize EAS for this app, also set:
+## Legacy dev split
 
-```env
-EXPO_PUBLIC_EAS_PROJECT_ID=your-eas-project-id
-```
-
-### Local iOS Workflow
-
-Start the backend and Metro together from the repo root:
+If you still want the separate Vite dev server while working inside the sandbox:
 
 ```bash
-cd /Users/kashane/app-dev/apps/ai-notecards
-npm run app
+npm run dev:server
+npm run dev:client
 ```
 
-Install the local simulator dev build when needed:
+In that mode the client talks to `/api` through `VITE_API_URL` instead of a Vercel rewrite.
 
-```bash
-npm run app:ios:simulator
-```
+## Files that matter for phase 4
 
-This uses `APP_ENV=development`, which keeps the app on a non-production bundle identifier and disables production-only iOS capabilities that should not block routine simulator work.
-It should install to the iOS Simulator without requiring code signing.
-The mobile script also pre-generates React Native iOS codegen artifacts before invoking `expo run:ios`.
+- `server/db/migrations/001_initial.sql`
+- `server/db/migrate.js`
+- `server/db/seed.js`
+- `server/src/routes/marketplace.js`
+- `server/src/routes/handoff-billing.js`
+- `server/src/routes/seller.js`
+- `server/src/routes/admin.js`
+- `server/src/config/runtime.js`
 
-### EAS Build Profiles
+## Verification run
 
-- `npm run app:ios:device` — development device build
-- `npm run app:ios:preview` — internal QA / preview build
-- `npm run app:ios:production` — production App Store build
+Verified locally in this sandbox:
 
-### App Environments
+- `npm --prefix server ci`
+- `npm --prefix client ci`
+- `npm --prefix server test -- src/config/runtime.test.js src/routes/marketplace.test.js src/routes/seller.test.js`
+- `npm --prefix client run build`
 
-- `development` — local simulator / local dev client
-- `preview` — internal testing with production-like capabilities
-- `production` — final shipping app identity
+Not verified here:
 
-The environment-specific app identity is defined in [mobile/app.config.js](/Users/kashane/app-dev/apps/ai-notecards/mobile/app.config.js).
+- `npm run setup:handoff`
+- `npm run start` against a real Postgres database
 
-## Database
+## Next phase
 
-Migrations are versioned SQL files in `server/src/db/migrations/`:
-
-| Migration | Description |
-|-----------|-------------|
-| `001_initial.sql` | Users, decks, cards, study_sessions |
-| `002_tiers_and_marketplace_prep.sql` | Tier columns, Connect fields, deck origin |
-| `003_marketplace.sql` | Categories, listings, tags, purchases, full-text search |
-| `004_ratings_and_flags.sql` | Ratings, content flags |
-
-```bash
-cd server && npm run migrate
-```
-
-The migrator tracks applied versions in a `schema_migrations` table and runs each migration in a transaction.
-
-## Stripe Setup
-
-### Subscriptions
-
-1. Create a Product + Price in Stripe Dashboard ($9/mo recurring)
-2. Set `STRIPE_PRO_PRICE_ID` to the price ID
-3. Create a webhook endpoint pointing to `<server-url>/api/stripe/webhook`
-4. Subscribe to events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `payment_intent.succeeded`, `invoice.payment_failed`
-5. Set `STRIPE_WEBHOOK_SECRET` to the webhook signing secret
-
-### Stripe Connect (Marketplace)
-
-1. Enable Stripe Connect in your Stripe Dashboard (Express accounts)
-2. Create a separate webhook endpoint for `<server-url>/webhooks/stripe-connect`
-3. Subscribe to events: `account.updated`, `account.application.deauthorized`
-4. Set `STRIPE_CONNECT_WEBHOOK_SECRET` to this webhook's signing secret
-
-### Local Webhook Testing
-
-```bash
-stripe listen --forward-to localhost:3001/api/stripe/webhook
-stripe listen --forward-to localhost:3001/webhooks/stripe-connect --connect
-```
-
-## Architecture
-
-```
-┌─────────────┐     ┌──────────────┐     ┌────────────┐
-│  React SPA  │────>│  Express API │────>│ PostgreSQL │
-│  (Vite)     │     │  (port 3001) │     │ (Supabase) │
-└─────────────┘     └──────┬───────┘     └────────────┘
-                           │
-                    ┌──────┴───────┐
-                    │   Stripe     │
-                    │  Checkout +  │
-                    │   Connect    │
-                    └──────────────┘
-```
-
-**Key flows:**
-
-- **Purchase:** Buyer clicks Buy -> Stripe Checkout (destination charge, 50/50 split) -> `payment_intent.succeeded` webhook -> idempotent copy-on-purchase (deck + cards copied in transaction)
-- **Rating:** Complete study session on purchased deck -> rating modal -> atomic SQL average update
-- **Trial:** Signup sets `trial_ends_at = NOW() + 7 days` -> `checkTrialExpiry` middleware auto-downgrades on every authenticated request (no cron needed)
-
-## Production Deployment
-
-### Supabase
-
-- Use Supabase Pro ($25/mo) — free tier pauses after 7 days of inactivity
-- `DATABASE_URL`: Supavisor session mode (port 5432), pool max 12
-- `DATABASE_URL_DIRECT`: Direct connection for migrations
-- SSL required: `ssl: { rejectUnauthorized: false }`
-
-### Server
-
-Deploy to Railway, Render, or any Node.js host:
-- Set all env vars from `.env.example`
-- Run `npm run migrate` on deploy
-- Ensure `NODE_ENV=production`
-
-Optional unified deployment prep:
-- Build the client first
-- Set `SERVE_CLIENT_BUILD=true`
-- Leave `CLIENT_DIST_PATH` empty if the built client will live at `client/dist` relative to the copied app, or set an absolute override
-- A draft `render.yaml` now exists at the repo root for the confirmed Polsia single-service deployment shape
-- `client/vercel.json` is now a legacy compatibility artifact and should only be removed after the unified root build/start flow is verified
-
-### Client
-
-Deploy to Cloudflare Pages, Vercel, or Netlify:
-- Build command: `npm run build`
-- Output directory: `dist`
-- Set `VITE_API_URL` to your production server URL
-
-## Atlas Agent Handoff Docs
-
-For Atlas setup and future repo handoff, start with these files:
-
-- `SOUL.md` — Atlas identity, judgment, and operating posture
-- `AGENTS.md` — repo-specific scope, guardrails, and working rules
-- `docs/agent-handoff/atlas-start-here.md` — fast orientation guide for Atlas
-- `docs/contracts/mobile-backend-contracts.md` — cross-layer contracts Atlas should treat as sensitive
-- `docs/agent-priorities/current-mobile-priorities.md` — current mobile priority stack for launch-focused work
-
-These are intended to keep Atlas scoped to AI Notecards, mobile-first, and careful around offline sync, auth, entitlements, environment setup, and other cross-layer risks.
-
-## License
-
-Private — all rights reserved.
+- Decide when the legacy `server/src/db/migrations/*` chain can be retired from the sandbox
+- Wire real billing/purchase infrastructure in the eventual Polsia repo
+- Replace shell seller/admin areas with production flows only after the target environment owns payments and moderation

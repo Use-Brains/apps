@@ -5,12 +5,10 @@ services:
     name: ai-notecards-polsia
     runtime: node
     buildCommand: npm --prefix server ci && npm --prefix client ci && npm run build:client
-    startCommand: npm run start:render
+    startCommand: npm run start
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
-      - key: SERVE_CLIENT_BUILD
-        value: "true"
       - key: CLIENT_DIST_PATH
         value: /opt/render/project/src/client/dist
