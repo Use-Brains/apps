@@ -237,11 +237,13 @@ Phase 3 batch 1 now includes:
 - Rewrite imports in one controlled pass after the compatibility surfaces from phases 2 and 3 exist
 - Validate auth, deck CRUD, generation, and study flows on the moved layout
 - Keep marketplace selling, native billing, and mobile parity out of the first production candidate
+- Run a human-relayed prompt loop with Polsia so migration assumptions, missing prep tasks, and any expected data handoff format are clarified before irreversible packaging moves
 
 ### Phase 5: Reintroduce optional systems
 
 - Reassess storage, subscriptions, marketplace, and mobile in that order
 - Only reintroduce each system after its boundary is explicit and testable
+- Continue the Polsia prompt loop for deferred systems like storage migration, payments replacement, and any eventual data import/export responsibilities
 
 ## Top technical blockers
 
@@ -295,3 +297,13 @@ Phase 3 batch 1 now includes:
 - Route compatibility matrix with exact files
 - Clear classification of web-core, optional, and deferred surfaces
 - Removal conditions for legacy deploy artifacts like `client/vercel.json`
+
+## Collaboration track
+
+- Use a human-relayed prompt loop with Polsia to exchange:
+  - current repo-state summaries
+  - structure and deployment assumptions
+  - database and storage migration expectations
+  - any requested prep work before code/data handoff
+- Keep those prompts grounded in the current copied sandbox state rather than hypothetical final architecture
+- Track this in `POLSIA_COLLAB_PROMPTS.md`
