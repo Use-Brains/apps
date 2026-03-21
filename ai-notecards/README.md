@@ -233,6 +233,18 @@ Deploy to Cloudflare Pages, Vercel, or Netlify:
 - Output directory: `dist`
 - Set `VITE_API_URL` to your production server URL
 
+## Atlas Agent Handoff Docs
+
+For Atlas setup and future repo handoff, start with these files:
+
+- `SOUL.md` — Atlas identity, judgment, and operating posture
+- `AGENTS.md` — repo-specific scope, guardrails, and working rules
+- `docs/agent-handoff/atlas-start-here.md` — fast orientation guide for Atlas
+- `docs/contracts/mobile-backend-contracts.md` — cross-layer contracts Atlas should treat as sensitive
+- `docs/agent-priorities/current-mobile-priorities.md` — current mobile priority stack for launch-focused work
+
+These are intended to keep Atlas scoped to AI Notecards, mobile-first, and careful around offline sync, auth, entitlements, environment setup, and other cross-layer risks.
+
 ## License
 
 Private — all rights reserved.
