@@ -158,19 +158,8 @@ If that scope is accepted, the first code refactor should be an infrastructure b
 
 ## Packaging / path-move prep in progress
 
-- Promoted these live route implementations into `server/routes/*`:
-  - `auth`
-  - `auth-google`
-  - `auth-magic`
-  - `decks`
-  - `generate`
-  - `marketplace`
-  - `study`
-  - `settings`
-  - `ratings`
-  - `notifications`
-  - `revenuecat`
-- Converted the matching `server/src/routes/*` files above into compatibility re-exports
+- Promoted all current live route implementations into `server/routes/*`
+- Converted `server/src/routes/*` into a compatibility re-export layer
 - Updated `server/src/index.js` to consume the future-facing route surface instead of importing directly from `server/src/routes/*`
 - Verified the promoted route surface still imports cleanly and the current server test suite still passes
 
