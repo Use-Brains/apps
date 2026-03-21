@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/AuthContext.jsx';
 import { analytics } from '../lib/analytics.js';
+import { getSellerToolsMode } from '../lib/runtime.js';
 import Navbar from '../components/Navbar.jsx';
 
 function SellerTermsModal({ onAccept, onClose }) {
@@ -74,11 +75,12 @@ function SellerTermsModal({ onAccept, onClose }) {
   );
 }
 
-function getDeckSellState(deck, user) {
+function getDeckSellState(deck, user, sellerToolsEnabled) {
   const isSeller = user.connect_charges_enabled && user.seller_terms_accepted_at;
 
   if (deck.listing_id && deck.listing_status === 'active') return 'view';
   if (deck.listing_id && deck.listing_status === 'delisted') return 'relist';
+  if (!sellerToolsEnabled) return 'hidden';
   if (deck.origin === 'duplicated') return 'disabled-duplicated';
   if (!isSeller) return 'hidden';
   if (deck.origin === 'purchased') return 'hidden';
@@ -131,6 +133,7 @@ function SellIcon({ state, deck, onRelist }) {
 
 export default function Dashboard() {
   const { user, refreshUser } = useAuth();
+  const sellerToolsMode = getSellerToolsMode(user);
   const navigate = useNavigate();
   const [decks, setDecks] = useState([]);
   const [stats, setStats] = useState(null);
@@ -272,7 +275,7 @@ export default function Dashboard() {
     : 0;
   const generatedDeckCount = decks.filter((d) => d.origin !== 'purchased').length;
   const isSeller = user?.connect_charges_enabled && user?.seller_terms_accepted_at;
-  const showSellerBanner = showSellerPrompt && user?.plan === 'pro' && !isSeller;
+  const showSellerBanner = showSellerPrompt && user?.plan === 'pro' && !isSeller && sellerToolsMode.enabled;
 
   if (loading) {
     return (
@@ -475,7 +478,7 @@ export default function Dashboard() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filteredDecks.map((deck) => {
-              const sellState = getDeckSellState(deck, user);
+              const sellState = getDeckSellState(deck, user, sellerToolsMode.enabled);
               return (
                 <div
                   key={deck.id}

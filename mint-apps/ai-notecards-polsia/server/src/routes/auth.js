@@ -6,6 +6,8 @@ import rateLimit from 'express-rate-limit';
 import pool from '../db/pool.js';
 import { PLAN_LIMITS } from '../middleware/plan.js';
 import { trackServerEvent } from '../services/analytics.js';
+import { getFeatureAvailability } from '../config/runtime.js';
+import { resolveAvatarUrl } from '../services/storage.js';
 
 const router = Router();
 export const SALT_ROUNDS = 12;
@@ -112,6 +114,11 @@ export async function respondWithSession(req, res, { user, isNewUser = false, st
   const safeUser = sanitizeUser(user);
 
   if (isNativeClient(req)) {
+    const availability = getFeatureAvailability('nativeAuthSessions');
+    if (!availability.enabled) {
+      return res.status(503).json({ error: availability.message, code: availability.code });
+    }
+
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -135,18 +142,8 @@ export async function respondWithSession(req, res, { user, isNewUser = false, st
   return res.status(statusCode).json({ user: safeUser, isNewUser });
 }
 
-const STORAGE_BASE = process.env.SUPABASE_URL
-  ? `${process.env.SUPABASE_URL}/storage/v1/object/public`
-  : '';
-
 export function sanitizeUser(user) {
-  let resolvedAvatar = null;
-  if (user.avatar_url && STORAGE_BASE) {
-    const cacheBust = user.updated_at ? `?v=${new Date(user.updated_at).getTime()}` : '';
-    resolvedAvatar = `${STORAGE_BASE}/${user.avatar_url}${cacheBust}`;
-  } else if (user.google_avatar_url) {
-    resolvedAvatar = user.google_avatar_url;
-  }
+  const resolvedAvatar = resolveAvatarUrl(user);
 
   return {
     id: user.id,
@@ -175,6 +172,9 @@ export function sanitizeUser(user) {
     apple_connected: !!user.apple_user_id,
     email_verified: !!user.email_verified,
     preferences: user.preferences || {},
+    feature_availability: {
+      seller_tools: getFeatureAvailability('sellerTools'),
+    },
   };
 }
 
@@ -252,6 +252,11 @@ router.post('/refresh', refreshLimiter, async (req, res) => {
   const { refreshToken, deviceInfo } = req.body ?? {};
   if (typeof refreshToken !== 'string' || refreshToken.length < 20) {
     return res.status(400).json({ error: 'Refresh token is required' });
+  }
+
+  const availability = getFeatureAvailability('nativeAuthSessions');
+  if (!availability.enabled) {
+    return res.status(503).json({ error: availability.message, code: availability.code });
   }
 
   const client = await pool.connect();

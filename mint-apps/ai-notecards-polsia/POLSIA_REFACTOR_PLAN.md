@@ -6,6 +6,20 @@
 
 The main technical risk is not Express itself. The highest-coupling areas are seller marketplace payments, Supabase storage assumptions, and iOS-specific auth/offline/billing systems that are mixed into the wider product story. A web-first Polsia alignment should happen before any serious mobile or marketplace parity work.
 
+## First-pass status
+
+This first pass is intentionally narrow. It does not rewrite auth, payments, or the mobile app. It does:
+
+- add a server runtime/config boundary in `server/src/config/runtime.js`
+- move storage URL resolution behind `server/src/services/storage.js`
+- make seller tools and native billing/session behavior explicitly flaggable
+- make the web API base env-driven instead of assuming a Vercel rewrite
+- centralize public app URL construction for checkout, onboarding, email, and notification links
+- add an opt-in Express-serves-client mode for unified deployment prep
+- add a web seller read-only boundary so seller pages remain visible when seller tools are disabled
+
+This means the copied app is closer to a Polsia-ready web-core architecture without deleting existing seller or native product logic.
+
 ## Current stack inventory
 
 - Monorepo app with `client/`, `server/`, `mobile/`, `docs/`, `scripts/`, and `todos/`
@@ -149,6 +163,14 @@ The main technical risk is not Express itself. The highest-coupling areas are se
 - Any backend logic that assumes Supavisor-specific pool/direct URL behavior without abstraction
 - Brand/app-specific naming and config if the Polsia collaboration expects a different product shell
 
+## What should be cut or feature-flagged off
+
+- Seller onboarding and payout setup should be feature-flagged, not deleted
+- RevenueCat reconcile endpoints should be feature-flagged in non-native deployments
+- Native refresh-token session paths should be feature-flagged in web-core deployments
+- Push notification infrastructure should be feature-flagged in web-core deployments
+- Stripe Connect webhook handling should be treated as optional/deferred infrastructure
+
 ## What should be deferred or cut from initial Polsia collaboration
 
 - Stripe Connect seller marketplace
@@ -193,10 +215,18 @@ The main technical risk is not Express itself. The highest-coupling areas are se
 ## Top technical blockers
 
 - Supabase storage is directly embedded in avatar handling and user serialization
-- Frontend deployment assumes Vercel rewrites to Railway
+- `client/vercel.json` still assumes a Vercel rewrite path even though the copied app now has env-driven and unified-serve prep modes
 - Billing is split between Stripe web flows and RevenueCat iOS flows
 - Marketplace logic depends on Stripe Connect webhooks and transactional copy-on-purchase semantics
 - Native auth/offline/session systems are substantial and not aligned to a web-first Polsia collaboration goal
+
+## Highest-risk subsystems
+
+- `server/src/routes/stripe.js` and `server/src/services/purchase.js`
+- `server/src/routes/seller.js`
+- `server/src/services/billing.js`
+- `server/src/routes/auth.js` native-session branch
+- `mobile/src/lib/auth.tsx`, `mobile/src/lib/subscriptions.ts`, and `mobile/src/lib/offline/*`
 
 ## Open questions
 
@@ -209,13 +239,13 @@ The main technical risk is not Express itself. The highest-coupling areas are se
 
 ## Suggested first 10 refactor tasks
 
-1. Rename nothing yet; keep `ai-notecards-polsia` as a functional clone until boundaries are documented.
-2. Add a short `MIGRATION_SCOPE.md` or equivalent checklist if Polsia work starts, scoped to web-first only.
-3. Replace frontend rewrite dependency on Railway with an explicit `VITE_API_URL` path in the copied app.
-4. Add a backend config module that centralizes database, storage, and callback URL env handling.
-5. Extract Supabase avatar storage into a provider-agnostic storage interface.
-6. Inventory all Supabase-specific references and label each as database-hosting-only or storage-coupled.
-7. Fence off marketplace routes/pages behind a feature flag or clear “deferred” module boundary.
-8. Fence off mobile billing and RevenueCat reconciliation from shared billing state where possible.
-9. Verify the web core slice on the copied app only: signup/login, generate, save, study, settings.
-10. After the above, create the first Polsia-targeted branch from this copied sandbox rather than from the original app.
+1. Keep `ai-notecards-polsia` as the only refactor sandbox and avoid touching the original app.
+2. Preserve the current folder structure until the real Polsia repo layout is available.
+3. Keep using `server/src/config/runtime.js` as the single place for new runtime flags.
+4. Extend the storage adapter so avatar/media URLs never require route-level Supabase knowledge.
+5. Replace remaining direct `CLIENT_URL` usage with a centralized public app URL helper.
+6. Add a seller capability/read-only availability layer for the client so seller pages can render disabled states cleanly.
+7. Add a unified web-core deployment mode where Express can serve built frontend assets when needed.
+8. Isolate Stripe Connect webhook and seller onboarding logic behind explicit optional runtime boundaries.
+9. Isolate RevenueCat and native refresh-token support from shared billing/auth code paths.
+10. Once the Polsia repo structure is known, port only the web-core slice first: auth, generation, decks, study, settings, marketplace browse/read.

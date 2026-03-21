@@ -7,7 +7,7 @@ import { authenticate, requireActiveUser } from '../middleware/auth.js';
 import { getStripe } from '../services/stripe.js';
 import { requireXHR } from '../middleware/csrf.js';
 import { SALT_ROUNDS, setTokenCookie } from './auth.js';
-import { uploadAvatar, deleteAvatar } from '../services/storage.js';
+import { buildPublicStorageUrl, uploadAvatar, deleteAvatar } from '../services/storage.js';
 import pool from '../db/pool.js';
 
 const router = Router();
@@ -73,7 +73,7 @@ router.post('/avatar', authenticate, requireXHR, requireActiveUser, (req, res, n
     await pool.query('UPDATE users SET avatar_url = $1 WHERE id = $2', [storagePath, req.userId]);
 
     // Return resolved public URL
-    const publicUrl = `${process.env.SUPABASE_URL}/storage/v1/object/public/${storagePath}?v=${Date.now()}`;
+    const publicUrl = buildPublicStorageUrl(storagePath, { cacheBust: Date.now() });
     res.json({ avatar_url: publicUrl });
   } catch (err) {
     console.error('Avatar upload error:', err);

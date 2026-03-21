@@ -2,23 +2,10 @@ import { Router } from 'express';
 import { authenticate, requireActiveUser } from '../middleware/auth.js';
 import { requireXHR } from '../middleware/csrf.js';
 import { createPurchaseCheckout } from '../services/purchase.js';
+import { getMarketplacePurchaseAvailability } from '../config/runtime.js';
 import pool from '../db/pool.js';
 
 const router = Router();
-
-function getMarketplacePurchaseAvailability() {
-  const iosNativeWebCheckoutEnabled = process.env.IOS_MARKETPLACE_WEB_PURCHASES_ENABLED !== 'false';
-
-  return {
-    ios_native: {
-      enabled: iosNativeWebCheckoutEnabled,
-      code: iosNativeWebCheckoutEnabled ? null : 'IOS_MARKETPLACE_WEB_PURCHASES_DISABLED',
-      message: iosNativeWebCheckoutEnabled
-        ? null
-        : 'Marketplace purchases are temporarily disabled in the iOS app.',
-    },
-  };
-}
 
 // Auto-approve listings stuck in pending_review after 60s (manual review fallback)
 let lastCleanup = 0;

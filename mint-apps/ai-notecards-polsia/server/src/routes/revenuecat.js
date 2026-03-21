@@ -3,6 +3,7 @@ import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import pool from '../db/pool.js';
 import { authenticate, requireActiveUser } from '../middleware/auth.js';
 import { requireXHR } from '../middleware/csrf.js';
+import { getFeatureAvailability } from '../config/runtime.js';
 import { sanitizeUser, USER_SELECT } from './auth.js';
 import { applyRevenueCatWebhookPayload, fetchRevenueCatSubscriber, syncRevenueCatStateForUser } from '../services/billing.js';
 
@@ -24,6 +25,11 @@ function isAuthorizedRevenueCatWebhook(req) {
 }
 
 router.post('/webhook', async (req, res) => {
+  const availability = getFeatureAvailability('nativeBilling');
+  if (!availability.enabled) {
+    return res.status(503).json({ error: availability.message, code: availability.code });
+  }
+
   if (!isAuthorizedRevenueCatWebhook(req)) {
     return res.status(401).json({ error: 'Unauthorized RevenueCat webhook' });
   }
@@ -44,6 +50,11 @@ router.post('/webhook', async (req, res) => {
 });
 
 router.post('/reconcile', requireXHR, authenticate, requireActiveUser, reconcileLimiter, async (req, res) => {
+  const availability = getFeatureAvailability('nativeBilling');
+  if (!availability.enabled) {
+    return res.status(503).json({ error: availability.message, code: availability.code });
+  }
+
   const client = await pool.connect();
   try {
     const subscriber = await fetchRevenueCatSubscriber(req.userId);

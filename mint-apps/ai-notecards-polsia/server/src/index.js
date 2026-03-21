@@ -1,4 +1,7 @@
 import * as Sentry from '@sentry/node';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 if (process.env.SENTRY_DSN) {
   Sentry.init({
@@ -43,10 +46,15 @@ import ratingsRoutes from './routes/ratings.js';
 import accountRoutes from './routes/account.js';
 import adminRoutes from './routes/admin.js';
 import notificationsRoutes from './routes/notifications.js';
+import { getRuntimeConfig } from './config/runtime.js';
 import pool from './db/pool.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const runtime = getRuntimeConfig();
+const serverDir = path.dirname(fileURLToPath(import.meta.url));
+const clientBuild = runtime.deployment.clientBuild;
+const clientDistPath = clientBuild.distPath || path.resolve(serverDir, '../../client/dist');
 const APPLE_TEAM_ID = process.env.APPLE_TEAM_ID || '';
 const IOS_BUNDLE_ID = process.env.IOS_BUNDLE_ID || 'com.ainotecards.app';
 
@@ -63,7 +71,7 @@ app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: runtime.clientUrl,
     credentials: true,
   })
 );
@@ -190,6 +198,21 @@ app.get('/.well-known/apple-app-site-association', (req, res) => {
 app.use('/api/*', (req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
+
+if (clientBuild.enabled) {
+  if (fs.existsSync(clientDistPath)) {
+    app.use(express.static(clientDistPath));
+
+    app.get('*', (req, res, next) => {
+      if (req.method !== 'GET') return next();
+      if (req.path === '/api' || req.path.startsWith('/api/')) return next();
+      if (req.path.startsWith('/webhooks') || req.path.startsWith('/.well-known')) return next();
+      res.sendFile(path.join(clientDistPath, 'index.html'));
+    });
+  } else {
+    console.warn(`SERVE_CLIENT_BUILD is enabled but no client dist was found at ${clientDistPath}`);
+  }
+}
 
 // Sentry error handler (captures errors before the generic handler)
 Sentry.setupExpressErrorHandler(app);

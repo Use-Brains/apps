@@ -3,10 +3,19 @@ import { authenticate, requireActiveUser } from '../middleware/auth.js';
 import { requireXHR } from '../middleware/csrf.js';
 import { checkTrialExpiry, requirePlan } from '../middleware/plan.js';
 import { getStripe } from '../services/stripe.js';
+import { buildClientUrl, getFeatureAvailability } from '../config/runtime.js';
 import pool from '../db/pool.js';
 import { trackServerEvent } from '../services/analytics.js';
 
 const router = Router();
+
+router.use((req, res, next) => {
+  const availability = getFeatureAvailability('sellerTools');
+  if (!availability.enabled) {
+    return res.status(503).json({ error: availability.message, code: availability.code });
+  }
+  next();
+});
 
 const MAX_ACTIVE_LISTINGS = 50;
 const MIN_CARD_COUNT = 10;
@@ -404,8 +413,8 @@ router.post('/onboard', requireXHR, authenticate, requireActiveUser, checkTrialE
     // Create account link
     const accountLink = await stripe.accountLinks.create({
       account: accountId,
-      refresh_url: `${process.env.CLIENT_URL}/seller?connect=refresh`,
-      return_url: `${process.env.CLIENT_URL}/seller?connect=return`,
+      refresh_url: buildClientUrl('/seller', { query: { connect: 'refresh' } }),
+      return_url: buildClientUrl('/seller', { query: { connect: 'return' } }),
       type: 'account_onboarding',
       collection_options: { fields: 'eventually_due' },
     });
@@ -433,8 +442,8 @@ router.get('/onboard/refresh', authenticate, async (req, res) => {
 
     const accountLink = await stripe.accountLinks.create({
       account: accountId,
-      refresh_url: `${process.env.CLIENT_URL}/seller?connect=refresh`,
-      return_url: `${process.env.CLIENT_URL}/seller?connect=return`,
+      refresh_url: buildClientUrl('/seller', { query: { connect: 'refresh' } }),
+      return_url: buildClientUrl('/seller', { query: { connect: 'return' } }),
       type: 'account_onboarding',
       collection_options: { fields: 'eventually_due' },
     });

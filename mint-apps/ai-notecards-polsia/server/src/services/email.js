@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import he from 'he';
+import { buildClientUrl } from '../config/runtime.js';
 
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'noreply@ai-notecards.com';
 const FROM_HEADER = `AI Notecards <${FROM_EMAIL}>`;
@@ -83,9 +84,9 @@ const TEMPLATES = {
         <p style="color: #6B635A; font-size: 14px; margin: 0;">$${(data.price / 100).toFixed(2)}</p>
       </div>
       <p style="color: #6B635A; font-size: 14px;">The deck has been added to your library. Head to your dashboard to start studying!</p>
-      <a href="${process.env.CLIENT_URL}/dashboard" style="display: inline-block; background: #1B6B5A; color: white; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px; margin-top: 8px;">Start Studying</a>
+      <a href="${buildClientUrl('/dashboard')}" style="display: inline-block; background: #1B6B5A; color: white; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px; margin-top: 8px;">Start Studying</a>
     `),
-    text: `Purchase confirmed: "${data.title}" for $${(data.price / 100).toFixed(2)}.\n\nThe deck has been added to your library. Head to your dashboard to start studying!\n\n${process.env.CLIENT_URL}/dashboard`,
+    text: `Purchase confirmed: "${data.title}" for $${(data.price / 100).toFixed(2)}.\n\nThe deck has been added to your library. Head to your dashboard to start studying!\n\n${buildClientUrl('/dashboard')}`,
   }),
 
   subscription_confirmed: (data) => ({
@@ -100,9 +101,9 @@ const TEMPLATES = {
           <li>Sell decks on the marketplace</li>
         </ul>
       </div>
-      <a href="${process.env.CLIENT_URL}/dashboard" style="display: inline-block; background: #1B6B5A; color: white; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px;">Go to Dashboard</a>
+      <a href="${buildClientUrl('/dashboard')}" style="display: inline-block; background: #1B6B5A; color: white; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px;">Go to Dashboard</a>
     `),
-    text: `Welcome to AI Notecards Pro!\n\nYour Pro benefits:\n- 10 AI generations per day\n- Unlimited decks\n- Sell decks on the marketplace\n\n${process.env.CLIENT_URL}/dashboard`,
+    text: `Welcome to AI Notecards Pro!\n\nYour Pro benefits:\n- 10 AI generations per day\n- Unlimited decks\n- Sell decks on the marketplace\n\n${buildClientUrl('/dashboard')}`,
   }),
 
   subscription_cancelling: (data) => ({
@@ -113,9 +114,9 @@ const TEMPLATES = {
         <p style="color: #1A1614; font-size: 14px; margin: 0;">Your access continues until <strong>${data.cancelAt}</strong>. After that, you'll be downgraded to the free plan.</p>
       </div>
       <p style="color: #6B635A; font-size: 14px;">Changed your mind? You can resubscribe anytime from your settings.</p>
-      <a href="${process.env.CLIENT_URL}/settings" style="display: inline-block; background: #1B6B5A; color: white; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px; margin-top: 8px;">Manage Subscription</a>
+      <a href="${buildClientUrl('/settings')}" style="display: inline-block; background: #1B6B5A; color: white; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px; margin-top: 8px;">Manage Subscription</a>
     `),
-    text: `Your Pro subscription will end on ${data.cancelAt}. After that, you'll be downgraded to the free plan.\n\nChanged your mind? Resubscribe anytime: ${process.env.CLIENT_URL}/settings`,
+    text: `Your Pro subscription will end on ${data.cancelAt}. After that, you'll be downgraded to the free plan.\n\nChanged your mind? Resubscribe anytime: ${buildClientUrl('/settings')}`,
   }),
 };
 

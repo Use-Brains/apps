@@ -1,6 +1,7 @@
 import { getStripe } from './stripe.js';
 import pool from '../db/pool.js';
 import { calculatePlatformFeeCents } from './billing.js';
+import { buildClientUrl } from '../config/runtime.js';
 
 /**
  * Create a Stripe Checkout Session for a marketplace purchase.
@@ -91,8 +92,8 @@ export async function createPurchaseCheckout(userId, listingId) {
         deck_id: listing.deck_id,
       },
     },
-    success_url: `${process.env.CLIENT_URL}/dashboard?purchased=true`,
-    cancel_url: `${process.env.CLIENT_URL}/marketplace/${listingId}`,
+    success_url: buildClientUrl('/dashboard', { query: { purchased: true } }),
+    cancel_url: buildClientUrl(`/marketplace/${listingId}`),
     metadata: {
       listing_id: listingId,
       buyer_id: userId,

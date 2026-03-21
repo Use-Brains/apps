@@ -25,6 +25,23 @@ AI-powered flashcard app with a peer-to-peer marketplace. Paste your notes or ty
 | Payments | Stripe Checkout (subscriptions) + Stripe Connect Express (marketplace) |
 | Mobile Offline | Expo SQLite + NetInfo + MMKV |
 
+## Polsia Prep Notes
+
+- The copied Polsia sandbox now supports an env-driven web API base via `VITE_API_URL`, so it can run in split or unified deployments.
+- The server can now optionally serve the built web client in a unified Express deployment:
+  - `SERVE_CLIENT_BUILD=true`
+  - `CLIENT_DIST_PATH=/absolute/path/to/client/dist` (optional override)
+- Server runtime flags now exist for boundary hardening:
+  - `FEATURE_SELLER_TOOLS`
+  - `FEATURE_NATIVE_AUTH_SESSIONS`
+  - `FEATURE_NATIVE_BILLING`
+  - `FEATURE_PUSH_NOTIFICATIONS`
+- Storage now has an explicit provider/public-base boundary:
+  - `STORAGE_PROVIDER`
+  - `STORAGE_PUBLIC_BASE_URL`
+- Current seller and native systems are still present, but the copied app is being prepared so those surfaces can be disabled cleanly without deleting product logic.
+- When `FEATURE_SELLER_TOOLS=false`, seller pages stay visible on web but render in a read-only disabled state instead of immediately failing into seller API calls.
+
 ## Getting Started
 
 ### Prerequisites
@@ -74,6 +91,8 @@ STRIPE_WEBHOOK_SECRET=whsec_xxx
 STRIPE_CONNECT_WEBHOOK_SECRET=whsec_xxx
 STRIPE_PRO_PRICE_ID=price_xxx
 CLIENT_URL=http://localhost:5173
+SERVE_CLIENT_BUILD=false
+CLIENT_DIST_PATH=
 PORT=3001
 NODE_ENV=development
 ```
@@ -225,6 +244,11 @@ Deploy to Railway, Render, or any Node.js host:
 - Set all env vars from `.env.example`
 - Run `npm run migrate` on deploy
 - Ensure `NODE_ENV=production`
+
+Optional unified deployment prep:
+- Build the client first
+- Set `SERVE_CLIENT_BUILD=true`
+- Leave `CLIENT_DIST_PATH` empty if the built client will live at `client/dist` relative to the copied app, or set an absolute override
 
 ### Client
 

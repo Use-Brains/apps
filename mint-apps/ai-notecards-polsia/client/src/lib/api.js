@@ -1,4 +1,6 @@
-const BASE = '/api';
+import { getApiBaseUrl } from './runtime.js';
+
+const BASE = getApiBaseUrl();
 
 async function request(path, options = {}) {
   const isFormData = options.body instanceof FormData;
@@ -121,7 +123,7 @@ export const api = {
 
   // Settings — extended
   updatePreferences: (prefs) => request('/settings/preferences', { method: 'PATCH', body: JSON.stringify(prefs) }),
-  exportDecks: () => fetch('/api/settings/export', {
+  exportDecks: () => fetch(`${BASE}/settings/export`, {
     credentials: 'include',
     headers: { 'X-Requested-With': 'XMLHttpRequest' },
   }),

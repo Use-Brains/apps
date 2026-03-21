@@ -2,6 +2,8 @@
 
 ## Likely folders/files to refactor first
 
+- `server/src/config/runtime.js`
+  - New first-pass config boundary. Keep expanding this instead of adding new env parsing ad hoc.
 - `client/src/lib/api.js`
   - Central web API boundary and a good first place to remove deployment coupling.
 - `client/vercel.json`
@@ -93,10 +95,46 @@ The key rule: do not let native conveniences drive the first Polsia architecture
 Define the minimum Polsia web slice and lock it in writing before code changes:
 
 - keep: web auth, deck CRUD, AI generation, study flows, basic settings
-- defer: seller marketplace, Stripe Connect, RevenueCat, native mobile parity, offline sync
+- defer: Stripe Connect payout machinery, RevenueCat, native mobile parity, offline sync
+- keep visible but disable behind flags: seller tools and native-only billing/session paths
 
 If that scope is accepted, the first code refactor should be an infrastructure boundary pass:
 
 1. centralize env/config access
 2. remove Vercel-to-Railway assumptions
 3. abstract storage away from Supabase
+
+## First-pass changes completed
+
+- Added runtime/feature flag parsing in `server/src/config/runtime.js`
+- Moved iOS marketplace purchase availability onto the shared runtime config surface
+- Added provider-aware public storage URL helpers in `server/src/services/storage.js`
+- Updated auth/account routes to stop constructing Supabase public URLs directly
+- Added seller/native feature gates that preserve current behavior by default and disable cleanly when flags are turned off
+- Made the web client API base env-driven via `VITE_API_URL`
+- Added a shared public app URL helper in `server/src/config/runtime.js` and moved checkout/onboarding/email link construction onto it
+- Added opt-in unified deployment prep so `server/src/index.js` can serve the built client when `SERVE_CLIENT_BUILD=true`
+- Added a client-side seller availability helper in `client/src/lib/runtime.js` so `/seller`, `/sell/:deckId`, `Settings`, and seller-entry points degrade into read-only states instead of falling into failed seller actions
+
+## Remaining direct infra coupling points
+
+- `client/vercel.json`
+  - Still encodes a Vercel-specific rewrite topology. Keep it until the real Polsia deployment target is finalized.
+- `server/src/db/pool.js`
+  - Still carries current Postgres env expectations and is the right place to normalize any Neon-specific connection tuning.
+- `server/src/services/storage.js`
+  - The boundary exists, but the only concrete upload/delete implementation is still Supabase.
+- `server/src/services/billing.js`
+  - Shared Stripe and Apple/RevenueCat billing state remains coupled here.
+- `server/src/routes/stripe.js`
+  - Web subscription and marketplace purchase side effects are still Stripe-first.
+- `server/src/routes/seller.js`
+  - Seller onboarding is still Stripe Connect-specific even though it is now easier to disable.
+- `server/src/services/purchase.js`
+  - Marketplace checkout still assumes Stripe destination-charge style fulfillment.
+- `server/src/routes/revenuecat.js`
+  - Native billing is gated, but the integration remains present and provider-specific.
+- `mobile/src/lib/auth.tsx`
+  - Native session restore and device-specific auth remain outside the web-core boundary.
+- `mobile/src/lib/subscriptions.ts`
+  - RevenueCat product identity and purchase logic remain native-coupled.

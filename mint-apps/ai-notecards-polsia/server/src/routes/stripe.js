@@ -9,6 +9,7 @@ import pool from '../db/pool.js';
 import { trackServerEvent } from '../services/analytics.js';
 import { calculateSellerEarningsCents, getStripePriceIdForPeriod, reconcileUserBillingState } from '../services/billing.js';
 import { notifyUser } from '../services/notifications.js';
+import { buildClientUrl } from '../config/runtime.js';
 
 const router = Router();
 
@@ -46,8 +47,8 @@ router.post('/checkout', requireXHR, authenticate, requireActiveUser, async (req
       payment_method_types: ['card'],
       line_items: [{ price: getStripePriceIdForPeriod(billingPeriod), quantity: 1 }],
       mode: 'subscription',
-      success_url: `${process.env.CLIENT_URL}/dashboard?upgraded=true`,
-      cancel_url: `${process.env.CLIENT_URL}/pricing`,
+      success_url: buildClientUrl('/dashboard', { query: { upgraded: true } }),
+      cancel_url: buildClientUrl('/pricing'),
       metadata: { userId: req.userId, billingPeriod },
     };
 
@@ -113,7 +114,7 @@ router.post('/portal', requireXHR, authenticate, requireActiveUser, portalLimite
     }
     const session = await stripe.billingPortal.sessions.create({
       customer: rows[0].stripe_customer_id,
-      return_url: `${process.env.CLIENT_URL}/settings?portal_return=true`,
+      return_url: buildClientUrl('/settings', { query: { portal_return: true } }),
     });
     res.json({ url: session.url });
   } catch (err) {
@@ -302,14 +303,14 @@ router.post('/webhook', async (req, res) => {
 	                  type: 'marketplace_sale',
 	                  title: 'Deck sold',
 	                  body: `${emailData.title} was purchased.`,
-	                  url: `${process.env.CLIENT_URL}/seller/dashboard`,
+	                  url: buildClientUrl('/seller/dashboard'),
 	                  metadata: { listingId: meta.listing_id },
 	                }, { preferenceKey: 'marketplace_activity' }),
 	                notifyUser(pool, meta.buyer_id, {
 	                  type: 'purchase_ready',
 	                  title: 'Deck ready',
 	                  body: `${emailData.title} is now in your library.`,
-	                  url: `${process.env.CLIENT_URL}/dashboard?purchased=true`,
+	                  url: buildClientUrl('/dashboard', { query: { purchased: true } }),
 	                  metadata: { listingId: meta.listing_id },
 	                }, { preferenceKey: 'marketplace_activity' }),
 	              ]).then(results => {

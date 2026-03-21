@@ -1,17 +1,54 @@
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+import { getStorageConfig } from '../config/runtime.js';
+
 const BUCKET = 'avatars';
 
-export const STORAGE_BASE = `${SUPABASE_URL}/storage/v1/object/public`;
+function trimTrailingSlash(value) {
+  return value ? value.replace(/\/+$/, '') : value;
+}
 
-export async function uploadAvatar(userId, buffer, mime) {
+function getSupabaseUploadUrl(config, storagePath) {
+  return `${trimTrailingSlash(config.supabaseUrl)}/storage/v1/object/${storagePath}`;
+}
+
+export function buildPublicStorageUrl(storagePath, options = {}, env = process.env) {
+  if (!storagePath) return null;
+
+  const { publicBaseUrl } = getStorageConfig(env);
+  if (!publicBaseUrl) return null;
+
+  const baseUrl = trimTrailingSlash(publicBaseUrl);
+  const encodedPath = storagePath.replace(/^\/+/, '');
+  const url = `${baseUrl}/${encodedPath}`;
+
+  if (!options.cacheBust) return url;
+
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}v=${encodeURIComponent(options.cacheBust)}`;
+}
+
+export function resolveAvatarUrl(user, env = process.env) {
+  if (user.avatar_url) {
+    const cacheBust = user.updated_at ? new Date(user.updated_at).getTime() : null;
+    const publicUrl = buildPublicStorageUrl(user.avatar_url, { cacheBust }, env);
+    if (publicUrl) return publicUrl;
+  }
+
+  return user.google_avatar_url || null;
+}
+
+export async function uploadAvatar(userId, buffer, mime, env = process.env) {
+  const config = getStorageConfig(env);
   const ext = mime === 'image/png' ? 'png' : 'jpg';
   const storagePath = `${BUCKET}/${userId}.${ext}`;
 
-  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${storagePath}`, {
+  if (config.provider !== 'supabase' || !config.supabaseUrl || !config.serviceRoleKey) {
+    throw new Error('Storage provider upload is not configured');
+  }
+
+  const res = await fetch(getSupabaseUploadUrl(config, storagePath), {
     method: 'PUT',
     headers: {
-      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      Authorization: `Bearer ${config.serviceRoleKey}`,
       'Content-Type': mime,
       'x-upsert': 'true',
     },
@@ -25,10 +62,14 @@ export async function uploadAvatar(userId, buffer, mime) {
   return storagePath;
 }
 
-export async function deleteAvatar(storagePath) {
+export async function deleteAvatar(storagePath, env = process.env) {
   if (!storagePath) return;
-  await fetch(`${SUPABASE_URL}/storage/v1/object/${storagePath}`, {
+
+  const config = getStorageConfig(env);
+  if (config.provider !== 'supabase' || !config.supabaseUrl || !config.serviceRoleKey) return;
+
+  await fetch(getSupabaseUploadUrl(config, storagePath), {
     method: 'DELETE',
-    headers: { Authorization: `Bearer ${SERVICE_ROLE_KEY}` },
-  }).catch(() => {}); // best-effort cleanup
+    headers: { Authorization: `Bearer ${config.serviceRoleKey}` },
+  }).catch(() => {});
 }
