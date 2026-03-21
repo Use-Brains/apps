@@ -131,6 +131,13 @@ If that scope is accepted, the first code refactor should be an infrastructure b
 - Produce a route compatibility inventory before any large file move
 - Demote `client/vercel.json` from active deployment assumption to legacy compatibility artifact
 
+## Phase 3 batch 1 completed
+
+- Added `server/src/db/index.js` as the internal DB export surface
+- Added `server/db/index.js` as a compatibility wrapper toward the confirmed Polsia path
+- Centralized pooled vs direct Postgres config parsing in `server/src/db/runtime.js`
+- Added `POLSIA_ROUTE_MATRIX.md` to classify route files into core, optional, and deferred groups
+
 ## Remaining direct infra coupling points
 
 - `client/vercel.json`

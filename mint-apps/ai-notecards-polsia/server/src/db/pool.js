@@ -1,15 +1,6 @@
 import pg from 'pg';
+import { getPoolConfig } from './runtime.js';
 
-const isProduction = process.env.NODE_ENV === 'production';
-
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  ...(isProduction && {
-    ssl: { rejectUnauthorized: false },
-    max: 12,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
-  }),
-});
+const pool = new pg.Pool(getPoolConfig());
 
 export default pool;

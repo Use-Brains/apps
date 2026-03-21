@@ -2,7 +2,7 @@
 
 | subsystem | current implementation | target direction | action needed | risk level | refactor phase |
 |---|---|---|---|---|---|
-| database connection | `pg` pool in `server/src/db/pool.js`, Supabase-oriented production notes | standard Neon-friendly `pg` runtime config | centralize DB env handling and keep raw SQL approach | medium | phase 2 |
+| database connection | `pg` pool in `server/src/db/pool.js`, Supabase-oriented production notes | standard Neon-friendly `pg` runtime config | DB compatibility surface now exists in `server/src/db/index.js`; next step is migrating imports toward it gradually | medium | phase 3 |
 | migrations | sequential SQL runner in `server/src/db/migrator.js` | keep migration model | preserve as-is, only align env/runtime assumptions | low | phase 1 |
 | avatar/media storage | Supabase-specific upload/delete and URL building in `server/src/services/storage.js` and route/auth call sites | provider-oriented storage service with R2-capable future path | continue expanding adapter and remove remaining provider assumptions | high | phase 2 |
 | auth/session model | web JWT cookies plus native refresh-token sessions in `server/src/routes/auth.js` | keep web auth, isolate native session branch | gate native session flows behind runtime flags and keep web auth stable | high | phase 3 |
@@ -46,3 +46,14 @@
   - Compatibility wrapper toward the confirmed Polsia server entry shape.
 - `POLSIA_STRUCTURE_MAP.md`
   - Canonical current-to-target structure mapping for later path migration work.
+
+## Phase 3 alignment artifacts
+
+- `server/src/db/index.js`
+  - Internal DB compatibility surface for pooled and direct Postgres usage.
+- `server/db/index.js`
+  - Future-facing wrapper toward Polsia’s confirmed DB entry path.
+- `server/src/db/runtime.js`
+  - Central DB env parsing and pool tuning surface.
+- `POLSIA_ROUTE_MATRIX.md`
+  - Route classification artifact with explicit removal trigger for `client/vercel.json`.

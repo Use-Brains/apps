@@ -216,13 +216,20 @@ Status: in progress
 
 ### Phase 3: Runtime and route convergence
 
-Status: next
+Status: in progress
 
 - Add a Polsia-aligned DB entry surface and document Neon runtime expectations
 - Inventory current routes against the confirmed Polsia route convention
 - Mark seller, Stripe Connect, RevenueCat, and native-only surfaces as optional or deferred with exact file references
 - Treat `client/vercel.json` as legacy compatibility and prepare its eventual removal
 - Verify root build/start flow once dependencies are available in the sandbox
+
+Phase 3 batch 1 now includes:
+
+- `server/src/db/index.js` as the internal DB compatibility surface
+- `server/db/index.js` as the future-facing compatibility wrapper
+- DB runtime config parsing for pooled vs direct URLs and Neon-friendly pool tuning
+- `POLSIA_ROUTE_MATRIX.md` as the route classification artifact for later packaging moves
 
 ### Phase 4: Packaging and path migration
 

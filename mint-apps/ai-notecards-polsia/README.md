@@ -46,6 +46,10 @@ AI-powered flashcard app with a peer-to-peer marketplace. Paste your notes or ty
   - a draft `render.yaml`
   - a thin `server/index.js` entrypoint adapter
   - `POLSIA_STRUCTURE_MAP.md` for current-to-target path mapping
+- Phase 3 has started with:
+  - a DB compatibility surface in `server/src/db/index.js`
+  - a future-facing wrapper in `server/db/index.js`
+  - `POLSIA_ROUTE_MATRIX.md` for route classification and legacy Vercel-removal criteria
 
 ## Getting Started
 
@@ -85,6 +89,9 @@ Create `server/.env` from `server/.env.example`:
 ```env
 DATABASE_URL=postgresql://localhost:5432/notecards
 DATABASE_URL_DIRECT=postgresql://localhost:5432/notecards
+DATABASE_POOL_MAX=12
+DATABASE_IDLE_TIMEOUT_MS=30000
+DATABASE_CONNECTION_TIMEOUT_MS=5000
 GROQ_API_KEY=gsk_xxx
 GEMINI_API_KEY=your-gemini-key
 AI_PROVIDER=groq
@@ -255,6 +262,7 @@ Optional unified deployment prep:
 - Set `SERVE_CLIENT_BUILD=true`
 - Leave `CLIENT_DIST_PATH` empty if the built client will live at `client/dist` relative to the copied app, or set an absolute override
 - A draft `render.yaml` now exists at the repo root for the confirmed Polsia single-service deployment shape
+- `client/vercel.json` is now a legacy compatibility artifact and should only be removed after the unified root build/start flow is verified
 
 ### Client
 

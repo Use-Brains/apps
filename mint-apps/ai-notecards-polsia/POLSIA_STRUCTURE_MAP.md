@@ -33,7 +33,7 @@ mintapps/
 | `server/src/routes/*` | `server/routes/*` | not moved | route code should stay put until phase 4 folder migration |
 | `server/src/middleware/*` | `server/middleware/*` | not moved | keep imports stable for now |
 | `server/src/services/*` | `server/services/*` | not moved | keep logic stable until packaging pass |
-| `server/src/db/pool.js` | `server/db/index.js` | not aligned yet | phase 3 should add a DB adapter path that matches Polsia convention |
+| `server/src/db/pool.js` | `server/db/index.js` | partially aligned | `server/src/db/index.js` now centralizes DB exports and `server/db/index.js` exists as a compatibility wrapper |
 | `server/src/db/migrations/*` | `server/db/migrations/*` | structurally close | SQL migration model already matches Polsia’s sequential approach |
 | `client/*` | `client/*` | already close | web app layout is already near target |
 | root `package.json` | single root `package.json` | partially aligned | root scripts now cover build/start/migrate flow without workspaces yet |
