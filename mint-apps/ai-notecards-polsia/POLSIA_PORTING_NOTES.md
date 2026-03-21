@@ -4,6 +4,8 @@
 
 - `server/src/config/runtime.js`
   - New first-pass config boundary. Keep expanding this instead of adding new env parsing ad hoc.
+- `POLSIA_STRUCTURE_MAP.md`
+  - Current-to-target path map for the confirmed Polsia repo convention.
 - `client/src/lib/api.js`
   - Central web API boundary and a good first place to remove deployment coupling.
 - `client/vercel.json`
@@ -115,6 +117,19 @@ If that scope is accepted, the first code refactor should be an infrastructure b
 - Added a shared public app URL helper in `server/src/config/runtime.js` and moved checkout/onboarding/email link construction onto it
 - Added opt-in unified deployment prep so `server/src/index.js` can serve the built client when `SERVE_CLIENT_BUILD=true`
 - Added a client-side seller availability helper in `client/src/lib/runtime.js` so `/seller`, `/sell/:deckId`, `Settings`, and seller-entry points degrade into read-only states instead of falling into failed seller actions
+
+## Phase 2 structure-alignment changes
+
+- Added root scripts in `package.json` so the copied app can be built, started, and migrated from a single control surface
+- Added a draft `render.yaml` that assumes Express serves `client/dist`
+- Added `server/index.js` as a thin compatibility entrypoint ahead of any future path migration
+- Added `POLSIA_STRUCTURE_MAP.md` to map the current copied app layout onto the confirmed Polsia target convention
+
+## Phase 3 next focus
+
+- Create a DB entry surface that matches the eventual `server/db/index.js` convention
+- Produce a route compatibility inventory before any large file move
+- Demote `client/vercel.json` from active deployment assumption to legacy compatibility artifact
 
 ## Remaining direct infra coupling points
 

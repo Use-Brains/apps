@@ -8,12 +8,14 @@
 - Make web client API origin env-driven
 - Add feature flags for seller tools, native billing, native auth sessions, and push notifications
 - Update Polsia prep docs with exact file-level blockers and migration phases
+- Add root scripts that operate the copied app more like a unified Polsia service
+- Add a draft `render.yaml` for the copied app now that the target deploy shape is documented
+- Add thin compatibility entrypoints like `server/index.js` when they reduce future move-risk without forcing a folder migration
 
 ## Wait until the real Polsia repo structure exists
 
 - Moving files to a unified `mintapps/server` + `mintapps/client` structure
 - Reworking the root package layout
-- Adding `render.yaml` tied to the final service topology
 - Converting frontend static serving to the final production shape
 - Renaming product/app identifiers to match the eventual Polsia integration target
 

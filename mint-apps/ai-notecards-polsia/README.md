@@ -41,6 +41,11 @@ AI-powered flashcard app with a peer-to-peer marketplace. Paste your notes or ty
   - `STORAGE_PUBLIC_BASE_URL`
 - Current seller and native systems are still present, but the copied app is being prepared so those surfaces can be disabled cleanly without deleting product logic.
 - When `FEATURE_SELLER_TOOLS=false`, seller pages stay visible on web but render in a read-only disabled state instead of immediately failing into seller API calls.
+- The copied app now also includes phase 2 structure-alignment prep:
+  - root build/start/migrate scripts in `package.json`
+  - a draft `render.yaml`
+  - a thin `server/index.js` entrypoint adapter
+  - `POLSIA_STRUCTURE_MAP.md` for current-to-target path mapping
 
 ## Getting Started
 
@@ -249,6 +254,7 @@ Optional unified deployment prep:
 - Build the client first
 - Set `SERVE_CLIENT_BUILD=true`
 - Leave `CLIENT_DIST_PATH` empty if the built client will live at `client/dist` relative to the copied app, or set an absolute override
+- A draft `render.yaml` now exists at the repo root for the confirmed Polsia single-service deployment shape
 
 ### Client
 

@@ -20,6 +20,19 @@ This first pass is intentionally narrow. It does not rewrite auth, payments, or 
 
 This means the copied app is closer to a Polsia-ready web-core architecture without deleting existing seller or native product logic.
 
+## Confirmed Polsia target structure
+
+Polsia has now confirmed the target repo convention:
+
+- single root `package.json`
+- `server/index.js` as the Express entrypoint
+- `server/db/index.js` as the standard Neon `pg` entrypoint
+- `client/dist` served statically by Express in the deployed app
+- `render.yaml` as the deployment config surface
+- no separate frontend deployment in the final shape
+
+This removes a major unknown. The remaining work should now optimize for compatibility adapters and path mapping, not for speculative abstractions.
+
 ## Current stack inventory
 
 - Monorepo app with `client/`, `server/`, `mobile/`, `docs/`, `scripts/`, and `todos/`
@@ -185,27 +198,38 @@ This means the copied app is closer to a Polsia-ready web-core architecture with
 
 ### Phase 1: Freeze boundaries
 
+Status: complete
+
 - Keep the copied app isolated under `mint-apps/ai-notecards-polsia`
 - Introduce a migration inventory and dependency map
 - Mark web-first scope for the Polsia prep branch
 
-### Phase 2: Decouple infrastructure
+### Phase 2: Structure and deployment alignment
 
-- Replace hard-coded Vercel/Railway assumptions with env-driven frontend/backend URLs
-- Add a storage adapter boundary for avatars/files
-- Make Postgres config Neon-friendly without changing application behavior
+Status: in progress
 
-### Phase 3: Narrow the product slice
+- Keep the current `client/` and `server/` directories in place, but make the root control surface look more like Polsia
+- Add root build/start/migrate scripts that operate the web app as a single service
+- Add a draft `render.yaml` for the copied app
+- Add thin compatibility entrypoints like `server/index.js` where they reduce future move-risk
+- Keep the current unified Express static-serving mode opt-in until final deployment is verified
 
-- Disable or isolate seller marketplace paths behind clear boundaries
-- Identify the minimum web product slice: auth, generate, decks, study, settings
-- Document mobile-only logic as non-blocking for the Polsia collaboration phase
+### Phase 3: Runtime and route convergence
 
-### Phase 4: Port web-first runtime
+Status: next
 
-- Stand up backend and web frontend under Polsia-aligned env/deploy assumptions
-- Validate auth, deck CRUD, generation, and study flows on the new stack
-- Keep marketplace and native billing out of the first production candidate
+- Add a Polsia-aligned DB entry surface and document Neon runtime expectations
+- Inventory current routes against the confirmed Polsia route convention
+- Mark seller, Stripe Connect, RevenueCat, and native-only surfaces as optional or deferred with exact file references
+- Treat `client/vercel.json` as legacy compatibility and prepare its eventual removal
+- Verify root build/start flow once dependencies are available in the sandbox
+
+### Phase 4: Packaging and path migration
+
+- Move code toward the confirmed `server/*` and `client/*` package layout
+- Rewrite imports in one controlled pass after the compatibility surfaces from phases 2 and 3 exist
+- Validate auth, deck CRUD, generation, and study flows on the moved layout
+- Keep marketplace selling, native billing, and mobile parity out of the first production candidate
 
 ### Phase 5: Reintroduce optional systems
 
@@ -249,3 +273,18 @@ This means the copied app is closer to a Polsia-ready web-core architecture with
 8. Isolate Stripe Connect webhook and seller onboarding logic behind explicit optional runtime boundaries.
 9. Isolate RevenueCat and native refresh-token support from shared billing/auth code paths.
 10. Once the Polsia repo structure is known, port only the web-core slice first: auth, generation, decks, study, settings, marketplace browse/read.
+
+## Phase 2 deliverables
+
+- Root scripts in `package.json` that reflect single-service build/start/migrate flows
+- Draft `render.yaml`
+- Thin `server/index.js` entry alignment
+- Current-to-target structure mapping in `POLSIA_STRUCTURE_MAP.md`
+- Updated migration docs that treat the Polsia repo shape as confirmed rather than hypothetical
+
+## Phase 3 deliverables
+
+- DB entrypoint compatibility plan and implementation target
+- Route compatibility matrix with exact files
+- Clear classification of web-core, optional, and deferred surfaces
+- Removal conditions for legacy deploy artifacts like `client/vercel.json`

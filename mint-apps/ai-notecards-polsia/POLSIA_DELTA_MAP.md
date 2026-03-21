@@ -35,3 +35,14 @@
   - Marketplace checkout and fulfillment still assume Stripe Connect commerce.
 - `server/src/routes/revenuecat.js`
   - RevenueCat remains a direct native billing integration, now only behind a flag.
+
+## Phase 2 alignment artifacts
+
+- `package.json`
+  - Root scripts now model the copied app more like a single-service Polsia repo.
+- `render.yaml`
+  - Draft deployment contract for a Render-served Express + static client topology.
+- `server/index.js`
+  - Compatibility wrapper toward the confirmed Polsia server entry shape.
+- `POLSIA_STRUCTURE_MAP.md`
+  - Canonical current-to-target structure mapping for later path migration work.
