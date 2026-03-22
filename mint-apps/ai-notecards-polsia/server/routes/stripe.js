@@ -296,32 +296,32 @@ router.post('/webhook', async (req, res) => {
               WHERE p.id = $1
             `, [result.purchaseId]);
 
-	            if (emailData) {
-	              const earnings = calculateSellerEarningsCents(emailData.price_cents);
-	              Promise.allSettled([
-	                notifyUser(pool, meta.seller_id, {
-	                  type: 'marketplace_sale',
-	                  title: 'Deck sold',
-	                  body: `${emailData.title} was purchased.`,
-	                  url: buildClientUrl('/seller/dashboard'),
-	                  metadata: { listingId: meta.listing_id },
-	                }, { preferenceKey: 'marketplace_activity' }),
-	                notifyUser(pool, meta.buyer_id, {
-	                  type: 'purchase_ready',
-	                  title: 'Deck ready',
-	                  body: `${emailData.title} is now in your library.`,
-	                  url: buildClientUrl('/dashboard', { query: { purchased: true } }),
-	                  metadata: { listingId: meta.listing_id },
-	                }, { preferenceKey: 'marketplace_activity' }),
-	              ]).then(results => {
-	                results.filter(r => r.status === 'rejected').forEach(r =>
-	                  console.error('Push notification failed:', r.reason)
-	                );
-	              });
+            if (emailData) {
+              const earnings = calculateSellerEarningsCents(emailData.price_cents);
+              Promise.allSettled([
+                notifyUser(pool, meta.seller_id, {
+                  type: 'marketplace_sale',
+                  title: 'Deck sold',
+                  body: `${emailData.title} was purchased.`,
+                  url: buildClientUrl('/seller/dashboard'),
+                  metadata: { listingId: meta.listing_id },
+                }, { preferenceKey: 'marketplace_activity' }),
+                notifyUser(pool, meta.buyer_id, {
+                  type: 'purchase_ready',
+                  title: 'Deck ready',
+                  body: `${emailData.title} is now in your library.`,
+                  url: buildClientUrl('/dashboard', { query: { purchased: true } }),
+                  metadata: { listingId: meta.listing_id },
+                }, { preferenceKey: 'marketplace_activity' }),
+              ]).then(results => {
+                results.filter(r => r.status === 'rejected').forEach(r =>
+                  console.error('Push notification failed:', r.reason)
+                );
+              });
 
-	              Promise.allSettled([
-	                sendTransactionalEmail('sale_notification', emailData.seller_email, {
-	                  title: emailData.title,
+              Promise.allSettled([
+                sendTransactionalEmail('sale_notification', emailData.seller_email, {
+                  title: emailData.title,
                   earnings,
                 }),
                 sendTransactionalEmail('purchase_confirmation', emailData.buyer_email, {

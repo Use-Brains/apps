@@ -2,21 +2,19 @@
 
 ## Likely folders/files to refactor first
 
-- `server/src/config/runtime.js`
+- `server/config/runtime.js`
   - New first-pass config boundary. Keep expanding this instead of adding new env parsing ad hoc.
 - `POLSIA_STRUCTURE_MAP.md`
   - Current-to-target path map for the confirmed Polsia repo convention.
 - `client/src/lib/api.js`
   - Central web API boundary and a good first place to remove deployment coupling.
-- `client/vercel.json`
-  - Current web routing depends on a Railway-hosted API URL.
 - `server/src/services/storage.js`
   - Thin Supabase-specific storage seam and one of the safest first abstractions.
-- `server/src/db/pool.js`
+- `server/db/pool.js`
   - Central place to normalize Neon-friendly Postgres configuration.
-- `server/src/routes/auth.js`
+- `server/routes/auth.js`
   - Core auth shape, including native-session branching and user serialization.
-- `server/src/routes/stripe.js`
+- `server/routes/stripe.js`
   - High-complexity payment logic that should be isolated early, even if not rewritten immediately.
 - `mobile/src/lib/api.ts`
   - Shows the native-specific token/session contract with the backend.
@@ -108,14 +106,14 @@ If that scope is accepted, the first code refactor should be an infrastructure b
 
 ## First-pass changes completed
 
-- Added runtime/feature flag parsing in `server/src/config/runtime.js`
+- Added runtime/feature flag parsing in `server/config/runtime.js`
 - Moved iOS marketplace purchase availability onto the shared runtime config surface
 - Added provider-aware public storage URL helpers in `server/src/services/storage.js`
 - Updated auth/account routes to stop constructing Supabase public URLs directly
 - Added seller/native feature gates that preserve current behavior by default and disable cleanly when flags are turned off
 - Made the web client API base env-driven via `VITE_API_URL`
-- Added a shared public app URL helper in `server/src/config/runtime.js` and moved checkout/onboarding/email link construction onto it
-- Added opt-in unified deployment prep so `server/src/index.js` can serve the built client when `SERVE_CLIENT_BUILD=true`
+- Added a shared public app URL helper in `server/config/runtime.js` and moved checkout/onboarding/email link construction onto it
+- Added unified deployment prep so `server/index.js` can serve the built client when `SERVE_CLIENT_BUILD=true`
 - Added a client-side seller availability helper in `client/src/lib/runtime.js` so `/seller`, `/sell/:deckId`, `Settings`, and seller-entry points degrade into read-only states instead of falling into failed seller actions
 
 ## Phase 2 structure-alignment changes
@@ -129,7 +127,7 @@ If that scope is accepted, the first code refactor should be an infrastructure b
 
 - Create a DB entry surface that matches the eventual `server/db/index.js` convention
 - Produce a route compatibility inventory before any large file move
-- Demote `client/vercel.json` from active deployment assumption to legacy compatibility artifact
+- Complete removal of `client/vercel.json` from the active deployment path
 
 ## Phase 3 batch 1 completed
 
@@ -145,7 +143,7 @@ If that scope is accepted, the first code refactor should be an infrastructure b
 - Added guarded handoff DB scripts so the squashed path does not run on top of the legacy migration history
 - Switched the default runtime expectation to unified Express-serves-client
 - Removed `client/vercel.json` from the handoff path
-- Removed `server/src/routes/stripe.js` from Express registration and replaced `/api/stripe/*` with placeholder responses
+- Removed the legacy Stripe route from active registration, then later restored it at `server/routes/stripe.js` as the future-facing deferred implementation surface
 - Converted buyer purchase checkout to a placeholder response while keeping marketplace browse/detail active
 - Kept seller and admin surfaces present as shell routes/pages for the handoff build
 
@@ -156,7 +154,7 @@ If that scope is accepted, the first code refactor should be an infrastructure b
 - Added future-facing `server/services/*` wrappers over the current service implementations
 - This should reduce the next move from a logic-heavy migration to a mostly mechanical relocation/import-rewrite pass
 
-## Packaging / path-move prep in progress
+## Packaging / path-move prep completed for the web-core handoff slice
 
 - Promoted all current live route implementations into `server/routes/*`
 - Converted `server/src/routes/*` into a compatibility re-export layer
@@ -170,25 +168,27 @@ If that scope is accepted, the first code refactor should be an infrastructure b
 - Copied the legacy SQL migration chain into `server/db/legacy-migrations/*` and the manual SQL helpers into `server/db/scripts/*` so the top-level DB surface no longer depends on `server/src/db/migrations/*`
 - Moved the active server tests onto top-level `server/config/*`, `server/db/*`, `server/routes/*`, and `server/services/*` paths
 - Retired the unused compatibility shims for promoted routes, selected DB helpers, selected services, and `server/src/middleware/plan.js`
-- Verified the promoted route/runtime/service surfaces still import cleanly, boot cleanly, and pass the current server test suite
+- Promoted the deferred legacy Stripe route into `server/routes/stripe.js`
+- Retired the remaining `server/src/*` entrypoint, middleware, runtime, and service compatibility shims so only the historical DB SQL copies remain under `server/src/*`
+- Verified the promoted route/runtime/service surfaces still import cleanly and boot cleanly; sandboxed test execution is partially blocked by socket permission limits
 
 ## Remaining direct infra coupling points
 
 - `server/src/services/storage.js`
   - The boundary exists, but the only concrete upload/delete implementation is still Supabase.
-- `server/src/services/billing.js`
+- `server/services/billing.js`
   - Shared Stripe and Apple/RevenueCat billing state remains coupled here.
-- `server/src/routes/stripe.js`
+- `server/routes/stripe.js`
   - Web subscription and marketplace purchase side effects are still Stripe-first.
-- `server/src/routes/seller.js`
+- `server/routes/seller.js`
   - Seller onboarding is still Stripe Connect-specific even though it is now easier to disable.
-- `server/src/routes/account.js`
+- `server/routes/account.js`
   - Account settings still couple avatar upload, password flows, and best-effort Stripe cleanup into one legacy route module.
-- `server/src/routes/auth-apple.js`
+- `server/routes/auth-apple.js`
   - Native auth remains isolated but has not yet been promoted onto the future-facing route path as a real implementation.
-- `server/src/services/purchase.js`
+- `server/services/purchase.js`
   - Marketplace checkout still assumes Stripe destination-charge style fulfillment.
-- `server/src/routes/revenuecat.js`
+- `server/routes/revenuecat.js`
   - Native billing is gated, but the integration remains present and provider-specific.
 - `mobile/src/lib/auth.tsx`
   - Native session restore and device-specific auth remain outside the web-core boundary.

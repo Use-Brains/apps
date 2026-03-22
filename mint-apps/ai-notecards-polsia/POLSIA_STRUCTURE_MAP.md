@@ -28,12 +28,12 @@ mintapps/
 
 | current path | target path | status in copied app | notes |
 |---|---|---|---|
-| `server/src/index.js` | `server/index.js` | aligned via compatibility layer | `server/index.js` now loads env and owns the real runtime entry; `server/src/index.js` delegates to it |
-| `server/src/bootstrap.js` | `server/index.js` bootstrapping concern | aligned via compatibility layer | `server/src/bootstrap.js` now delegates to `server/index.js` instead of owning boot logic |
-| `server/src/routes/*` | `server/routes/*` | aligned via compatibility layer | live route implementations now live in `server/routes/*`; `server/src/routes/*` remains as compatibility re-exports during the move |
-| `server/src/middleware/*` | `server/middleware/*` | aligned via compatibility layer | live middleware implementations now live in `server/middleware/*`; `server/src/middleware/*` re-exports them |
-| `server/src/services/*` | `server/services/*` | aligned via compatibility layer | live service implementations now live in `server/services/*`; `server/src/services/*` re-exports them |
-| `server/src/db/*` | `server/db/*` | aligned via compatibility layer | DB runtime, pool, queries, and index now live in `server/db/*`; `server/src/db/*` delegates to them |
+| `server/src/index.js` | `server/index.js` | retired | live runtime now starts from `server/index.js`; the old compatibility entrypoint has been removed |
+| `server/src/bootstrap.js` | `server/index.js` bootstrapping concern | retired | boot logic now lives only at the top-level server entry |
+| `server/src/routes/*` | `server/routes/*` | mostly retired | live route implementations now live in `server/routes/*`; only historical/deferred references should remain in docs, not runtime |
+| `server/src/middleware/*` | `server/middleware/*` | retired | live middleware implementations now live only in `server/middleware/*` |
+| `server/src/services/*` | `server/services/*` | retired | live service implementations now live only in `server/services/*` |
+| `server/src/db/*` | `server/db/*` | partially retained for history | live DB runtime, pool, queries, and index now live in `server/db/*`; only historical SQL/script copies remain under `server/src/db/*` |
 | `server/src/db/migrations/*` | `server/db/legacy-migrations/*` | aligned via copied legacy chain | the promoted legacy migrator now reads top-level `server/db/legacy-migrations/*`; the old `server/src/db/migrations/*` files remain as compatibility/history copies for now |
 | `client/*` | `client/*` | already close | web app layout is already near target |
 | root `package.json` | single root `package.json` | partially aligned | root scripts now cover build/start/migrate flow without workspaces yet |
@@ -43,7 +43,6 @@ mintapps/
 ## Explicit non-goals for phase 2
 
 - Do not move the existing `server/src/*` tree yet.
-- Do not remove `client/vercel.json` yet.
 - Do not delete `mobile/`, seller routes, Stripe routes, or RevenueCat routes.
 - Do not rewrite imports just to match the future folder names.
 
@@ -57,7 +56,7 @@ mintapps/
 
 - `server/routes/*` now exists as the live future-facing route surface.
 - All current Express route implementations now live in `server/routes/*`.
-- Most former `server/src/routes/*` compatibility re-exports have now been retired; only deferred legacy-only route code remains under `server/src/routes/*`.
+- The former `server/src/routes/*` compatibility layer has now been retired from runtime use.
 - `server/middleware/*` now exists as the live middleware surface.
 - `server/services/*` now exists as the live service surface.
 - `server/index.js` now exists as the live runtime entry surface.
@@ -66,5 +65,4 @@ mintapps/
 - `server/db/*` now owns the primary DB runtime/config/pool/query surfaces used by the promoted app.
 - `server/db/migrator.js`, `server/db/legacy-migrate.js`, and `server/db/legacy-seed.js` now own the legacy DB runner surface.
 - `server/db/legacy-migrations/*` and `server/db/scripts/*` now exist as the top-level DB artifact surface.
-- The remaining packaging move should now be mostly:
-  - trimming the last entrypoint and deferred-feature compatibility files under `server/src/*`
+- The remaining historical residue under `server/src/*` is now limited to copied SQL migrations and helper scripts retained for history/reference.

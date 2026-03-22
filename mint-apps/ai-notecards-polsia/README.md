@@ -83,7 +83,7 @@ Safety note:
 
 - `npm run migrate:handoff` refuses to run against a database that already contains the legacy multi-file migration history.
 - The legacy chain is still available via `npm run migrate` and `npm run seed`, now backed by `server/db/legacy-migrate.js` and `server/db/legacy-seed.js`.
-- The legacy multi-file SQL chain now lives under `server/db/legacy-migrations/`, while the old `server/src/db/*` copies remain as compatibility artifacts during packaging prep.
+- The legacy multi-file SQL chain now lives under `server/db/legacy-migrations/`, while the old `server/src/db/*` SQL copies remain only as historical reference artifacts.
 
 ## Legacy dev split
 
@@ -123,6 +123,6 @@ Not verified here:
 
 ## Next phase
 
-- Decide when the compatibility copies under `server/src/*` can be retired from the sandbox
+- Complete handoff-hardening docs for Polsia collaboration
 - Wire real billing/purchase infrastructure in the eventual Polsia repo
 - Replace shell seller/admin areas with production flows only after the target environment owns payments and moderation
