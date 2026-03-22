@@ -82,7 +82,7 @@ npm run setup:handoff
 Safety note:
 
 - `npm run migrate:handoff` refuses to run against a database that already contains the legacy multi-file migration history.
-- The legacy chain is still available via `npm run migrate` and the old demo seed via `npm --prefix server run seed`.
+- The legacy chain is still available via `npm run migrate` and `npm run seed`, now backed by `server/db/legacy-migrate.js` and `server/db/legacy-seed.js`.
 
 ## Legacy dev split
 

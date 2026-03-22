@@ -64,6 +64,6 @@ mintapps/
 - `server/app.js` now exists as the live shared app module behind the runtime entry.
 - `server/config/runtime.js` now exists as the live runtime/config surface.
 - `server/db/*` now owns the primary DB runtime/config/pool/query surfaces used by the promoted app.
+- `server/db/migrator.js`, `server/db/legacy-migrate.js`, and `server/db/legacy-seed.js` now own the legacy DB runner surface.
 - The remaining packaging move should now be mostly:
-  - cleaning up legacy-only DB scripts that still live under `server/src/db/*`
   - cleanup of the temporary compatibility layer once the move is complete
