@@ -101,11 +101,11 @@ In that mode the client talks to `/api` through `VITE_API_URL` instead of a Verc
 - `server/db/migrations/001_initial.sql`
 - `server/db/migrate.js`
 - `server/db/seed.js`
-- `server/src/routes/marketplace.js`
-- `server/src/routes/handoff-billing.js`
-- `server/src/routes/seller.js`
-- `server/src/routes/admin.js`
-- `server/src/config/runtime.js`
+- `server/routes/marketplace.js`
+- `server/routes/handoff-billing.js`
+- `server/routes/seller.js`
+- `server/routes/admin.js`
+- `server/config/runtime.js`
 
 ## Verification run
 
@@ -123,6 +123,6 @@ Not verified here:
 
 ## Next phase
 
-- Decide when the legacy `server/src/db/migrations/*` chain can be retired from the sandbox
+- Decide when the compatibility copies under `server/src/*` can be retired from the sandbox
 - Wire real billing/purchase infrastructure in the eventual Polsia repo
 - Replace shell seller/admin areas with production flows only after the target environment owns payments and moderation
