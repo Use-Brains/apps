@@ -10,7 +10,7 @@
     "migrate:handoff": "node db/migrate.js",
     "seed": "node db/legacy-seed.js",
     "seed:handoff": "node db/seed.js",
-    "test": "node --test src/**/*.test.js"
+    "test": "node --test config/*.test.js db/*.test.js routes/*.test.js services/*.test.js"
   },
   "dependencies": {
     "@google/genai": "^0.14.0",

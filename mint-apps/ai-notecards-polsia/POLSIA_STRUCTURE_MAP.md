@@ -57,7 +57,7 @@ mintapps/
 
 - `server/routes/*` now exists as the live future-facing route surface.
 - All current Express route implementations now live in `server/routes/*`.
-- `server/src/routes/*` now acts as a compatibility re-export layer for those route modules.
+- Most former `server/src/routes/*` compatibility re-exports have now been retired; only deferred legacy-only route code remains under `server/src/routes/*`.
 - `server/middleware/*` now exists as the live middleware surface.
 - `server/services/*` now exists as the live service surface.
 - `server/index.js` now exists as the live runtime entry surface.
@@ -67,4 +67,4 @@ mintapps/
 - `server/db/migrator.js`, `server/db/legacy-migrate.js`, and `server/db/legacy-seed.js` now own the legacy DB runner surface.
 - `server/db/legacy-migrations/*` and `server/db/scripts/*` now exist as the top-level DB artifact surface.
 - The remaining packaging move should now be mostly:
-  - cleanup of the temporary compatibility layer once the move is complete
+  - trimming the last entrypoint and deferred-feature compatibility files under `server/src/*`

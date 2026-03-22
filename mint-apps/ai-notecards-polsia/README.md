@@ -113,7 +113,7 @@ Verified locally in this sandbox:
 
 - `npm --prefix server ci`
 - `npm --prefix client ci`
-- `npm --prefix server test -- src/config/runtime.test.js src/routes/marketplace.test.js src/routes/seller.test.js`
+- `npm --prefix server test -- config/runtime.test.js routes/marketplace.test.js routes/seller.test.js`
 - `npm --prefix client run build`
 
 Not verified here:
