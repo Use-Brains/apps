@@ -28,12 +28,12 @@ mintapps/
 
 | current path | target path | status in copied app | notes |
 |---|---|---|---|
-| `server/src/index.js` | `server/index.js` | partially aligned | `server/index.js` now exists as a thin wrapper; main app logic still lives in `server/src/index.js` |
-| `server/src/bootstrap.js` | `server/index.js` bootstrapping concern | preserved | still loads `server/.env`; final Polsia repo likely moves env management up a level |
+| `server/src/index.js` | `server/index.js` | aligned via compatibility layer | `server/index.js` now loads env and owns the real runtime entry; `server/src/index.js` delegates to it |
+| `server/src/bootstrap.js` | `server/index.js` bootstrapping concern | aligned via compatibility layer | `server/src/bootstrap.js` now delegates to `server/index.js` instead of owning boot logic |
 | `server/src/routes/*` | `server/routes/*` | aligned via compatibility layer | live route implementations now live in `server/routes/*`; `server/src/routes/*` remains as compatibility re-exports during the move |
-| `server/src/middleware/*` | `server/middleware/*` | partially aligned | compatibility wrappers now exist under `server/middleware/*` |
-| `server/src/services/*` | `server/services/*` | partially aligned | compatibility wrappers now exist under `server/services/*` |
-| `server/src/db/pool.js` | `server/db/index.js` | partially aligned | `server/src/db/index.js` now centralizes DB exports and `server/db/index.js` exists as a compatibility wrapper |
+| `server/src/middleware/*` | `server/middleware/*` | aligned via compatibility layer | live middleware implementations now live in `server/middleware/*`; `server/src/middleware/*` re-exports them |
+| `server/src/services/*` | `server/services/*` | aligned via compatibility layer | live service implementations now live in `server/services/*`; `server/src/services/*` re-exports them |
+| `server/src/db/*` | `server/db/*` | aligned via compatibility layer | DB runtime, pool, queries, and index now live in `server/db/*`; `server/src/db/*` delegates to them |
 | `server/src/db/migrations/*` | `server/db/migrations/*` | structurally close | SQL migration model already matches Polsia’s sequential approach |
 | `client/*` | `client/*` | already close | web app layout is already near target |
 | root `package.json` | single root `package.json` | partially aligned | root scripts now cover build/start/migrate flow without workspaces yet |
@@ -58,9 +58,11 @@ mintapps/
 - `server/routes/*` now exists as the live future-facing route surface.
 - All current Express route implementations now live in `server/routes/*`.
 - `server/src/routes/*` now acts as a compatibility re-export layer for those route modules.
-- `server/middleware/*` now exists as a thin wrapper layer over the current middleware modules.
-- `server/services/*` now exists as a thin wrapper layer over the current service modules.
+- `server/middleware/*` now exists as the live middleware surface.
+- `server/services/*` now exists as the live service surface.
+- `server/index.js` now exists as the live runtime entry surface.
+- `server/db/*` now owns the primary DB runtime/config/pool/query surfaces used by the promoted app.
 - The remaining packaging move should now be mostly:
-  - relocation of the highest-value middleware/service implementations
-  - eventual replacement of `server/src/index.js` with a top-level `server/index.js` runtime entry
+  - deciding whether `server/src/app.js` should remain as the long-lived shared app module or also move top-level
+  - cleaning up legacy-only DB scripts that still live under `server/src/db/*`
   - cleanup of the temporary compatibility layer once the move is complete

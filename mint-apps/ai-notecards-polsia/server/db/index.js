@@ -1,2 +1,2 @@
-export { default } from '../src/db/index.js';
-export * from '../src/db/index.js';
+export { default } from './pool.js';
+export { getDatabaseConfig, getMigrationConfig, getPoolConfig } from './runtime.js';

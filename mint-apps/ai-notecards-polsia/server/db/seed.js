@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { getMigrationConfig } from '../src/db/runtime.js';
+import { getMigrationConfig } from './runtime.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

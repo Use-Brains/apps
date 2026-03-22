@@ -4,7 +4,7 @@ import pg from 'pg';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'node:url';
 
-import { getMigrationConfig } from '../src/db/runtime.js';
+import { getMigrationConfig } from './runtime.js';
 
 const handoffMigrationFilename = '001_initial.sql';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

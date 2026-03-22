@@ -160,13 +160,16 @@ If that scope is accepted, the first code refactor should be an infrastructure b
 
 - Promoted all current live route implementations into `server/routes/*`
 - Converted `server/src/routes/*` into a compatibility re-export layer
-- Updated `server/src/index.js` to consume the future-facing route surface instead of importing directly from `server/src/routes/*`
-- Verified the promoted route surface still imports cleanly and the current server test suite still passes
+- Promoted middleware into `server/middleware/*` and converted `server/src/middleware/*` into compatibility re-exports
+- Promoted services into `server/services/*` and converted `server/src/services/*` into compatibility re-exports
+- Promoted DB runtime/pool/query surfaces into `server/db/*` and converted `server/src/db/*` into compatibility shims
+- Promoted `server/index.js` into the live runtime entry and moved the main Express app body into `server/src/app.js`
+- Verified the promoted route/runtime/service surfaces still import cleanly, boot cleanly, and pass the current server test suite
 
 ## Remaining direct infra coupling points
 
-- `server/src/db/pool.js`
-  - Still carries current Postgres env expectations and is the right place to normalize any Neon-specific connection tuning.
+- `server/src/app.js`
+  - The app body is still kept under `server/src/*` even though `server/index.js` now owns boot and env loading.
 - `server/src/services/storage.js`
   - The boundary exists, but the only concrete upload/delete implementation is still Supabase.
 - `server/src/services/billing.js`
