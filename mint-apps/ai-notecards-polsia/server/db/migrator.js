@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const defaultMigrationsDir = path.join(__dirname, '../src/db/migrations');
+const defaultMigrationsDir = path.join(__dirname, 'legacy-migrations');
 
 export function getLegacyMigrationsDir() {
   return defaultMigrationsDir;

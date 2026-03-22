@@ -7,7 +7,7 @@ import path from 'node:path';
 import { getLegacyMigrationsDir, migrate } from '../../db/migrator.js';
 
 test('getLegacyMigrationsDir points at the legacy migration chain', () => {
-  assert.match(getLegacyMigrationsDir(), /server\/src\/db\/migrations$/);
+  assert.match(getLegacyMigrationsDir(), /server\/db\/legacy-migrations$/);
 });
 
 test('migrate applies only unapplied sql files from the provided directory', async () => {

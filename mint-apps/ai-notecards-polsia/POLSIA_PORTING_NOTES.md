@@ -167,6 +167,7 @@ If that scope is accepted, the first code refactor should be an infrastructure b
 - Promoted `server/app.js` into the live shared Express app module and converted `server/src/app.js` into a compatibility shim
 - Promoted `server/config/runtime.js` into the live runtime/config module and converted `server/src/config/runtime.js` into a compatibility shim
 - Promoted the legacy sequential migrator and legacy DB scripts into `server/db/*` and converted `server/src/db/migrator.js`, `server/src/db/migrate.js`, and `server/src/db/seed.js` into compatibility shims
+- Copied the legacy SQL migration chain into `server/db/legacy-migrations/*` and the manual SQL helpers into `server/db/scripts/*` so the top-level DB surface no longer depends on `server/src/db/migrations/*`
 - Verified the promoted route/runtime/service surfaces still import cleanly, boot cleanly, and pass the current server test suite
 
 ## Remaining direct infra coupling points

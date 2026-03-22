@@ -83,6 +83,7 @@ Safety note:
 
 - `npm run migrate:handoff` refuses to run against a database that already contains the legacy multi-file migration history.
 - The legacy chain is still available via `npm run migrate` and `npm run seed`, now backed by `server/db/legacy-migrate.js` and `server/db/legacy-seed.js`.
+- The legacy multi-file SQL chain now lives under `server/db/legacy-migrations/`, while the old `server/src/db/*` copies remain as compatibility artifacts during packaging prep.
 
 ## Legacy dev split
 

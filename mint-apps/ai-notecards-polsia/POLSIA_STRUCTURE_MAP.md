@@ -34,7 +34,7 @@ mintapps/
 | `server/src/middleware/*` | `server/middleware/*` | aligned via compatibility layer | live middleware implementations now live in `server/middleware/*`; `server/src/middleware/*` re-exports them |
 | `server/src/services/*` | `server/services/*` | aligned via compatibility layer | live service implementations now live in `server/services/*`; `server/src/services/*` re-exports them |
 | `server/src/db/*` | `server/db/*` | aligned via compatibility layer | DB runtime, pool, queries, and index now live in `server/db/*`; `server/src/db/*` delegates to them |
-| `server/src/db/migrations/*` | `server/db/migrations/*` | structurally close | SQL migration model already matches Polsia’s sequential approach |
+| `server/src/db/migrations/*` | `server/db/legacy-migrations/*` | aligned via copied legacy chain | the promoted legacy migrator now reads top-level `server/db/legacy-migrations/*`; the old `server/src/db/migrations/*` files remain as compatibility/history copies for now |
 | `client/*` | `client/*` | already close | web app layout is already near target |
 | root `package.json` | single root `package.json` | partially aligned | root scripts now cover build/start/migrate flow without workspaces yet |
 | no `render.yaml` | `render.yaml` | aligned by draft | current file is a copied-app draft, not final production truth |
@@ -65,5 +65,6 @@ mintapps/
 - `server/config/runtime.js` now exists as the live runtime/config surface.
 - `server/db/*` now owns the primary DB runtime/config/pool/query surfaces used by the promoted app.
 - `server/db/migrator.js`, `server/db/legacy-migrate.js`, and `server/db/legacy-seed.js` now own the legacy DB runner surface.
+- `server/db/legacy-migrations/*` and `server/db/scripts/*` now exist as the top-level DB artifact surface.
 - The remaining packaging move should now be mostly:
   - cleanup of the temporary compatibility layer once the move is complete
