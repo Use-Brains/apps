@@ -332,7 +332,7 @@ These tasks are now part of the refactor/handoff plan. They are not optional pol
 - Purpose:
   - give Polsia one reliable orientation path
   - summarize current repo shape, current launch scope, deferred systems, and collaboration boundaries
-  - link out to `README.md`, `POLSIA_PORTING_NOTES.md`, `POLSIA_STRUCTURE_MAP.md`, `POLSIA_ROUTE_MATRIX.md`, `docs/contracts/mobile-backend-contracts.md`, and current launch docs under `ops/`
+  - link out to `README.md`, `POLSIA_PORTING_NOTES.md`, `POLSIA_STRUCTURE_MAP.md`, `POLSIA_ROUTE_MATRIX.md`, `docs/contracts/mobile-api-runtime-contract.md`, and current launch docs under `ops/`
 - Include:
   - what Polsia can work on now
   - what remains founder-owned for now
