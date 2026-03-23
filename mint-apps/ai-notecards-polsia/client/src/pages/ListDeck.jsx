@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { api } from '../lib/api.js';
 import { calculatePlatformFeeCents, calculateSellerEarningsCents, MARKETPLACE_PLATFORM_FEE_RATE } from '../lib/marketplace.js';
 import { useAuth } from '../lib/AuthContext.jsx';
+import { getSellerToolsMode } from '../lib/runtime.js';
 import Navbar from '../components/Navbar.jsx';
 
 const PRICE_OPTIONS = [
@@ -18,6 +19,7 @@ export default function ListDeck() {
   const { deckId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const sellerToolsMode = getSellerToolsMode(user);
   const [deck, setDeck] = useState(null);
   const [categories, setCategories] = useState([]);
   const [categoryId, setCategoryId] = useState('');
@@ -29,6 +31,11 @@ export default function ListDeck() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!sellerToolsMode.enabled) {
+      setLoading(false);
+      return;
+    }
+
     if (!user?.connect_charges_enabled || !user?.seller_terms_accepted_at) {
       toast.error('Complete seller setup to list decks');
       navigate('/seller');
@@ -45,7 +52,27 @@ export default function ListDeck() {
         navigate('/dashboard');
       })
       .finally(() => setLoading(false));
-  }, [deckId]);
+  }, [deckId, navigate, sellerToolsMode.enabled, user?.connect_charges_enabled, user?.seller_terms_accepted_at]);
+
+  if (!sellerToolsMode.enabled) {
+    return (
+      <div className="min-h-screen bg-[#FAF7F2]">
+        <Navbar />
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-12">
+          <div className="bg-white rounded-2xl border border-gray-100 p-8">
+            <h1 className="text-2xl font-bold text-[#1A1614] mb-3">List on Marketplace</h1>
+            <p className="text-[#6B635A] mb-4">
+              Listing creation is disabled in this deployment, so this page is available for visibility only.
+            </p>
+            <p className="text-sm text-[#6B635A] mb-6">{sellerToolsMode.message}</p>
+            <a href="/seller" className="inline-flex px-5 py-2.5 bg-[#1B6B5A] text-white rounded-xl font-medium hover:bg-[#155a4a] transition-colors">
+              Back to Seller Dashboard
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const addTag = () => {
     const tag = tagInput.trim().toLowerCase();

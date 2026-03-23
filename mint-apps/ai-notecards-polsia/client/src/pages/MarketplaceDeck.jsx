@@ -120,6 +120,10 @@ export default function MarketplaceDeck() {
     setPurchasing(true);
     try {
       const result = await api.createPurchase(id);
+      if (result.status === 'unavailable') {
+        toast(result.message);
+        return;
+      }
       if (result.url) {
         window.location.href = result.url;
       }
@@ -255,9 +259,9 @@ export default function MarketplaceDeck() {
                 disabled={purchasing || listing.status !== 'active'}
                 className="w-full sm:w-auto px-8 py-3 bg-[#1B6B5A] text-white rounded-xl font-semibold hover:bg-[#155a4a] transition-colors disabled:opacity-50"
               >
-                {purchasing ? 'Processing...' : `Buy for $${listing.price_cents / 100}`}
+                {purchasing ? 'Checking...' : `Buy for $${listing.price_cents / 100}`}
               </button>
-              <p className="text-xs text-[#6B635A] mt-2">Non-refundable digital purchase</p>
+              <p className="text-xs text-[#6B635A] mt-2">Deck purchases are not live in this handoff build yet.</p>
             </div>
           </div>
         </div>

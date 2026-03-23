@@ -3,11 +3,13 @@ import { Link, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/AuthContext.jsx';
+import { getSellerToolsMode } from '../lib/runtime.js';
 import Navbar from '../components/Navbar.jsx';
 import SharePopover from '../components/SharePopover.jsx';
 
 export default function SellerDashboard() {
   const { user, refreshUser, loading: authLoading } = useAuth();
+  const sellerToolsMode = getSellerToolsMode(user);
   const [searchParams] = useSearchParams();
   const [dashboard, setDashboard] = useState(null);
   const [listings, setListings] = useState([]);
@@ -16,6 +18,7 @@ export default function SellerDashboard() {
 
   useEffect(() => {
     if (authLoading) return;
+    if (!sellerToolsMode.enabled) return;
     const connectStatus = searchParams.get('connect');
     if (connectStatus === 'return') {
       window.history.replaceState({}, '', '/seller');
@@ -26,9 +29,14 @@ export default function SellerDashboard() {
       window.history.replaceState({}, '', '/seller');
       toast.error('Your Stripe link expired. Click below to try again.');
     }
-  }, [authLoading]);
+  }, [authLoading, refreshUser, searchParams, sellerToolsMode.enabled]);
 
   useEffect(() => {
+    if (!sellerToolsMode.enabled) {
+      setLoading(false);
+      return;
+    }
+
     if (!user?.connect_charges_enabled) {
       setLoading(false);
       return;
@@ -41,7 +49,7 @@ export default function SellerDashboard() {
       })
       .catch(err => toast.error(err.message))
       .finally(() => setLoading(false));
-  }, [user?.connect_charges_enabled]);
+  }, [sellerToolsMode.enabled, user?.connect_charges_enabled]);
 
   const handleOnboard = async () => {
     setOnboarding(true);
@@ -94,6 +102,31 @@ export default function SellerDashboard() {
       toast.error(err.message);
     }
   };
+
+  if (!sellerToolsMode.enabled) {
+    return (
+      <div className="min-h-screen bg-[#FAF7F2]">
+        <Navbar />
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-20">
+          <div className="bg-white rounded-2xl border border-gray-100 p-8">
+            <h1 className="text-2xl font-bold text-[#1A1614] mb-3">Seller Dashboard</h1>
+            <p className="text-[#6B635A] mb-4">
+              Seller pages stay visible here, but seller setup, listing management, and payout actions are read-only in this deployment.
+            </p>
+            <p className="text-sm text-[#6B635A] mb-6">{sellerToolsMode.message}</p>
+            <div className="flex flex-wrap gap-3">
+              <Link to="/dashboard" className="px-5 py-2.5 bg-[#1B6B5A] text-white rounded-xl font-medium hover:bg-[#155a4a] transition-colors">
+                Back to Decks
+              </Link>
+              <Link to="/marketplace" className="px-5 py-2.5 border border-[#1B6B5A]/30 text-[#1B6B5A] rounded-xl font-medium hover:bg-[#E8F5F0] transition-colors">
+                Browse Marketplace
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Not connected — show onboarding CTA
   if (!user?.connect_charges_enabled) {

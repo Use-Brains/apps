@@ -6,6 +6,33 @@
 
 The main technical risk is not Express itself. The highest-coupling areas are seller marketplace payments, Supabase storage assumptions, and iOS-specific auth/offline/billing systems that are mixed into the wider product story. A web-first Polsia alignment should happen before any serious mobile or marketplace parity work.
 
+## First-pass status
+
+This first pass is intentionally narrow. It does not rewrite auth, payments, or the mobile app. It does:
+
+- add a server runtime/config boundary in `server/config/runtime.js`
+- move storage URL resolution behind `server/src/services/storage.js`
+- make seller tools and native billing/session behavior explicitly flaggable
+- make the web API base env-driven instead of assuming a Vercel rewrite
+- centralize public app URL construction for checkout, onboarding, email, and notification links
+- add an opt-in Express-serves-client mode for unified deployment prep
+- add a web seller read-only boundary so seller pages remain visible when seller tools are disabled
+
+This means the copied app is closer to a Polsia-ready web-core architecture without deleting existing seller or native product logic.
+
+## Confirmed Polsia target structure
+
+Polsia has now confirmed the target repo convention:
+
+- single root `package.json`
+- `server/index.js` as the Express entrypoint
+- `server/db/index.js` as the standard Neon `pg` entrypoint
+- `client/dist` served statically by Express in the deployed app
+- `render.yaml` as the deployment config surface
+- no separate frontend deployment in the final shape
+
+This removes a major unknown. The remaining work should now optimize for compatibility adapters and path mapping, not for speculative abstractions.
+
 ## Current stack inventory
 
 - Monorepo app with `client/`, `server/`, `mobile/`, `docs/`, `scripts/`, and `todos/`
@@ -22,7 +49,7 @@ The main technical risk is not Express itself. The highest-coupling areas are se
 - Tailwind CSS for styling
 - `@react-oauth/google` for Google auth on web
 - `posthog-js`, `@vercel/analytics`, and Sentry for analytics/observability
-- Direct API access through `/api` rewrite in `client/vercel.json`
+- Direct API access now assumes env-driven or same-origin `/api` usage in the unified handoff shape
 
 ## Current backend stack
 
@@ -84,11 +111,10 @@ The main technical risk is not Express itself. The highest-coupling areas are se
 
 ## Deployment assumptions
 
-- Web frontend expects Vercel-style deployment and rewrites
-- API is currently wired to a Railway-hosted URL in `client/vercel.json`
-- Backend expects environment-managed Postgres, Stripe, Supabase, Resend, and auth secrets
-- Mobile assumes Expo/EAS workflows for internal and production builds
-- Current setup is split-deployment oriented, not a single-service Render-style template yet
+- The handoff build now assumes Express can serve `client/dist`
+- Backend still expects environment-managed Postgres, Stripe, Supabase, Resend, and auth secrets
+- Mobile still assumes Expo/EAS workflows for internal and production builds
+- The copied sandbox is now materially closer to a single-service Render-style template than to the older Vercel + Railway split
 
 ## Marketplace/seller-specific complexity
 
@@ -149,6 +175,14 @@ The main technical risk is not Express itself. The highest-coupling areas are se
 - Any backend logic that assumes Supavisor-specific pool/direct URL behavior without abstraction
 - Brand/app-specific naming and config if the Polsia collaboration expects a different product shell
 
+## What should be cut or feature-flagged off
+
+- Seller onboarding and payout setup should be feature-flagged, not deleted
+- RevenueCat reconcile endpoints should be feature-flagged in non-native deployments
+- Native refresh-token session paths should be feature-flagged in web-core deployments
+- Push notification infrastructure should be feature-flagged in web-core deployments
+- Stripe Connect webhook handling should be treated as optional/deferred infrastructure
+
 ## What should be deferred or cut from initial Polsia collaboration
 
 - Stripe Connect seller marketplace
@@ -163,40 +197,71 @@ The main technical risk is not Express itself. The highest-coupling areas are se
 
 ### Phase 1: Freeze boundaries
 
+Status: complete
+
 - Keep the copied app isolated under `mint-apps/ai-notecards-polsia`
 - Introduce a migration inventory and dependency map
 - Mark web-first scope for the Polsia prep branch
 
-### Phase 2: Decouple infrastructure
+### Phase 2: Structure and deployment alignment
 
-- Replace hard-coded Vercel/Railway assumptions with env-driven frontend/backend URLs
-- Add a storage adapter boundary for avatars/files
-- Make Postgres config Neon-friendly without changing application behavior
+Status: complete
 
-### Phase 3: Narrow the product slice
+- Keep the current `client/` and `server/` directories in place, but make the root control surface look more like Polsia
+- Add root build/start/migrate scripts that operate the web app as a single service
+- Add a draft `render.yaml` for the copied app
+- Add thin compatibility entrypoints like `server/index.js` where they reduce future move-risk
+- Unified Express static-serving mode is now the default handoff expectation
 
-- Disable or isolate seller marketplace paths behind clear boundaries
-- Identify the minimum web product slice: auth, generate, decks, study, settings
-- Document mobile-only logic as non-blocking for the Polsia collaboration phase
+### Phase 3: Runtime and route convergence
 
-### Phase 4: Port web-first runtime
+Status: complete
 
-- Stand up backend and web frontend under Polsia-aligned env/deploy assumptions
-- Validate auth, deck CRUD, generation, and study flows on the new stack
-- Keep marketplace and native billing out of the first production candidate
+- Add a Polsia-aligned DB entry surface and document Neon runtime expectations
+- Inventory current routes against the confirmed Polsia route convention
+- Mark seller, Stripe Connect, RevenueCat, and native-only surfaces as optional or deferred with exact file references
+- Remove `client/vercel.json` from the active handoff path and treat it as completed legacy cleanup
+- Root build flow is now verified in the sandbox; runtime boot still depends on real env and database availability
+
+Phase 3 batch 1 now includes:
+
+- `server/src/db/index.js` as the internal DB compatibility surface
+- `server/db/index.js` as the future-facing compatibility wrapper
+- DB runtime config parsing for pooled vs direct URLs and Neon-friendly pool tuning
+- `POLSIA_ROUTE_MATRIX.md` as the route classification artifact for later packaging moves
+
+### Phase 4: Packaging and path migration
+
+Status: complete for the web-core handoff slice
+
+- Move code toward the confirmed `server/*` and `client/*` package layout
+- Rewrite imports in one controlled pass after the compatibility surfaces from phases 2 and 3 exist
+- Validate auth, deck CRUD, generation, and study flows on the moved layout
+- Keep marketplace selling, native billing, and mobile parity out of the first production candidate
+- Run a human-relayed prompt loop with Polsia so migration assumptions, missing prep tasks, and any expected data handoff format are clarified before irreversible packaging moves
 
 ### Phase 5: Reintroduce optional systems
 
+- Status: in progress
+
 - Reassess storage, subscriptions, marketplace, and mobile in that order
 - Only reintroduce each system after its boundary is explicit and testable
+- Continue the Polsia prompt loop for deferred systems like storage migration, payments replacement, and any eventual data import/export responsibilities
 
 ## Top technical blockers
 
-- Supabase storage is directly embedded in avatar handling and user serialization
-- Frontend deployment assumes Vercel rewrites to Railway
-- Billing is split between Stripe web flows and RevenueCat iOS flows
-- Marketplace logic depends on Stripe Connect webhooks and transactional copy-on-purchase semantics
-- Native auth/offline/session systems are substantial and not aligned to a web-first Polsia collaboration goal
+- Supabase storage is still directly embedded in avatar handling and user serialization
+- Billing is still split between Stripe web flows and RevenueCat iOS flows
+- Marketplace logic still depends on Stripe Connect webhooks and transactional copy-on-purchase semantics
+- Native auth/offline/session systems are still substantial and not aligned to a web-first Polsia collaboration goal
+
+## Highest-risk subsystems
+
+- `server/routes/stripe.js` and `server/services/purchase.js`
+- `server/routes/seller.js`
+- `server/services/billing.js`
+- `server/routes/auth.js` native-session branch
+- `mobile/src/lib/auth.tsx`, `mobile/src/lib/subscriptions.ts`, and `mobile/src/lib/offline/*`
 
 ## Open questions
 
@@ -209,13 +274,189 @@ The main technical risk is not Express itself. The highest-coupling areas are se
 
 ## Suggested first 10 refactor tasks
 
-1. Rename nothing yet; keep `ai-notecards-polsia` as a functional clone until boundaries are documented.
-2. Add a short `MIGRATION_SCOPE.md` or equivalent checklist if Polsia work starts, scoped to web-first only.
-3. Replace frontend rewrite dependency on Railway with an explicit `VITE_API_URL` path in the copied app.
-4. Add a backend config module that centralizes database, storage, and callback URL env handling.
-5. Extract Supabase avatar storage into a provider-agnostic storage interface.
-6. Inventory all Supabase-specific references and label each as database-hosting-only or storage-coupled.
-7. Fence off marketplace routes/pages behind a feature flag or clear “deferred” module boundary.
-8. Fence off mobile billing and RevenueCat reconciliation from shared billing state where possible.
-9. Verify the web core slice on the copied app only: signup/login, generate, save, study, settings.
-10. After the above, create the first Polsia-targeted branch from this copied sandbox rather than from the original app.
+1. Keep `ai-notecards-polsia` as the only refactor sandbox and avoid touching the original app.
+2. Preserve the current folder structure until the real Polsia repo layout is available.
+3. Keep using `server/config/runtime.js` as the single place for new runtime flags.
+4. Extend the storage adapter so avatar/media URLs never require route-level Supabase knowledge.
+5. Replace remaining direct `CLIENT_URL` usage with a centralized public app URL helper.
+6. Add a seller capability/read-only availability layer for the client so seller pages can render disabled states cleanly.
+7. Add a unified web-core deployment mode where Express can serve built frontend assets when needed.
+8. Isolate Stripe Connect webhook and seller onboarding logic behind explicit optional runtime boundaries.
+9. Isolate RevenueCat and native refresh-token support from shared billing/auth code paths.
+10. Once the Polsia repo structure is known, port only the web-core slice first: auth, generation, decks, study, settings, marketplace browse/read.
+
+## Phase 2 deliverables
+
+- Root scripts in `package.json` that reflect single-service build/start/migrate flows
+- Draft `render.yaml`
+- Thin `server/index.js` entry alignment
+- Current-to-target structure mapping in `POLSIA_STRUCTURE_MAP.md`
+- Updated migration docs that treat the Polsia repo shape as confirmed rather than hypothetical
+- Completed: root build flow now works from the copied sandbox
+
+## Phase 3 deliverables
+
+- DB entrypoint compatibility plan and implementation target
+- Route compatibility matrix with exact files
+- Clear classification of web-core, optional, and deferred surfaces
+- Removal conditions for legacy deploy artifacts like `client/vercel.json`
+- Completed: `client/vercel.json` is no longer part of the active handoff path
+
+## Current status summary
+
+- Phase 1: complete
+- Phase 2: complete
+- Phase 3: complete
+- Phase 4: complete for the web-core handoff slice
+- Phase 5: started; handoff-hardening docs are complete and optional-system reintroduction remains later work
+
+## Collaboration track
+
+- Use a human-relayed prompt loop with Polsia to exchange:
+  - current repo-state summaries
+  - structure and deployment assumptions
+  - database and storage migration expectations
+  - any requested prep work before code/data handoff
+- Keep those prompts grounded in the current copied sandbox state rather than hypothetical final architecture
+- Track this in `POLSIA_COLLAB_PROMPTS.md`
+
+## Additional handoff-hardening tasks
+
+These tasks are now part of the refactor/handoff plan. They are not optional polish. They reduce Polsia ramp time, remove ambiguity, and make collaboration safer.
+
+### H1. Add a single handoff entry document
+
+- Status: complete
+
+- Create `START_HERE_FOR_POLSIA.md` at repo root
+- Purpose:
+  - give Polsia one reliable orientation path
+  - summarize current repo shape, current launch scope, deferred systems, and collaboration boundaries
+  - link out to `README.md`, `POLSIA_PORTING_NOTES.md`, `POLSIA_STRUCTURE_MAP.md`, `POLSIA_ROUTE_MATRIX.md`, `docs/contracts/mobile-api-runtime-contract.md`, and current launch docs under `ops/`
+- Include:
+  - what Polsia can work on now
+  - what remains founder-owned for now
+  - what is intentionally placeholder or deferred
+
+### H2. Add a concrete mobile API contract document
+
+- Status: complete
+
+- Create a practical mobile contract doc such as `docs/contracts/mobile-api-runtime-contract.md`
+- Purpose:
+  - describe the actual mobile-to-backend contract, not just conceptual sensitivity areas
+- Include:
+  - exact endpoints mobile currently calls
+  - required headers, especially native-client headers
+  - auth/session expectations
+  - critical request/response shapes
+  - which fields are high-risk to change
+  - which routes are active, optional, or deferred
+
+### H3. Add an environment manifest
+
+- Status: complete
+
+- Create `docs/deployment/environment-manifest.md` or equivalent
+- Purpose:
+  - make local boot, preview, production, and handoff setup explicit
+- Include:
+  - required env vars
+  - optional env vars
+  - deferred env vars
+  - which variables are needed for web-core only
+  - which are needed for mobile / RevenueCat / notifications / seller / storage
+  - current known backend URL expectations for preview and production
+
+### H4. Add a verification status document
+
+- Status: complete
+
+- Create `docs/handoff/verification-status.md` or equivalent
+- Purpose:
+  - show what is currently proven vs assumed
+- Include:
+  - exact commands used for verification
+  - what currently passes
+  - what currently fails
+  - what is intentionally placeholder
+  - what remains unverified
+  - last verification date
+
+### H5. Add a launch-scope decision memo
+
+- Status: complete
+
+- Create `docs/handoff/launch-scope-decision.md` or equivalent
+- Purpose:
+  - make current product and launch assumptions explicit so Polsia does not infer the wrong scope
+- Include:
+  - buyer marketplace importance
+  - seller tooling deferral stance
+  - current Apple subscription / RevenueCat stance
+  - current iOS marketplace purchase stance
+  - what is firm vs flexible for launch
+
+### H6. Add a handoff decision log
+
+- Status: complete
+
+- Create `docs/handoff/decision-log.md`
+- Purpose:
+  - track major decisions that affect Polsia collaboration
+- Seed with:
+  - web-core first collaboration boundary
+  - seller tools deferred by default
+  - native/mobile parity not first-pass Polsia scope
+  - current backend/deployment target assumptions
+  - any decisions on marketplace purchase behavior for iOS
+
+### H7. Run a secrets/access scrub pass before deeper collaboration
+
+- Status: complete
+
+- Audit the copied sandbox for:
+  - checked-in secrets
+  - config files with sensitive values
+  - URLs or credentials that should not be shared
+  - hidden assumptions about access to external services
+- Document the result in a short note under `docs/handoff/`
+
+### H8. Define Polsia-ready execution boundaries explicitly
+
+- Status: complete
+
+- Add a short section to the handoff entry doc or a dedicated `docs/handoff/execution-boundaries.md`
+- Include:
+  - safe-now Polsia work
+  - unsafe / founder-only work
+  - work that requires explicit founder approval
+  - work that depends on Apple/RevenueCat/real credentials
+
+## Completion criteria for engineering collaboration point
+
+Treat the repo as having reached the Polsia engineering collaboration point only when all of the following are true:
+
+- the web-core structure and route classification are stable
+- the active/deferred system boundaries are explicit in docs
+- the mobile API contract is documented concretely
+- environment setup is documented concretely
+- verification status is documented concretely
+- launch-scope decisions are documented concretely
+- secrets/access scrub is complete
+- Polsia can be pointed at one handoff entry document instead of reconstructing context from multiple files
+
+## Immediate next focus
+
+Until the items in "Additional handoff-hardening tasks" are complete, treat them as the highest-priority work under this refactor plan.
+
+Sequence:
+
+1. `START_HERE_FOR_POLSIA.md`
+2. concrete mobile API contract doc
+3. environment manifest
+4. verification status doc
+5. launch-scope decision memo
+6. decision log
+7. secrets/access scrub note
+8. execution boundaries doc

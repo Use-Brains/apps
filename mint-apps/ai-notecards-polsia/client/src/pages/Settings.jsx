@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../lib/AuthContext.jsx';
 import { api } from '../lib/api.js';
 import { analytics, updateConsent } from '../lib/analytics.js';
+import { getSellerToolsMode } from '../lib/runtime.js';
 import Navbar from '../components/Navbar.jsx';
 
 function SellerTermsModal({ onAccept, onClose }) {
@@ -141,6 +142,7 @@ function Toggle({ checked, onChange, disabled }) {
 
 export default function Settings() {
   const { user, refreshUser, loading: authLoading } = useAuth();
+  const sellerToolsMode = getSellerToolsMode(user);
   const navigate = useNavigate();
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [onboarding, setOnboarding] = useState(false);
@@ -306,7 +308,11 @@ export default function Settings() {
   const handleCancel = async () => {
     if (!confirm('Cancel your Pro subscription? You\'ll keep access until the end of your billing period.')) return;
     try {
-      await api.cancelSubscription();
+      const result = await api.cancelSubscription();
+      if (result.status === 'unavailable') {
+        toast(result.message);
+        return;
+      }
       toast.success('Subscription will cancel at end of billing period');
       await refreshUser();
     } catch (err) {
@@ -530,6 +536,10 @@ export default function Settings() {
         {/* Subscription */}
         <section className="bg-white rounded-2xl p-6 border border-gray-100 mb-6">
           <h2 className="text-lg font-semibold text-[#1A1614] mb-4">Subscription</h2>
+          <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4 mb-4">
+            <p className="text-sm font-medium text-[#1A1614] mb-1">Billing is a placeholder in this handoff build</p>
+            <p className="text-sm text-[#6B635A]">Upgrade, billing portal, and cancellation actions will return a coming-soon response until Polsia wires the payment system.</p>
+          </div>
           <div className="flex items-center gap-3 mb-4">
             <span className="text-[#1A1614] font-medium capitalize">{user?.plan} plan</span>
             {user?.plan === 'trial' && user?.trial_ends_at && (
@@ -561,6 +571,11 @@ export default function Settings() {
                     setPortalLoading(true);
                     try {
                       const data = await api.createBillingPortal();
+                      if (data.status === 'unavailable') {
+                        toast(data.message);
+                        setPortalLoading(false);
+                        return;
+                      }
                       window.location.href = data.url;
                     } catch (err) {
                       toast.error(err.message);
@@ -597,7 +612,16 @@ export default function Settings() {
         {isPro && (
           <section className="bg-white rounded-2xl p-6 border border-gray-100 mb-6">
             <h2 className="text-lg font-semibold text-[#1A1614] mb-4">Seller</h2>
-            {isActiveSeller && (
+            {!sellerToolsMode.enabled && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4">
+                <p className="text-sm font-medium text-[#1A1614] mb-1">Seller tools are read-only here</p>
+                <p className="text-sm text-[#6B635A] mb-2">{sellerToolsMode.message}</p>
+                <p className="text-sm text-[#6B635A]">
+                  Existing seller state stays visible in the account model, but onboarding, listing management, and payout actions are disabled in this deployment.
+                </p>
+              </div>
+            )}
+            {sellerToolsMode.enabled && isActiveSeller && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <span className="px-2 py-0.5 bg-[#E8F5F0] text-[#1B6B5A] text-xs font-medium rounded">Active Seller</span>
@@ -613,7 +637,7 @@ export default function Settings() {
                 </Link>
               </div>
             )}
-            {needsConnectSetup && (
+            {sellerToolsMode.enabled && needsConnectSetup && (
               <div>
                 <p className="text-sm text-[#6B635A] mb-4">
                   You've accepted the seller terms. Complete your Stripe setup to start selling.
@@ -627,7 +651,7 @@ export default function Settings() {
                 </button>
               </div>
             )}
-            {!hasAcceptedTerms && (
+            {sellerToolsMode.enabled && !hasAcceptedTerms && (
               <div>
                 <p className="text-sm text-[#6B635A] mb-4">
                   Earn money by selling your flashcard decks on the marketplace.

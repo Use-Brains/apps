@@ -2,17 +2,19 @@
 
 ## Likely folders/files to refactor first
 
+- `server/config/runtime.js`
+  - New first-pass config boundary. Keep expanding this instead of adding new env parsing ad hoc.
+- `POLSIA_STRUCTURE_MAP.md`
+  - Current-to-target path map for the confirmed Polsia repo convention.
 - `client/src/lib/api.js`
   - Central web API boundary and a good first place to remove deployment coupling.
-- `client/vercel.json`
-  - Current web routing depends on a Railway-hosted API URL.
 - `server/src/services/storage.js`
   - Thin Supabase-specific storage seam and one of the safest first abstractions.
-- `server/src/db/pool.js`
+- `server/db/pool.js`
   - Central place to normalize Neon-friendly Postgres configuration.
-- `server/src/routes/auth.js`
+- `server/routes/auth.js`
   - Core auth shape, including native-session branching and user serialization.
-- `server/src/routes/stripe.js`
+- `server/routes/stripe.js`
   - High-complexity payment logic that should be isolated early, even if not rewritten immediately.
 - `mobile/src/lib/api.ts`
   - Shows the native-specific token/session contract with the backend.
@@ -93,10 +95,102 @@ The key rule: do not let native conveniences drive the first Polsia architecture
 Define the minimum Polsia web slice and lock it in writing before code changes:
 
 - keep: web auth, deck CRUD, AI generation, study flows, basic settings
-- defer: seller marketplace, Stripe Connect, RevenueCat, native mobile parity, offline sync
+- defer: Stripe Connect payout machinery, RevenueCat, native mobile parity, offline sync
+- keep visible but disable behind flags: seller tools and native-only billing/session paths
 
 If that scope is accepted, the first code refactor should be an infrastructure boundary pass:
 
 1. centralize env/config access
 2. remove Vercel-to-Railway assumptions
 3. abstract storage away from Supabase
+
+## First-pass changes completed
+
+- Added runtime/feature flag parsing in `server/config/runtime.js`
+- Moved iOS marketplace purchase availability onto the shared runtime config surface
+- Added provider-aware public storage URL helpers in `server/src/services/storage.js`
+- Updated auth/account routes to stop constructing Supabase public URLs directly
+- Added seller/native feature gates that preserve current behavior by default and disable cleanly when flags are turned off
+- Made the web client API base env-driven via `VITE_API_URL`
+- Added a shared public app URL helper in `server/config/runtime.js` and moved checkout/onboarding/email link construction onto it
+- Added unified deployment prep so `server/index.js` can serve the built client when `SERVE_CLIENT_BUILD=true`
+- Added a client-side seller availability helper in `client/src/lib/runtime.js` so `/seller`, `/sell/:deckId`, `Settings`, and seller-entry points degrade into read-only states instead of falling into failed seller actions
+
+## Phase 2 structure-alignment changes
+
+- Added root scripts in `package.json` so the copied app can be built, started, and migrated from a single control surface
+- Added a draft `render.yaml` that assumes Express serves `client/dist`
+- Added `server/index.js` as a thin compatibility entrypoint ahead of any future path migration
+- Added `POLSIA_STRUCTURE_MAP.md` to map the current copied app layout onto the confirmed Polsia target convention
+
+## Phase 3 next focus
+
+- Create a DB entry surface that matches the eventual `server/db/index.js` convention
+- Produce a route compatibility inventory before any large file move
+- Complete removal of `client/vercel.json` from the active deployment path
+
+## Phase 3 batch 1 completed
+
+- Added `server/src/db/index.js` as the internal DB export surface
+- Added `server/db/index.js` as a compatibility wrapper toward the confirmed Polsia path
+- Centralized pooled vs direct Postgres config parsing in `server/src/db/runtime.js`
+- Added `POLSIA_ROUTE_MATRIX.md` to classify route files into core, optional, and deferred groups
+
+## Phase 4 handoff prep completed
+
+- Added a squashed handoff migration at `server/db/migrations/001_initial.sql`
+- Added an idempotent handoff seed at `server/db/seed.js`
+- Added guarded handoff DB scripts so the squashed path does not run on top of the legacy migration history
+- Switched the default runtime expectation to unified Express-serves-client
+- Removed `client/vercel.json` from the handoff path
+- Removed the legacy Stripe route from active registration, then later restored it at `server/routes/stripe.js` as the future-facing deferred implementation surface
+- Converted buyer purchase checkout to a placeholder response while keeping marketplace browse/detail active
+- Kept seller and admin surfaces present as shell routes/pages for the handoff build
+
+## Packaging / path-move prep started
+
+- Added future-facing `server/routes/*` wrappers over the current route implementations
+- Added future-facing `server/middleware/*` wrappers over the current middleware implementations
+- Added future-facing `server/services/*` wrappers over the current service implementations
+- This should reduce the next move from a logic-heavy migration to a mostly mechanical relocation/import-rewrite pass
+
+## Packaging / path-move prep completed for the web-core handoff slice
+
+- Promoted all current live route implementations into `server/routes/*`
+- Converted `server/src/routes/*` into a compatibility re-export layer
+- Promoted middleware into `server/middleware/*` and converted `server/src/middleware/*` into compatibility re-exports
+- Promoted services into `server/services/*` and converted `server/src/services/*` into compatibility re-exports
+- Promoted DB runtime/pool/query surfaces into `server/db/*` and converted `server/src/db/*` into compatibility shims
+- Promoted `server/index.js` into the live runtime entry
+- Promoted `server/app.js` into the live shared Express app module and converted `server/src/app.js` into a compatibility shim
+- Promoted `server/config/runtime.js` into the live runtime/config module and converted `server/src/config/runtime.js` into a compatibility shim
+- Promoted the legacy sequential migrator and legacy DB scripts into `server/db/*` and converted `server/src/db/migrator.js`, `server/src/db/migrate.js`, and `server/src/db/seed.js` into compatibility shims
+- Copied the legacy SQL migration chain into `server/db/legacy-migrations/*` and the manual SQL helpers into `server/db/scripts/*` so the top-level DB surface no longer depends on `server/src/db/migrations/*`
+- Moved the active server tests onto top-level `server/config/*`, `server/db/*`, `server/routes/*`, and `server/services/*` paths
+- Retired the unused compatibility shims for promoted routes, selected DB helpers, selected services, and `server/src/middleware/plan.js`
+- Promoted the deferred legacy Stripe route into `server/routes/stripe.js`
+- Retired the remaining `server/src/*` entrypoint, middleware, runtime, and service compatibility shims so only the historical DB SQL copies remain under `server/src/*`
+- Verified the promoted route/runtime/service surfaces still import cleanly and boot cleanly; sandboxed test execution is partially blocked by socket permission limits
+
+## Remaining direct infra coupling points
+
+- `server/src/services/storage.js`
+  - The boundary exists, but the only concrete upload/delete implementation is still Supabase.
+- `server/services/billing.js`
+  - Shared Stripe and Apple/RevenueCat billing state remains coupled here.
+- `server/routes/stripe.js`
+  - Web subscription and marketplace purchase side effects are still Stripe-first.
+- `server/routes/seller.js`
+  - Seller onboarding is still Stripe Connect-specific even though it is now easier to disable.
+- `server/routes/account.js`
+  - Account settings still couple avatar upload, password flows, and best-effort Stripe cleanup into one legacy route module.
+- `server/routes/auth-apple.js`
+  - Native auth remains isolated but has not yet been promoted onto the future-facing route path as a real implementation.
+- `server/services/purchase.js`
+  - Marketplace checkout still assumes Stripe destination-charge style fulfillment.
+- `server/routes/revenuecat.js`
+  - Native billing is gated, but the integration remains present and provider-specific.
+- `mobile/src/lib/auth.tsx`
+  - Native session restore and device-specific auth remain outside the web-core boundary.
+- `mobile/src/lib/subscriptions.ts`
+  - RevenueCat product identity and purchase logic remain native-coupled.
