@@ -151,6 +151,27 @@ function validatePreferences(input) {
     }
     clean.timezone = timezone;
   }
+  if ('ai_generation_consent' in input) {
+    const consent = input.ai_generation_consent;
+    if (typeof consent !== 'object' || consent === null || Array.isArray(consent)) return null;
+    if (typeof consent.granted !== 'boolean') return null;
+    if (typeof consent.version !== 'string' || consent.version.trim().length === 0 || consent.version.length > 50) return null;
+
+    clean.ai_generation_consent = {
+      granted: consent.granted,
+      version: consent.version.trim(),
+    };
+
+    if ('granted_at' in consent) {
+      if (typeof consent.granted_at !== 'string' || Number.isNaN(Date.parse(consent.granted_at))) return null;
+      clean.ai_generation_consent.granted_at = consent.granted_at;
+    }
+
+    if ('updated_at' in consent) {
+      if (typeof consent.updated_at !== 'string' || Number.isNaN(Date.parse(consent.updated_at))) return null;
+      clean.ai_generation_consent.updated_at = consent.updated_at;
+    }
+  }
   return clean;
 }
 
@@ -171,3 +192,4 @@ function deepMerge(target, source) {
 }
 
 export default router;
+export { validatePreferences };

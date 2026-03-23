@@ -19,6 +19,8 @@ import { getOfflineFeatureMessage } from '@/lib/offline/ui';
 import { fontSize, spacing, borderRadius, useThemedStyles } from '@/lib/theme';
 import type { AppTheme } from '@/lib/theme';
 import { api, ApiError } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
+import { buildGrantedAiGenerationConsent, hasGrantedAiGenerationConsent } from '@/lib/ai-consent';
 
 const MAX_INPUT_LENGTH = 50000;
 const MAX_PHOTOS = 5;
@@ -29,6 +31,7 @@ type PreviewCard = { front: string; back: string };
 export default function GenerateScreen() {
   const styles = useThemedStyles(createStyles);
   const { isOnline } = useNetwork();
+  const { user, refreshUser } = useAuth();
 
   const [input, setInput] = useState('');
   const [title, setTitle] = useState('');
@@ -39,6 +42,34 @@ export default function GenerateScreen() {
   const abortRef = useRef<AbortController | null>(null);
 
   const canGenerate = (input.trim().length > 0 || photos.length > 0) && !loading;
+
+  const ensureAiConsent = async () => {
+    if (hasGrantedAiGenerationConsent(user?.preferences)) return true;
+
+    const approved = await new Promise<boolean>((resolve) => {
+      Alert.alert(
+        'AI Notecard Generation',
+        'When you use AI generation, content you choose to submit, such as text, photos, audio, or video, may be sent to third-party AI providers so AI Notecards can create notecards for you.\n\nOnly submit content you have the right to use. Do not submit sensitive personal information unless you are comfortable sharing it for this purpose.',
+        [
+          {
+            text: 'Not Now',
+            style: 'cancel',
+            onPress: () => resolve(false),
+          },
+          {
+            text: 'Agree and Continue',
+            onPress: () => resolve(true),
+          },
+        ]
+      );
+    });
+
+    if (!approved) return false;
+
+    await api.updatePreferences(buildGrantedAiGenerationConsent());
+    await refreshUser();
+    return true;
+  };
 
   const pickFromLibrary = async () => {
     if (photos.length >= MAX_PHOTOS) {
@@ -85,6 +116,8 @@ export default function GenerateScreen() {
     abortRef.current = controller;
     setLoading(true);
     try {
+      const hasConsent = await ensureAiConsent();
+      if (!hasConsent || controller.signal.aborted) return;
       let data;
       if (photos.length > 0) {
         data = await api.generatePreviewWithPhotos(input.trim(), title.trim() || undefined, photos);

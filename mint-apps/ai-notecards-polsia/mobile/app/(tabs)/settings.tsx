@@ -11,6 +11,10 @@ import { canUseRevenueCat, getAvailablePackages, hasActiveProEntitlement, purcha
 import { fontSize, spacing, useThemedStyles } from '@/lib/theme';
 import type { AppTheme } from '@/lib/theme';
 import type { PurchasesPackage } from 'react-native-purchases';
+import {
+  buildWithdrawnAiGenerationConsent,
+  hasGrantedAiGenerationConsent,
+} from '@/lib/ai-consent';
 
 export default function SettingsScreen() {
   const styles = useThemedStyles(createStyles);
@@ -25,6 +29,7 @@ export default function SettingsScreen() {
   const notificationPreferences = user?.preferences?.notifications as Record<string, unknown> | undefined;
   const studyRemindersEnabled = notificationPreferences?.study_reminders !== false;
   const marketplaceActivityEnabled = notificationPreferences?.marketplace_activity !== false;
+  const aiConsentGranted = hasGrantedAiGenerationConsent(user?.preferences);
 
   const handleToggleBiometric = async (enabled: boolean) => {
     if (!enabled) {
@@ -157,6 +162,45 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleReviewAiConsent = () => {
+    Alert.alert(
+      'AI Generation Consent',
+      aiConsentGranted
+        ? 'You have allowed AI Notecards to send content you choose to submit, such as text, photos, audio, or video, to third-party AI providers for AI notecard generation.'
+        : 'AI generation requires your approval before content you choose to submit, such as text, photos, audio, or video, is sent to third-party AI providers for AI notecard generation.'
+    );
+  };
+
+  const handleWithdrawAiConsent = () => {
+    Alert.alert(
+      'Withdraw AI consent?',
+      'If you withdraw consent, AI generation will be unavailable until you agree again.',
+      [
+        {
+          text: 'Keep Enabled',
+          style: 'cancel',
+        },
+        {
+          text: 'Withdraw Consent',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              try {
+                setPreferencesBusy(true);
+                await api.updatePreferences(buildWithdrawnAiGenerationConsent());
+                await refreshUser();
+              } catch (error) {
+                Alert.alert('Unable to update preference', error instanceof Error ? error.message : 'Please try again');
+              } finally {
+                setPreferencesBusy(false);
+              }
+            })();
+          },
+        },
+      ]
+    );
+  };
+
   const handleUpgradeOnWeb = async (billingPeriod: 'monthly' | 'annual') => {
     if (!isOnline) {
       Alert.alert('Offline', getOfflineFeatureMessage('billing'));
@@ -284,6 +328,26 @@ export default function SettingsScreen() {
 
       <View style={styles.section}>
         <ManageDownloads />
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.rowTitle}>AI Generation Consent</Text>
+        <Text style={styles.rowSubtitle}>
+          {aiConsentGranted
+            ? 'You have allowed AI Notecards to send submitted content to third-party AI providers for AI notecard generation.'
+            : 'AI generation will ask for your approval before submitted content is sent to third-party AI providers.'}
+        </Text>
+        <Text style={styles.helperText}>
+          Submitted content may include text, photos, audio, or video that you choose to upload or enter.
+        </Text>
+        <Pressable style={styles.secondaryButton} onPress={handleReviewAiConsent}>
+          <Text style={styles.secondaryButtonText}>Review Consent</Text>
+        </Pressable>
+        {aiConsentGranted ? (
+          <Pressable style={styles.logoutButton} onPress={handleWithdrawAiConsent} disabled={preferencesBusy}>
+            <Text style={styles.logoutText}>Withdraw Consent</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       <Pressable style={styles.logoutButton} onPress={() => void handleLogout()}>
