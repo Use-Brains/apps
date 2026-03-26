@@ -1,0 +1,72 @@
+[
+  {
+    "id": 1,
+    "name": "Small office straightforward",
+    "property_type": "Office",
+    "square_footage": 8500,
+    "frequency": "3x/week"
+  },
+  {
+    "id": 2,
+    "name": "Medical clinic uncertainty",
+    "property_type": "Clinic",
+    "square_footage": 5200,
+    "frequency": "5x/week"
+  },
+  {
+    "id": 3,
+    "name": "Church campus",
+    "property_type": "Church",
+    "square_footage": 14000,
+    "frequency": "2x/week"
+  },
+  {
+    "id": 4,
+    "name": "Multi-tenant office building",
+    "property_type": "Multi-tenant office",
+    "square_footage": 32000,
+    "frequency": "5x/week"
+  },
+  {
+    "id": 5,
+    "name": "School admin building",
+    "property_type": "School admin building",
+    "square_footage": 11000,
+    "frequency": "5x/week"
+  },
+  {
+    "id": 6,
+    "name": "Warehouse office combo",
+    "property_type": "Warehouse + office",
+    "square_footage": 18000,
+    "frequency": "2x/week"
+  },
+  {
+    "id": 7,
+    "name": "Law office polish matters",
+    "property_type": "Professional office",
+    "square_footage": 6300,
+    "frequency": "3x/week"
+  },
+  {
+    "id": 8,
+    "name": "Property manager walkthrough",
+    "property_type": "Mixed office suite",
+    "square_footage": 9700,
+    "frequency": null
+  },
+  {
+    "id": 9,
+    "name": "Floor-heavy site",
+    "property_type": "Office",
+    "square_footage": 12400,
+    "frequency": "3x/week"
+  },
+  {
+    "id": 10,
+    "name": "Messy real-world notes",
+    "property_type": "Office",
+    "square_footage": null,
+    "frequency": null
+  }
+]
