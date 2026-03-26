@@ -1,5 +1,7 @@
 # AI Notecards
 
+> Archive notice: after the Polsia import, this folder is no longer the source of truth. Do not perform new canonical engineering work here; use the Polsia-managed repo instead.
+
 AI-powered flashcard app with marketplace. Paste notes or type a topic, AI generates study flashcards. Buy and sell decks on the marketplace.
 
 ## Stack

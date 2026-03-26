@@ -1,5 +1,7 @@
 # AGENTS.md
 
+> Archive notice: this folder is no longer a source-of-truth workspace. AI agents should not implement new canonical work here.
+
 This file defines how Atlas should operate in `apps/ai-notecards/`.
 
 ## Repo Context

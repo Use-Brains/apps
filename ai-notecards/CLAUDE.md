@@ -1,5 +1,7 @@
 # AI Notecards
 
+> Archive notice: this folder is not the active source of truth for AI Notecards. Do not perform new canonical engineering work here.
+
 AI-powered flashcard app with marketplace. Paste notes or type a topic, AI generates study flashcards. Buy and sell decks on the marketplace.
 
 ## Stack
