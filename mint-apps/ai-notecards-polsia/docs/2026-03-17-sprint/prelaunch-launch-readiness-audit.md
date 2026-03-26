@@ -1,7 +1,7 @@
 # AI Notecards Prelaunch Audit
 
 Date: 2026-03-16
-Audited repo: `/Users/kashane/app-dev/apps/ai-notecards`
+Audited repo: `/repo/ai-notecards`
 
 ## 1. Executive verdict
 
@@ -21,11 +21,11 @@ Why:
 ## 2. What is already strong
 
 - Backend architecture is real, not aspirational. Auth, billing, marketplace, ratings, moderation, notifications, and study sync are all implemented in Express with database-backed flows.
-- Auth is stronger than typical prelaunch work. The repo supports cookie sessions for web plus refresh-token mobile sessions in [`server/src/routes/auth.js`](/Users/kashane/app-dev/apps/ai-notecards/server/src/routes/auth.js), and uses revocation checks in [`server/src/middleware/auth.js`](/Users/kashane/app-dev/apps/ai-notecards/server/src/middleware/auth.js).
-- Marketplace fulfillment is thoughtfully implemented. Purchase creation, idempotent webhook fulfillment, deck-copy creation, seller/buyer notifications, and fee calculation are all present in [`server/src/services/purchase.js`](/Users/kashane/app-dev/apps/ai-notecards/server/src/services/purchase.js) and [`server/src/routes/stripe.js`](/Users/kashane/app-dev/apps/ai-notecards/server/src/routes/stripe.js).
-- AI generation is production-shaped. Text generation has provider fallback, photo generation validates mime types and content, and failures are mapped to user-facing errors in [`server/src/routes/generate.js`](/Users/kashane/app-dev/apps/ai-notecards/server/src/routes/generate.js) and [`server/src/services/ai.js`](/Users/kashane/app-dev/apps/ai-notecards/server/src/services/ai.js).
-- Offline study work on mobile is substantive. There is real local storage, offline snapshotting, and sync reconciliation in [`mobile/src/lib/offline/`](/Users/kashane/app-dev/apps/ai-notecards/mobile/src/lib/offline) and [`server/src/services/study-sync.js`](/Users/kashane/app-dev/apps/ai-notecards/server/src/services/study-sync.js).
-- Observability is started correctly. Client and server both initialize Sentry, and analytics are consent-gated rather than blindly on by default in [`client/src/lib/analytics.js`](/Users/kashane/app-dev/apps/ai-notecards/client/src/lib/analytics.js) and [`client/src/components/ConsentBanner.jsx`](/Users/kashane/app-dev/apps/ai-notecards/client/src/components/ConsentBanner.jsx).
+- Auth is stronger than typical prelaunch work. The repo supports cookie sessions for web plus refresh-token mobile sessions in [`server/src/routes/auth.js`](/repo/ai-notecards/server/src/routes/auth.js), and uses revocation checks in [`server/src/middleware/auth.js`](/repo/ai-notecards/server/src/middleware/auth.js).
+- Marketplace fulfillment is thoughtfully implemented. Purchase creation, idempotent webhook fulfillment, deck-copy creation, seller/buyer notifications, and fee calculation are all present in [`server/src/services/purchase.js`](/repo/ai-notecards/server/src/services/purchase.js) and [`server/src/routes/stripe.js`](/repo/ai-notecards/server/src/routes/stripe.js).
+- AI generation is production-shaped. Text generation has provider fallback, photo generation validates mime types and content, and failures are mapped to user-facing errors in [`server/src/routes/generate.js`](/repo/ai-notecards/server/src/routes/generate.js) and [`server/src/services/ai.js`](/repo/ai-notecards/server/src/services/ai.js).
+- Offline study work on mobile is substantive. There is real local storage, offline snapshotting, and sync reconciliation in [`mobile/src/lib/offline/`](/repo/ai-notecards/mobile/src/lib/offline) and [`server/src/services/study-sync.js`](/repo/ai-notecards/server/src/services/study-sync.js).
+- Observability is started correctly. Client and server both initialize Sentry, and analytics are consent-gated rather than blindly on by default in [`client/src/lib/analytics.js`](/repo/ai-notecards/client/src/lib/analytics.js) and [`client/src/components/ConsentBanner.jsx`](/repo/ai-notecards/client/src/components/ConsentBanner.jsx).
 - Verification today:
   - Server tests: **pass** (`32/32`)
   - Web build: **pass**
@@ -39,8 +39,8 @@ Why:
 
 - Why it matters: the app is marketed as having a marketplace, buying, and selling. Native sellers currently cannot manage listings or complete a credible seller workflow.
 - Evidence:
-  - [`mobile/app/seller.tsx`](/Users/kashane/app-dev/apps/ai-notecards/mobile/app/seller.tsx#L5) is only a title/subtitle placeholder.
-  - [`mobile/app/sell/[deckId].tsx`](/Users/kashane/app-dev/apps/ai-notecards/mobile/app/sell/[deckId].tsx#L6) only renders “List for Sale” plus the deck id.
+  - [`mobile/app/seller.tsx`](/repo/ai-notecards/mobile/app/seller.tsx#L5) is only a title/subtitle placeholder.
+  - [`mobile/app/sell/[deckId].tsx`](/repo/ai-notecards/mobile/app/sell/[deckId].tsx#L6) only renders “List for Sale” plus the deck id.
 - Affected platform: **iOS**
 - Severity: **critical**
 - Recommended fix: either remove seller entry points from iOS and ship web-first, or finish the seller dashboard and listing creation/edit flow to parity with web.
@@ -50,8 +50,8 @@ Why:
 
 - Why it matters: the native app currently initiates purchase of digital study content by opening browser-based checkout. That is likely to trigger App Store review rejection under Apple’s digital goods purchase rules.
 - Evidence:
-  - [`mobile/app/(tabs)/marketplace/[id].tsx`](/Users/kashane/app-dev/apps/ai-notecards/mobile/app/(tabs)/marketplace/%5Bid%5D.tsx#L53) calls `api.createPurchase(id)` and then opens the returned URL with `WebBrowser.openBrowserAsync`.
-  - The CTA explicitly says “Buy in Browser” at [`mobile/app/(tabs)/marketplace/[id].tsx`](/Users/kashane/app-dev/apps/ai-notecards/mobile/app/(tabs)/marketplace/%5Bid%5D.tsx#L111).
+  - [`mobile/app/(tabs)/marketplace/[id].tsx`](/repo/ai-notecards/mobile/app/(tabs)/marketplace/%5Bid%5D.tsx#L53) calls `api.createPurchase(id)` and then opens the returned URL with `WebBrowser.openBrowserAsync`.
+  - The CTA explicitly says “Buy in Browser” at [`mobile/app/(tabs)/marketplace/[id].tsx`](/repo/ai-notecards/mobile/app/(tabs)/marketplace/%5Bid%5D.tsx#L111).
 - Affected platform: **iOS**
 - Severity: **critical**
 - Recommended fix: do not market or submit iOS with this flow. Either disable marketplace purchasing in the iOS app, reposition iOS as a reader/study companion, or redesign monetization for App Store compliance.
@@ -61,8 +61,8 @@ Why:
 
 - Why it matters: the product exposes notification controls, but the implementation only clearly sends marketplace push notifications. Study reminders are presented in settings without a real delivery path.
 - Evidence:
-  - Web settings says “Email delivery coming soon” in [`client/src/pages/Settings.jsx`](/Users/kashane/app-dev/apps/ai-notecards/client/src/pages/Settings.jsx#L509).
-  - `notifyUser` exists in [`server/src/services/notifications.js`](/Users/kashane/app-dev/apps/ai-notecards/server/src/services/notifications.js#L84), but its only production call sites are marketplace purchase events in [`server/src/routes/stripe.js`](/Users/kashane/app-dev/apps/ai-notecards/server/src/routes/stripe.js#L301).
+  - Web settings says “Email delivery coming soon” in [`client/src/pages/Settings.jsx`](/repo/ai-notecards/client/src/pages/Settings.jsx#L509).
+  - `notifyUser` exists in [`server/src/services/notifications.js`](/repo/ai-notecards/server/src/services/notifications.js#L84), but its only production call sites are marketplace purchase events in [`server/src/routes/stripe.js`](/repo/ai-notecards/server/src/routes/stripe.js#L301).
 - Affected platform: **web / iOS / backend**
 - Severity: **high**
 - Recommended fix: either remove reminder promises from launch surfaces or implement one real reminder channel end to end, with scheduling, retry, and opt-out handling.
@@ -72,7 +72,7 @@ Why:
 
 - Why it matters: launching iOS without a working local verification baseline is risky. Right now the mobile repo requires a newer Node version than the environment used for checks, and that breaks routine validation.
 - Evidence:
-  - [`mobile/package.json`](/Users/kashane/app-dev/apps/ai-notecards/mobile/package.json#L71) requires `node >=20.19.4`.
+  - [`mobile/package.json`](/repo/ai-notecards/mobile/package.json#L71) requires `node >=20.19.4`.
   - `npm test` failed under Node `20.10.0` with a `node:util` export error.
   - `npm run lint` failed under Node `20.10.0` with Expo env parsing/runtime errors.
 - Affected platform: **iOS / CI / developer workflow**
@@ -84,7 +84,7 @@ Why:
 
 - Why it matters: once you start marketing, traffic quality changes. You need baseline hardening for headers and browser attack surface, not just route logic.
 - Evidence:
-  - [`server/src/index.js`](/Users/kashane/app-dev/apps/ai-notecards/server/src/index.js#L62) sets JSON, cookies, and CORS, but I found no `helmet`, CSP, HSTS, frame protections, or similar header middleware anywhere in the server stack.
+  - [`server/src/index.js`](/repo/ai-notecards/server/src/index.js#L62) sets JSON, cookies, and CORS, but I found no `helmet`, CSP, HSTS, frame protections, or similar header middleware anywhere in the server stack.
 - Affected platform: **backend / infra**
 - Severity: **high**
 - Recommended fix: add `helmet` with an explicit CSP posture, HSTS in production, and review any cross-origin/embed requirements before launch.
@@ -94,7 +94,7 @@ Why:
 
 - Why it matters: the most fragile launch paths are frontend auth, generation, Stripe redirects/webhooks, seller onboarding, and purchase/rating flows. The repo’s automated coverage does not yet match that risk.
 - Evidence:
-  - Server tests exist in [`server/src/routes/generate.test.js`](/Users/kashane/app-dev/apps/ai-notecards/server/src/routes/generate.test.js) and related files.
+  - Server tests exist in [`server/src/routes/generate.test.js`](/repo/ai-notecards/server/src/routes/generate.test.js) and related files.
   - I found **no client tests** under `client/`.
   - I found **no Playwright/Cypress E2E suite** in the app repo.
   - Mobile tests exist, but are currently not runnable in this environment.
@@ -197,11 +197,11 @@ The web app feels materially closer to “marketable” than the mobile app. Rou
 
 The main polish gaps are around trust and finish rather than missing architecture:
 
-- Settings still exposes a notifications section with “Email delivery coming soon” in [`client/src/pages/Settings.jsx`](/Users/kashane/app-dev/apps/ai-notecards/client/src/pages/Settings.jsx#L509), which weakens perceived completeness.
+- Settings still exposes a notifications section with “Email delivery coming soon” in [`client/src/pages/Settings.jsx`](/repo/ai-notecards/client/src/pages/Settings.jsx#L509), which weakens perceived completeness.
 - Some destructive or important flows still use browser `confirm()` dialogs instead of product-grade modals:
-  - [`client/src/pages/Dashboard.jsx`](/Users/kashane/app-dev/apps/ai-notecards/client/src/pages/Dashboard.jsx#L193)
-  - [`client/src/pages/Settings.jsx`](/Users/kashane/app-dev/apps/ai-notecards/client/src/pages/Settings.jsx#L306)
-  - [`client/src/pages/SellerDashboard.jsx`](/Users/kashane/app-dev/apps/ai-notecards/client/src/pages/SellerDashboard.jsx#L87)
+  - [`client/src/pages/Dashboard.jsx`](/repo/ai-notecards/client/src/pages/Dashboard.jsx#L193)
+  - [`client/src/pages/Settings.jsx`](/repo/ai-notecards/client/src/pages/Settings.jsx#L306)
+  - [`client/src/pages/SellerDashboard.jsx`](/repo/ai-notecards/client/src/pages/SellerDashboard.jsx#L87)
 - I did not verify visual consistency or accessibility via live browser QA in this audit, so that remains a residual risk even though the codebase shape is good.
 
 Verdict on web polish: **above average for a serious beta, not yet fully premium.**
@@ -213,7 +213,7 @@ What is good:
 - Real auth flows exist, including Apple/Google/magic-link support.
 - Offline study architecture is real.
 - Home, deck detail, study, generate, notifications, and subscription settings have meaningful implementation.
-- App config and EAS profiles are present in [`mobile/app.config.js`](/Users/kashane/app-dev/apps/ai-notecards/mobile/app.config.js) and [`mobile/eas.json`](/Users/kashane/app-dev/apps/ai-notecards/mobile/eas.json).
+- App config and EAS profiles are present in [`mobile/app.config.js`](/repo/ai-notecards/mobile/app.config.js) and [`mobile/eas.json`](/repo/ai-notecards/mobile/eas.json).
 
 What is not good enough:
 
@@ -255,7 +255,7 @@ What still needs work:
 
 Good:
 
-- Environment examples exist in [`server/.env.example`](/Users/kashane/app-dev/apps/ai-notecards/server/.env.example).
+- Environment examples exist in [`server/.env.example`](/repo/ai-notecards/server/.env.example).
 - Health check exists.
 - Migrations are versioned and transactional.
 - Sentry and PostHog are wired.

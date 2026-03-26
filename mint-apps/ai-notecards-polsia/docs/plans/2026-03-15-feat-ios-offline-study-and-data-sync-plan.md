@@ -12,15 +12,15 @@
 
 ## Research Summary
 
-- Relevant brainstorm: [2026-03-15-ios-offline-study-and-data-sync-brainstorm.md](/Users/kashane/app-dev/apps/ai-notecards/docs/brainstorms/2026-03-15-ios-offline-study-and-data-sync-brainstorm.md)
-- Mobile app shell already persists selected query roots with MMKV in [query-client.ts](/Users/kashane/app-dev/apps/ai-notecards/mobile/src/lib/query-client.ts).
-- iOS study and deck detail screens are still placeholders in [study/[deckId].tsx](/Users/kashane/app-dev/apps/ai-notecards/mobile/app/study/[deckId].tsx) and [decks/[id].tsx](/Users/kashane/app-dev/apps/ai-notecards/mobile/app/decks/[id].tsx).
-- The home screen is also a placeholder in [home/index.tsx](/Users/kashane/app-dev/apps/ai-notecards/mobile/app/(tabs)/home/index.tsx), so download/offline status should land there rather than in a new top-level surface.
-- The current study backend only supports server-created sessions and `NOW()`-based completion/streak logic in [study.js](/Users/kashane/app-dev/apps/ai-notecards/server/src/routes/study.js).
-- Profile/settings cannot be treated as fully disabled offline anymore because [profile.tsx](/Users/kashane/app-dev/apps/ai-notecards/mobile/app/(tabs)/profile.tsx) now contains biometric controls and billing entry points.
-- Relevant institutional doc: [account-settings-experience.md](/Users/kashane/app-dev/apps/ai-notecards/docs/solutions/feature-patterns/account-settings-experience.md) confirms the project prefers extending existing settings/profile surfaces instead of inventing parallel account UIs.
-- Current package manifests do not yet include `expo-sqlite` or `@react-native-community/netinfo`, so the plan must account for dependency installation and any Expo compatibility checks in [mobile/package.json](/Users/kashane/app-dev/apps/ai-notecards/mobile/package.json).
-- The existing server test command uses Node's built-in test runner and currently has no route-level study test file, so the plan should expect to add route tests from scratch in [server/package.json](/Users/kashane/app-dev/apps/ai-notecards/server/package.json).
+- Relevant brainstorm: [2026-03-15-ios-offline-study-and-data-sync-brainstorm.md](/repo/ai-notecards/docs/brainstorms/2026-03-15-ios-offline-study-and-data-sync-brainstorm.md)
+- Mobile app shell already persists selected query roots with MMKV in [query-client.ts](/repo/ai-notecards/mobile/src/lib/query-client.ts).
+- iOS study and deck detail screens are still placeholders in [study/[deckId].tsx](/repo/ai-notecards/mobile/app/study/[deckId].tsx) and [decks/[id].tsx](/repo/ai-notecards/mobile/app/decks/[id].tsx).
+- The home screen is also a placeholder in [home/index.tsx](/repo/ai-notecards/mobile/app/(tabs)/home/index.tsx), so download/offline status should land there rather than in a new top-level surface.
+- The current study backend only supports server-created sessions and `NOW()`-based completion/streak logic in [study.js](/repo/ai-notecards/server/src/routes/study.js).
+- Profile/settings cannot be treated as fully disabled offline anymore because [profile.tsx](/repo/ai-notecards/mobile/app/(tabs)/profile.tsx) now contains biometric controls and billing entry points.
+- Relevant institutional doc: [account-settings-experience.md](/repo/ai-notecards/docs/solutions/feature-patterns/account-settings-experience.md) confirms the project prefers extending existing settings/profile surfaces instead of inventing parallel account UIs.
+- Current package manifests do not yet include `expo-sqlite` or `@react-native-community/netinfo`, so the plan must account for dependency installation and any Expo compatibility checks in [mobile/package.json](/repo/ai-notecards/mobile/package.json).
+- The existing server test command uses Node's built-in test runner and currently has no route-level study test file, so the plan should expect to add route tests from scratch in [server/package.json](/repo/ai-notecards/server/package.json).
 
 ## Spec Decisions
 

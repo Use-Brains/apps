@@ -163,9 +163,9 @@ export async function syncPendingSessions(options: { now?: Date } = {}) {
 **Commands run**:
 
 ```bash
-cd /Users/kashane/app-dev/apps/ai-notecards/server && npm test
-cd /Users/kashane/app-dev/apps/ai-notecards/mobile && /Users/kashane/.nvm/versions/node/v22.22.0/bin/node ./node_modules/vitest/vitest.mjs run
-cd /Users/kashane/app-dev/apps/ai-notecards/mobile && /Users/kashane/.nvm/versions/node/v22.22.0/bin/node ./node_modules/typescript/bin/tsc --noEmit
+cd /repo/ai-notecards/server && npm test
+cd /repo/ai-notecards/mobile && node ./node_modules/vitest/vitest.mjs run
+cd /repo/ai-notecards/mobile && node ./node_modules/typescript/bin/tsc --noEmit
 ```
 
 ## Why This Works
@@ -197,5 +197,5 @@ The fix closes all three gaps together:
 
 ## Related Issues
 
-- See also: [Account & Settings Experience](/Users/kashane/app-dev/apps/ai-notecards/docs/solutions/feature-patterns/account-settings-experience.md)
-- See also: [Pre-Launch Checklist](/Users/kashane/app-dev/apps/ai-notecards/docs/solutions/feature-patterns/pre-launch-checklist.md)
+- See also: [Account & Settings Experience](/repo/ai-notecards/docs/solutions/feature-patterns/account-settings-experience.md)
+- See also: [Pre-Launch Checklist](/repo/ai-notecards/docs/solutions/feature-patterns/pre-launch-checklist.md)

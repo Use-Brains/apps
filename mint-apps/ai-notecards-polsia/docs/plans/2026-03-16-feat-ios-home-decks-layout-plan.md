@@ -21,16 +21,16 @@ origin: docs/brainstorms/2026-03-16-ios-home-decks-layout-brainstorm.md
 
 ### Repo Patterns
 
-- [home/index.tsx](/Users/kashane/app-dev/apps/ai-notecards/mobile/app/(tabs)/home/index.tsx) currently owns both offline download actions and deck listing UI. It already has the right data sources for deck list query + offline snapshot lookup, but the information hierarchy is wrong for the desired product direction.
-- [settings.tsx](/Users/kashane/app-dev/apps/ai-notecards/mobile/app/(tabs)/settings.tsx) already hosts download management through [ManageDownloads.tsx](/Users/kashane/app-dev/apps/ai-notecards/mobile/src/components/downloads/ManageDownloads.tsx), so Home should not duplicate download explanation copy.
-- [BottomSheet.tsx](/Users/kashane/app-dev/apps/ai-notecards/mobile/src/components/BottomSheet.tsx) is the correct primitive for the deck actions menu. `ActionSheetIOS` is too limited for inline progress, disabled checked rows, and mixed destructive/non-destructive states.
-- [auth.tsx](/Users/kashane/app-dev/apps/ai-notecards/mobile/src/lib/auth.tsx) and [api.ts](/Users/kashane/app-dev/apps/ai-notecards/mobile/src/lib/api.ts) already expose seller readiness signals: `plan`, `sellerTermsAccepted`, and `stripeConnectOnboarded`.
-- [decks.js](/Users/kashane/app-dev/apps/ai-notecards/server/src/routes/decks.js) supports list, read, duplicate, edit, and delete, but has no archive state or archive route today.
+- [home/index.tsx](/repo/ai-notecards/mobile/app/(tabs)/home/index.tsx) currently owns both offline download actions and deck listing UI. It already has the right data sources for deck list query + offline snapshot lookup, but the information hierarchy is wrong for the desired product direction.
+- [settings.tsx](/repo/ai-notecards/mobile/app/(tabs)/settings.tsx) already hosts download management through [ManageDownloads.tsx](/repo/ai-notecards/mobile/src/components/downloads/ManageDownloads.tsx), so Home should not duplicate download explanation copy.
+- [BottomSheet.tsx](/repo/ai-notecards/mobile/src/components/BottomSheet.tsx) is the correct primitive for the deck actions menu. `ActionSheetIOS` is too limited for inline progress, disabled checked rows, and mixed destructive/non-destructive states.
+- [auth.tsx](/repo/ai-notecards/mobile/src/lib/auth.tsx) and [api.ts](/repo/ai-notecards/mobile/src/lib/api.ts) already expose seller readiness signals: `plan`, `sellerTermsAccepted`, and `stripeConnectOnboarded`.
+- [decks.js](/repo/ai-notecards/server/src/routes/decks.js) supports list, read, duplicate, edit, and delete, but has no archive state or archive route today.
 
 ### Institutional Learnings
 
-- [ios-offline-study-sync-and-local-storage.md](/Users/kashane/app-dev/apps/ai-notecards/docs/solutions/integration-issues/ios-offline-study-sync-and-local-storage.md): treat offline downloads as a SQLite-backed source of truth, not a UI-only flag. Reuse the existing repository/download helpers instead of introducing a parallel cache.
-- [2026-03-13-feat-seller-onboarding-and-marketplace-listing-plan.md](/Users/kashane/app-dev/apps/ai-notecards/docs/plans/2026-03-13-feat-seller-onboarding-and-marketplace-listing-plan.md): seller state should come from existing account signals and existing sell routes rather than a new eligibility system.
+- [ios-offline-study-sync-and-local-storage.md](/repo/ai-notecards/docs/solutions/integration-issues/ios-offline-study-sync-and-local-storage.md): treat offline downloads as a SQLite-backed source of truth, not a UI-only flag. Reuse the existing repository/download helpers instead of introducing a parallel cache.
+- [2026-03-13-feat-seller-onboarding-and-marketplace-listing-plan.md](/repo/ai-notecards/docs/plans/2026-03-13-feat-seller-onboarding-and-marketplace-listing-plan.md): seller state should come from existing account signals and existing sell routes rather than a new eligibility system.
 
 ### External Research Decision
 
@@ -100,9 +100,9 @@ Skipped. The feature is an internal product/UI flow with strong local patterns a
 ### Task 1: Add Server-Side Archive Support For Purchased Decks
 
 **Files:**
-- Create: [013_deck_archive_state.sql](/Users/kashane/app-dev/apps/ai-notecards/server/src/db/migrations/013_deck_archive_state.sql)
-- Modify: [decks.js](/Users/kashane/app-dev/apps/ai-notecards/server/src/routes/decks.js)
-- Test: [decks.test.js](/Users/kashane/app-dev/apps/ai-notecards/server/src/routes/decks.test.js)
+- Create: [013_deck_archive_state.sql](/repo/ai-notecards/server/src/db/migrations/013_deck_archive_state.sql)
+- Modify: [decks.js](/repo/ai-notecards/server/src/routes/decks.js)
+- Test: [decks.test.js](/repo/ai-notecards/server/src/routes/decks.test.js)
 
 **Steps:**
 1. Add a migration that introduces `archived_at TIMESTAMPTZ NULL` on `decks`.
@@ -115,8 +115,8 @@ Skipped. The feature is an internal product/UI flow with strong local patterns a
 ### Task 2: Extend Mobile API Types And Client Methods
 
 **Files:**
-- Modify: [api.ts](/Users/kashane/app-dev/apps/ai-notecards/mobile/src/lib/api.ts)
-- Modify: [api.ts](/Users/kashane/app-dev/apps/ai-notecards/mobile/src/types/api.ts)
+- Modify: [api.ts](/repo/ai-notecards/mobile/src/lib/api.ts)
+- Modify: [api.ts](/repo/ai-notecards/mobile/src/types/api.ts)
 
 **Steps:**
 1. Extend the mobile `Deck` type with `archivedAt: string | null` and ensure API response mapping includes it.
@@ -126,14 +126,14 @@ Skipped. The feature is an internal product/UI flow with strong local patterns a
 ### Task 3: Extract Reusable Home Deck Action UI
 
 **Files:**
-- Create: [DeckActionsSheet.tsx](/Users/kashane/app-dev/apps/ai-notecards/mobile/src/components/decks/DeckActionsSheet.tsx)
-- Create: [DeckCard.tsx](/Users/kashane/app-dev/apps/ai-notecards/mobile/src/components/decks/DeckCard.tsx)
-- Create: [deck-actions.ts](/Users/kashane/app-dev/apps/ai-notecards/mobile/src/lib/decks/deck-actions.ts)
-- Test: [home-deck-actions.test.tsx](/Users/kashane/app-dev/apps/ai-notecards/mobile/__tests__/unit/home-deck-actions.test.tsx)
+- Create: [DeckActionsSheet.tsx](/repo/ai-notecards/mobile/src/components/decks/DeckActionsSheet.tsx)
+- Create: [DeckCard.tsx](/repo/ai-notecards/mobile/src/components/decks/DeckCard.tsx)
+- Create: [deck-actions.ts](/repo/ai-notecards/mobile/src/lib/decks/deck-actions.ts)
+- Test: [home-deck-actions.test.tsx](/repo/ai-notecards/mobile/__tests__/unit/home-deck-actions.test.tsx)
 
 **Steps:**
 1. Create a reusable `DeckCard` component that renders title plus visible `Open` and `Study` buttons and a top-right actions trigger.
-2. Create a `DeckActionsSheet` using the shared [BottomSheet.tsx](/Users/kashane/app-dev/apps/ai-notecards/mobile/src/components/BottomSheet.tsx).
+2. Create a `DeckActionsSheet` using the shared [BottomSheet.tsx](/repo/ai-notecards/mobile/src/components/BottomSheet.tsx).
 3. Build a small helper module to derive action rows from deck state: downloaded/not downloaded/downloading, generated/purchased, seller-ready/onboarding-needed, archived/active.
 4. Support `Download`, `Downloaded` with circled check icon and disabled state, `Remove Download`, `Sell`, `Archive` or `Delete`, and archived-state `Restore`.
 5. Use `ActivityIndicator` for in-progress download row state.
@@ -142,8 +142,8 @@ Skipped. The feature is an internal product/UI flow with strong local patterns a
 ### Task 4: Rebuild Home Around Active And Archived Sections
 
 **Files:**
-- Modify: [home/index.tsx](/Users/kashane/app-dev/apps/ai-notecards/mobile/app/(tabs)/home/index.tsx)
-- Test: [home-screen.test.tsx](/Users/kashane/app-dev/apps/ai-notecards/mobile/__tests__/unit/home-screen.test.tsx)
+- Modify: [home/index.tsx](/repo/ai-notecards/mobile/app/(tabs)/home/index.tsx)
+- Test: [home-screen.test.tsx](/repo/ai-notecards/mobile/__tests__/unit/home-screen.test.tsx)
 
 **Steps:**
 1. Remove the subtitle and separate `Downloaded` section from Home.
@@ -157,25 +157,25 @@ Skipped. The feature is an internal product/UI flow with strong local patterns a
 ### Task 5: Wire Confirmations And Navigation For Secondary Actions
 
 **Files:**
-- Modify: [home/index.tsx](/Users/kashane/app-dev/apps/ai-notecards/mobile/app/(tabs)/home/index.tsx)
-- Modify: [decks/[id].tsx](/Users/kashane/app-dev/apps/ai-notecards/mobile/app/decks/[id].tsx)
-- Modify: [settings.tsx](/Users/kashane/app-dev/apps/ai-notecards/mobile/app/(tabs)/settings.tsx)
+- Modify: [home/index.tsx](/repo/ai-notecards/mobile/app/(tabs)/home/index.tsx)
+- Modify: [decks/[id].tsx](/repo/ai-notecards/mobile/app/decks/[id].tsx)
+- Modify: [settings.tsx](/repo/ai-notecards/mobile/app/(tabs)/settings.tsx)
 
 **Steps:**
 1. Add `Alert.alert` confirmation for `Remove Download` with copy that explicitly says the deck stays in the account.
 2. Add `Alert.alert` confirmation for generated deck delete with irreversible copy.
 3. Add onboarding guidance alert for `Sell` when the user is not yet seller-ready, with a direct route to `/seller`.
 4. Add a separate non-onboarding alert for purchased decks when `Sell` is unavailable because purchased decks cannot be sold.
-5. Keep [decks/[id].tsx](/Users/kashane/app-dev/apps/ai-notecards/mobile/app/decks/[id].tsx) aligned with the new semantics if it still exposes download/remove controls. Do not let deck detail contradict Home.
+5. Keep [decks/[id].tsx](/repo/ai-notecards/mobile/app/decks/[id].tsx) aligned with the new semantics if it still exposes download/remove controls. Do not let deck detail contradict Home.
 6. Adjust Settings copy only if needed so download management language no longer implies Home owns offline management.
 
 ### Task 6: Add Verification Coverage
 
 **Files:**
-- Modify: [offline-sync.test.ts](/Users/kashane/app-dev/apps/ai-notecards/mobile/__tests__/unit/offline-sync.test.ts)
-- Modify: [offline-db.test.ts](/Users/kashane/app-dev/apps/ai-notecards/mobile/__tests__/unit/offline-db.test.ts)
-- Modify: [query-client.test.ts](/Users/kashane/app-dev/apps/ai-notecards/mobile/__tests__/unit/query-client.test.ts)
-- Modify: [decks.test.js](/Users/kashane/app-dev/apps/ai-notecards/server/src/routes/decks.test.js)
+- Modify: [offline-sync.test.ts](/repo/ai-notecards/mobile/__tests__/unit/offline-sync.test.ts)
+- Modify: [offline-db.test.ts](/repo/ai-notecards/mobile/__tests__/unit/offline-db.test.ts)
+- Modify: [query-client.test.ts](/repo/ai-notecards/mobile/__tests__/unit/query-client.test.ts)
+- Modify: [decks.test.js](/repo/ai-notecards/server/src/routes/decks.test.js)
 
 **Steps:**
 1. Add regression tests for download/remove-download behavior after the Home refactor.
@@ -187,14 +187,14 @@ Skipped. The feature is an internal product/UI flow with strong local patterns a
 ## Suggested Verification Commands
 
 ```bash
-cd /Users/kashane/app-dev/apps/ai-notecards/mobile
+cd /repo/ai-notecards/mobile
 npm run typecheck
 npm run lint
 npm test -- home-deck-actions home-screen offline-sync offline-db query-client
 ```
 
 ```bash
-cd /Users/kashane/app-dev/apps/ai-notecards/server
+cd /repo/ai-notecards/server
 npm test -- decks
 ```
 
@@ -217,10 +217,10 @@ Ship in this order:
 
 ## References
 
-- [2026-03-16-ios-home-decks-layout-brainstorm.md](/Users/kashane/app-dev/apps/ai-notecards/docs/brainstorms/2026-03-16-ios-home-decks-layout-brainstorm.md)
-- [home/index.tsx](/Users/kashane/app-dev/apps/ai-notecards/mobile/app/(tabs)/home/index.tsx)
-- [settings.tsx](/Users/kashane/app-dev/apps/ai-notecards/mobile/app/(tabs)/settings.tsx)
-- [ManageDownloads.tsx](/Users/kashane/app-dev/apps/ai-notecards/mobile/src/components/downloads/ManageDownloads.tsx)
-- [BottomSheet.tsx](/Users/kashane/app-dev/apps/ai-notecards/mobile/src/components/BottomSheet.tsx)
-- [decks.js](/Users/kashane/app-dev/apps/ai-notecards/server/src/routes/decks.js)
-- [ios-offline-study-sync-and-local-storage.md](/Users/kashane/app-dev/apps/ai-notecards/docs/solutions/integration-issues/ios-offline-study-sync-and-local-storage.md)
+- [2026-03-16-ios-home-decks-layout-brainstorm.md](/repo/ai-notecards/docs/brainstorms/2026-03-16-ios-home-decks-layout-brainstorm.md)
+- [home/index.tsx](/repo/ai-notecards/mobile/app/(tabs)/home/index.tsx)
+- [settings.tsx](/repo/ai-notecards/mobile/app/(tabs)/settings.tsx)
+- [ManageDownloads.tsx](/repo/ai-notecards/mobile/src/components/downloads/ManageDownloads.tsx)
+- [BottomSheet.tsx](/repo/ai-notecards/mobile/src/components/BottomSheet.tsx)
+- [decks.js](/repo/ai-notecards/server/src/routes/decks.js)
+- [ios-offline-study-sync-and-local-storage.md](/repo/ai-notecards/docs/solutions/integration-issues/ios-offline-study-sync-and-local-storage.md)

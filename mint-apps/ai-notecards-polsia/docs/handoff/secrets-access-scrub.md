@@ -6,18 +6,18 @@ This note records the current secrets/access review for the Polsia sandbox befor
 
 ## Result
 
-The sandbox is not yet in a clean shareable state for deeper external collaboration without redaction or access discipline.
+The sandbox is now materially safer to share for engineering collaboration, with the highest-risk local secret files scrubbed before transfer.
 
 ## Findings
 
-### Real env files are present
+### Real env files were present locally and have now been scrubbed
 
-The repo currently contains populated runtime env files:
+The local working copy previously contained populated runtime env files:
 
 - `server/.env`
 - `mobile/.env`
 
-That is the main immediate access risk.
+Those local files have now been cleared so they are not transferred as part of the handoff copy.
 
 ### Example files also exist
 
@@ -34,7 +34,13 @@ The scan found:
 - normal placeholder examples in README and `.env.example` files
 - historical plan docs with example database connection strings and provider setup instructions
 
-These are less serious than the real `.env` files, but they still mean repo-sharing should be selective and intentional.
+These are less serious than live `.env` files, but they still mean repo-sharing should be selective and intentional.
+
+### Historical docs had local absolute filesystem paths
+
+Some older audit/plan/solution docs contained absolute local paths under `/Users/kashane/...`.
+
+Those personal path references have now been replaced with neutral repo-oriented paths in the handoff copy.
 
 ## External-service assumptions currently embedded in the sandbox
 
@@ -56,16 +62,15 @@ That does not mean all are required for web-core collaboration, but it does mean
 
 ## Required action before deeper collaboration access
 
-1. Remove or redact populated `server/.env`
-2. Remove or redact populated `mobile/.env`
-3. Confirm no production-only credentials remain in local config files before granting direct repo access
-4. Prefer sharing `.env.example` plus this document instead of real `.env` files
-5. Keep Apple, RevenueCat, Stripe, and Expo account access founder-controlled unless explicitly delegated
+1. Confirm no production-only credentials are reintroduced into local config files before future transfers
+2. Prefer sharing `.env.example` plus this document instead of real `.env` files
+3. Keep Apple, RevenueCat, Stripe, and Expo account access founder-controlled unless explicitly delegated
+4. Treat placeholder connection strings in historical docs as examples only, not live values
 
 ## Current recommendation
 
 For now:
 
-- document against the sandbox freely
 - collaborate against code and docs freely
-- do not treat the repo as ready for unrestricted credential-bearing access until the real env files are scrubbed
+- use `.env.example` and the environment manifest as the setup source of truth
+- keep secrets and third-party account access out of the transferred repo copy

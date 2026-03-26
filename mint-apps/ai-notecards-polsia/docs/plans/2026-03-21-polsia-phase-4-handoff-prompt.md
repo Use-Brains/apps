@@ -5,7 +5,7 @@ Use this prompt in another Codex instance to execute the first real phase 4 pass
 ```text
 You are working only inside:
 
-/Users/kashane/app-dev/apps/mint-apps/ai-notecards-polsia
+mint-apps/ai-notecards-polsia
 
 Context:
 - Phase 1, phase 2, and phase 3 batch 1 are already complete.

@@ -200,4 +200,4 @@ These can stay unset for purely web-core Polsia collaboration if the correspondi
 
 ## Current risk note
 
-The copied sandbox currently contains checked-in `server/.env` and `mobile/.env` files with populated values. See `docs/handoff/secrets-access-scrub.md` before granting broader access.
+Live `.env` files were present in the local working copy during the handoff prep phase and have since been scrubbed from the transfer copy. Use `.env.example` files plus `docs/handoff/secrets-access-scrub.md` as the source of truth for safe sharing and setup.

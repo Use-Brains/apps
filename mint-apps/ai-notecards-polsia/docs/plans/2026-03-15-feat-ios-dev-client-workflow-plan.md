@@ -140,7 +140,7 @@ Define the desired root command contract:
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd /Users/kashane/app-dev/apps/ai-notecards && npm run app`
+Run: `cd /repo/ai-notecards && npm run app`
 Expected: FAIL because no root script exists.
 
 **Step 3: Write minimal implementation**
@@ -233,7 +233,7 @@ Apply only the final fixes needed to make the workflow coherent.
 Run:
 - `node --input-type=module -e "import('./mobile/app.config.js').then(() => console.log('ok'))"`
 - `cd mobile && npm run start -- --dev-client --offline`
-- `cd /Users/kashane/app-dev/apps/ai-notecards && npm run app`
+- `cd /repo/ai-notecards && npm run app`
 
 Expected: commands start cleanly or fail only with documented external prerequisites.
 
